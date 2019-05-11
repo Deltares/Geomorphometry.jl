@@ -1,5 +1,9 @@
 module GeoRasterFiltering
 
-greet() = print("Hello World!")
+using ImageFiltering
+
+include("pmf.jl")
+
+export pmf
 
 end # module
