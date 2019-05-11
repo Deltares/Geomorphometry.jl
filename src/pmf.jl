@@ -1,6 +1,6 @@
 """
 ```
-zmax, flags = pmf(A, [region])
+B, flags = pmf(A; ωₘ, slope, dhₘ, dh₀, cellsize)
 ```
 Applies the progressive morphological filter by [Zhang et al. (2003)] to `A`.
 
@@ -8,7 +8,7 @@ Applies the progressive morphological filter by [Zhang et al. (2003)] to `A`.
 - `B::Array{T,2}` Maximum allowable values
 - `flags::Array{Float64,2}` A sized array with window sizes if filtered, zero if not filtered.
 
-Afterwards, one can retrieve the filtermask for `A` by `A .<= B` or `flags .== 0.`.
+Afterwards, one can retrieve the resulting mask for `A` by `A .<= B` or `flags .== 0.`.
 
 # Arguments
 - `A::Array{T,2}` Input Array
@@ -17,9 +17,6 @@ Afterwards, one can retrieve the filtermask for `A` by `A .<= B` or `flags .== 0
 - `dhₘ::Float64=2.5` Maximum elevation threshold [m]
 - `dh₀::Float64=0.2` Initial elevation threshold [m]
 - `cellsize::Float64=1.` Cellsize in [m]
-
-# Note
-Input array `A` should have no `missing`, `NaN` or `Inf` values.
 
 [Zhang et al. (2003)] Zhang, Keqi, Shu-Ching Chen, Dean Whitman, Mei-Ling Shyu, Jianhua Yan, and Chengcui Zhang. “A Progressive Morphological Filter for Removing Nonground Measurements from Airborne LIDAR Data.” IEEE Transactions on Geoscience and Remote Sensing 41, no. 4 (2003): 872–82. [https://doi.org/10.1109/TGRS.2003.810682].
 """
