@@ -1,0 +1,10 @@
+name = "GeoRasterFiltering"
+uuid = "e6005643-8f00-58df-85c5-7d93a3520d70"
+authors = ["Maarten Pronk <git@evetion.nl>"]
+version = "0.1.0"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
