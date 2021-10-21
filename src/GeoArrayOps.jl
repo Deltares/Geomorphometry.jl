@@ -1,4 +1,4 @@
-module GeoRasterFiltering
+module GeoArrayOps
 
 using ImageFiltering
 
@@ -8,5 +8,8 @@ include("smf.jl")
 
 export pmf
 export smf
+
+precompile(pmf, (Matrix{Float64},))
+precompile(smf, (Matrix{Float64},))
 
 end # module
