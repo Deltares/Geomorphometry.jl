@@ -1,9 +1,8 @@
-[![Build Status](https://travis-ci.org/Deltares/GeoRasterFiltering.jl.svg?branch=master)](https://travis-ci.org/Deltares/GeoRasterFiltering.jl)
-[![Build Status](https://ci.appveyor.com/api/projects/status/qdotgkqqmkjta1yt/branch/master?svg=true)](https://ci.appveyor.com/project/evetion/georasterfiltering-jl/branch/master)
-[![Codecov](https://codecov.io/gh/Deltares/GeoRasterFiltering.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/Deltares/GeoRasterFiltering.jl)
+[![CI](https://github.com/Deltares/GeoRasterFiltering.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/Deltares/GeoRasterFiltering.jl/actions/workflows/CI.yml)
+[![Codecov](https://codecov.io/gh/Deltares/GeoArrayOps.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/Deltares/GeoArrayOps.jl)
 
-# GeoRasterFiltering
-Geospatial filtering algorithms, such as DTM generation.
+# GeoArrayOps
+Geospatial operations, cost and filtering algorithms as used in for elevation rasters.
 
 *This is a work in progress*
 
@@ -12,5 +11,5 @@ The package can be installed with the Julia package manager.
 From the Julia REPL, type `]` to enter the Pkg REPL mode and run:
 
 ```
-pkg> add https://github.com/Deltares/GeoRasterFiltering.jl
+pkg> add https://github.com/Deltares/GeoArrayOps.jl
 ```
