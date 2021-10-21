@@ -25,17 +25,17 @@ function pmf(A::Array{T,2};
     slope::Float64=0.01,
     dhₘ::Float64=2.5,
     dh₀::Float64=0.2,
-    cellsize::Float64=1.0) where T<:Real
+    cellsize::Float64=1.0) where T <: Real
 
     # Compute windowsizes and thresholds
     ωₘ = round(Int, ωₘ / cellsize)
-    κ_max = floor(Int, log2(ωₘ-1))  # determine # iterations based on exp growth
+    κ_max = floor(Int, log2(ωₘ - 1))  # determine # iterations based on exp growth
     windowsizes = Int.(exp2.(1:κ_max)) .+ 1
 
     # Compute tresholds
     dwindows = vcat(windowsizes[1], windowsizes)  # prepend first element so we get 0 as diff
-    window_diffs = [dwindows[i]-dwindows[i-1] for i in 2:length(dwindows)]
-    height_tresholds = [min(dhₘ, slope*window_diff*cellsize + dh₀) for window_diff in window_diffs]
+    window_diffs = [dwindows[i] - dwindows[i - 1] for i in 2:length(dwindows)]
+    height_tresholds = [min(dhₘ, slope * window_diff * cellsize + dh₀) for window_diff in window_diffs]
 
     # Set up arrays
     Af = copy(A)  # array to be morphed
@@ -51,17 +51,10 @@ function pmf(A::Array{T,2};
     for (ωₖ, dhₜ) in zip(windowsizes, height_tresholds)
         Af = opening(Af, ωₖ)
         mask = A - Af .> dhₜ
-        flags[mask .& (flags.==0)] .= ωₖ
+        flags[mask .& (flags .== 0)] .= ωₖ
         @info "PMF with window size $ωₖ and threshold $dhₜ filters $(sum(mask)) cells."
         B = min.(B, Af .+ dhₜ)
     end
 
     B, flags
-end
-
-"""Apply the opening operation to `A` with window size `ω`."""
-function opening(A::Array{T,2}, ω::Integer) where T<:Real
-    A = mapwindow(minimum, A, (ω,ω))  # erosion
-    A = mapwindow(maximum, A, (ω,ω))  # dilation
-    A
 end
