@@ -1,7 +1,7 @@
 name = "GeoRasterFiltering"
 uuid = "e6005643-8f00-58df-85c5-7d93a3520d70"
-authors = ["Maarten Pronk <git@evetion.nl>"]
-version = "0.1.0"
+authors = ["Maarten Pronk <git@evetion.nl>", "Deltares"]
+version = "0.1.1"
 
 [deps]
 ImageFiltering = "6a3955dd-da59-5b1f-98d4-e7296123deb5"
