@@ -18,3 +18,13 @@ From the Julia REPL, type `]` to enter the Pkg REPL mode and run:
 ```
 pkg> add https://github.com/Deltares/GeoArrayOps.jl
 ```
+
+## Reference
+```@autodocs
+Modules = [GeoArrayOps]
+Order   = [:function, :type]
+```
+
+## Index
+```@index
+```
