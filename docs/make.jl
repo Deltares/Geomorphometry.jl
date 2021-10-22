@@ -4,5 +4,5 @@ using Documenter, GeoArrayOps
 makedocs(sitename="GeoArrayOps.jl")
 
 deploydocs(
-    repo="github.com/evetion/GeoArrayOps.jl.git",
+    repo="github.com/Deltares/GeoArrayOps.jl.git",
 )
