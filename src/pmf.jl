@@ -2,7 +2,7 @@
 ```
 B, flags = pmf(A; ωₘ, slope, dhₘ, dh₀, cellsize)
 ```
-Applies the progressive morphological filter by [Zhang et al. (2003)] to `A`.
+Applies the progressive morphological filter by *Zhang et al. (2003)* [^zhang2003] to `A`.
 
 # Output
 - `B::Array{T,2}` Maximum allowable values
@@ -18,7 +18,7 @@ Afterwards, one can retrieve the resulting mask for `A` by `A .<= B` or `flags .
 - `dh₀::Float64=0.2` Initial elevation threshold [m]
 - `cellsize::Float64=1.` Cellsize in [m]
 
-[Zhang et al. (2003)] Zhang, Keqi, Shu-Ching Chen, Dean Whitman, Mei-Ling Shyu, Jianhua Yan, and Chengcui Zhang. “A Progressive Morphological Filter for Removing Nonground Measurements from Airborne LIDAR Data.” IEEE Transactions on Geoscience and Remote Sensing 41, no. 4 (2003): 872–82. [https://doi.org/10.1109/TGRS.2003.810682].
+[^zhang2003]: Zhang, Keqi, Shu-Ching Chen, Dean Whitman, Mei-Ling Shyu, Jianhua Yan, and Chengcui Zhang. “A Progressive Morphological Filter for Removing Nonground Measurements from Airborne LIDAR Data.” IEEE Transactions on Geoscience and Remote Sensing 41, no. 4 (2003): 872–82. <https://doi.org/10.1109/TGRS.2003.810682>.
 """
 function pmf(A::Array{T,2};
     ωₘ::Float64=20.,
@@ -52,7 +52,6 @@ function pmf(A::Array{T,2};
         Af = opening(Af, ωₖ)
         mask = A - Af .> dhₜ
         flags[mask .& (flags .== 0)] .= ωₖ
-        @info "PMF with window size $ωₖ and threshold $dhₜ filters $(sum(mask)) cells."
         B = min.(B, Af .+ dhₜ)
     end
 
