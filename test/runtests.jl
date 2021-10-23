@@ -23,3 +23,9 @@ end
     friction = [1.0 200 1 1 1; 200 1 1 4 4; 1 1 4 4 4; 1 1 3 200 200; 1 Inf 3 200 4]
     @test spread(points, initial, friction) == spread2(points, initial, friction)
 end
+@testset "terrain" begin
+    A = rand(25, 25)
+    TRI(A)
+    TPI(A)
+    roughness(A)
+end

@@ -7,7 +7,6 @@ using DataStructures
 using Statistics
 
 const sqrt2 = sqrt(2.0)
-const neib_8 = @SMatrix[1. 1 1; 1 0 1; 1 1 1]
 const distance_8 = @SMatrix[sqrt2 1 sqrt2; 1 Inf 1; sqrt2 1 sqrt2]
 const distance_4 = @SMatrix[Inf 1 Inf; 1 Inf 1; Inf 1 Inf]
 const Δ = CartesianIndex(1, 1)
@@ -148,7 +147,7 @@ spread(points::Matrix{<:Real}, initial::Real, friction::Real; distance=Euclidean
 ```
 """
 function spread(points::Matrix{<:Real}, initial::Real, friction::Real; distance=Euclidean(), res=1.0)
-    init = Fill(initial, size(points))
+    init = fill(initial, size(points))
     return spread(points, init, friction; distance, res)
 end
 

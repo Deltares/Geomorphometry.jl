@@ -43,16 +43,23 @@ function pmf(A::Array{T,2};
     Af[nan_mask] .= Inf  # Replace NaN with Inf, as to always filter these
 
     B = copy(A)  # max_elevation raster
+    out = copy(A)  # max_elevation raster
 
     flags = zeros(size(A))  # 0 = ground, other values indicate window size
     flags[nan_mask] .= NaN
 
+    mask = falses(size(A))
+
     # Iterate over window sizes and height tresholds
     for (ωₖ, dhₜ) in zip(windowsizes, height_tresholds)
-        Af = opening(Af, ωₖ)
-        mask = A - Af .> dhₜ
-        flags[mask .& (flags .== 0)] .= ωₖ
-        B = min.(B, Af .+ dhₜ)
+        opening!(Af, ωₖ, out)
+        mask .= (A .- Af) .> dhₜ
+        for I in eachindex(flags)
+            if mask[I] && flags[I] == 0
+                flags[I] = ωₖ
+            end
+        end
+        B .= min.(B, Af .+ dhₜ)
     end
 
     B, flags
