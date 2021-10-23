@@ -8,7 +8,15 @@ function opening(A::Array{T,2}, ω::Integer) where T <: Real
     A
 end
 
+"""Apply the opening operation to `A` with window size `ω`."""
+function opening!(A::Array{T,2}, ω::Integer, out::Array{T,2}) where T <: Real
+    mapwindow!(minimum, A, ω, out)  # erosion
+    mapwindow!(maximum, out, ω, A)  # dilation
+    A
+end
+
 function circmask(n::Integer)
+    # TODO This could be precomputed for first N integers
     kern = falses(-n:n, -n:n)
     for I in CartesianIndices(kern)
         i, j = Tuple(I)
@@ -22,4 +30,17 @@ function opening_circ(A::Array{T,2}, ω::Integer) where T <: Real
     A = mapwindow(x -> minimum(x[m]), A, (ω, ω))  # erosion
     A = mapwindow(x -> maximum(x[m]), A, (ω, ω))  # dilation
     A
+end
+
+
+# First discussed here https://github.com/JuliaImages/ImageFiltering.jl/issues/179
+function mapwindow!(f, img, window, out)
+    R = CartesianIndices(img)
+    I_first, I_last = first(R), last(R)
+    Δ = CartesianIndex(ntuple(x -> window ÷ 2, ndims(img)))
+    @inbounds @simd for I in R
+        patch = max(I_first, I - Δ):min(I_last, I + Δ)
+        out[I] = f(view(img, patch))
+    end
+    out
 end
