@@ -4,10 +4,10 @@ using Documenter, GeoArrayOps
 makedocs(
     sitename="GeoArrayOps.jl",
     pages=[
-        "Index.md",
+        "index.md",
         "Tutorials" => [],
         "Topics" => [],
-        "Reference" => "reference.md"
+        "Reference" => "reference.md",
         "How-To Guides" => [],
     ]
 )
