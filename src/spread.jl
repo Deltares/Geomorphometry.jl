@@ -30,7 +30,7 @@ This is also the method implemented by [PCRaster](https://pcraster.geo.uu.nl/pcr
 
 [^tomlin1983]: Tomlin, Charles Dana. 1983. Digital Cartographic Modeling Techniques in Environmental Planning. Yale University.
 """
-function spread(points::Matrix{<:Real}, initial::Matrix{<:Real}, friction::Matrix{<:Real}; res=1, limit=Inf)
+function spread(points::AbstractMatrix{<:Real}, initial::AbstractMatrix{<:Real}, friction::AbstractMatrix{<:Real}; res=1, limit=Inf)
 
     ofriction = OffsetMatrix(fill(Inf, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
     ofriction[begin + 1:end - 1,begin + 1:end - 1] .= friction
@@ -108,7 +108,7 @@ This method should scale much better (linearly) than the [^tomlin1983] method, b
 
 [^eastman1989]: Eastman, J. Ronald. 1989. ‘Pushbroom Algorithms for Calculating Distances in Raster Grids’. In Proceedings, Autocarto, 9:288–97.
 """
-function spread2(points::Matrix{<:Real}, initial::Matrix{<:Real}, friction::Matrix{<:Real}; res=1, limit=Inf, iterations=3)
+function spread2(points::AbstractMatrix{<:Real}, initial::AbstractMatrix{<:Real}, friction::AbstractMatrix{<:Real}; res=1, limit=Inf, iterations=3)
 
     ofriction = OffsetMatrix(fill(Inf, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
     ofriction[begin + 1:end - 1,begin + 1:end - 1] .= friction
@@ -146,7 +146,7 @@ end
 spread(points::Matrix{<:Real}, initial::Real, friction::Real; distance=Euclidean(), res=1.0)
 ```
 """
-function spread(points::Matrix{<:Real}, initial::Real, friction::Real; distance=Euclidean(), res=1.0)
+function spread(points::AbstractMatrix{<:Real}, initial::Real, friction::Real; distance=Euclidean(), res=1.0)
     init = fill(initial, size(points))
     return spread(points, init, friction; distance, res)
 end
@@ -163,7 +163,7 @@ as one can just take a direct line to the input points.
 
 The calculated cost is more accurate, as there's no 'zigzag' from cell center to cell center.
 """
-function spread(points::Matrix{<:Real}, initial::Matrix{<:Real}, friction::Real; distance=Euclidean(), res=1.0)
+function spread(points::AbstractMatrix{<:Real}, initial::AbstractMatrix{<:Real}, friction::Real; distance=Euclidean(), res=1.0)
     locations = points .> 0
     I = CartesianIndices(size(points))
 
