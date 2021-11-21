@@ -20,7 +20,7 @@ Afterwards, one can retrieve the resulting mask for `A` by `A .<= B` or `flags .
 
 [^zhang2003]: Zhang, Keqi, Shu-Ching Chen, Dean Whitman, Mei-Ling Shyu, Jianhua Yan, and Chengcui Zhang. “A Progressive Morphological Filter for Removing Nonground Measurements from Airborne LIDAR Data.” IEEE Transactions on Geoscience and Remote Sensing 41, no. 4 (2003): 872–82. <https://doi.org/10.1109/TGRS.2003.810682>.
 """
-function pmf(A::Array{T,2};
+function pmf(A::AbstractMatrix{T};
     ωₘ::Float64=20.,
     slope::Float64=0.01,
     dhₘ::Float64=2.5,

@@ -22,7 +22,7 @@ roughness(dem::Matrix{<:Real})
 
 Roughness is the largest inter-cell difference of a central pixel and its surrounding cell, as defined in Wilson et al (2007, Marine Geodesy 30:3-35).
 """
-function roughness(dem::Matrix{<:Real})
+function roughness(dem::AbstractMatrix{<:Real})
 
     ex_dem = buffer_array(dem)
     roughness = similar(dem)
@@ -43,7 +43,7 @@ TPI(dem::Matrix{<:Real})
 
 TPI stands for Topographic Position Index, which is defined as the difference between a central pixel and the mean of its surrounding cells (see Wilson et al 2007, Marine Geodesy 30:3-35).
 """
-function TPI(dem::Matrix{<:Real})
+function TPI(dem::AbstractMatrix{<:Real})
 
     ex_dem = buffer_array(dem)
     tpi = similar(dem)
@@ -66,7 +66,7 @@ TRI stands for Terrain Ruggedness Index, which measures the difference between a
 This algorithm uses the square root of the sum of the square of the difference between a central pixel and its surrounding cells.
 This is recommended for terrestrial use cases.
 """
-function TRI(dem::Matrix{<:Real})
+function TRI(dem::AbstractMatrix{<:Real})
 
     ex_dem = buffer_array(dem)
     tri = similar(dem)
