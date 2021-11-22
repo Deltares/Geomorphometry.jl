@@ -4,14 +4,16 @@ using Test
 @testset "pmf" begin
     # Write your own tests here.
     A = rand(25, 25)
-    A[2,2] = NaN
+    A[2, 2] = NaN
     B, flags = pmf(A)
-    @test (A .<= B) == (flags .== 0.)
+    @test (A .<= B) == (flags .== 0.0)
+    B, flags = pmf(A; circular = true)
+    @test (A .<= B) == (flags .== 0.0)
 end
 @testset "smf" begin
     # Write your own tests here.
     A = rand(25, 25)
-    A[2,2] = NaN
+    A[2, 2] = NaN
     B = smf(A)
 end
 @testset "pssm" begin

@@ -21,11 +21,12 @@ Afterwards, one can retrieve the resulting mask for `A` by `A .<= B` or `flags .
 [^zhang2003]: Zhang, Keqi, Shu-Ching Chen, Dean Whitman, Mei-Ling Shyu, Jianhua Yan, and Chengcui Zhang. “A Progressive Morphological Filter for Removing Nonground Measurements from Airborne LIDAR Data.” IEEE Transactions on Geoscience and Remote Sensing 41, no. 4 (2003): 872–82. <https://doi.org/10.1109/TGRS.2003.810682>.
 """
 function pmf(A::AbstractMatrix{T};
-    ωₘ::Float64=20.,
-    slope::Float64=0.01,
-    dhₘ::Float64=2.5,
-    dh₀::Float64=0.2,
-    cellsize::Float64=1.0) where T <: Real
+    ωₘ::Float64 = 20.0,
+    slope::Float64 = 0.01,
+    dhₘ::Float64 = 2.5,
+    dh₀::Float64 = 0.2,
+    cellsize::Float64 = 1.0,
+    circular = false) where {T<:Real}
 
     # Compute windowsizes and thresholds
     ωₘ = round(Int, ωₘ / cellsize)
@@ -34,8 +35,9 @@ function pmf(A::AbstractMatrix{T};
 
     # Compute tresholds
     dwindows = vcat(windowsizes[1], windowsizes)  # prepend first element so we get 0 as diff
-    window_diffs = [dwindows[i] - dwindows[i - 1] for i in 2:length(dwindows)]
+    window_diffs = [dwindows[i] - dwindows[i-1] for i = 2:length(dwindows)]
     height_tresholds = [min(dhₘ, slope * window_diff * cellsize + dh₀) for window_diff in window_diffs]
+    @info "Using the following thresholds: $height_tresholds for the following windows: $windowsizes"
 
     # Set up arrays
     Af = copy(A)  # array to be morphed
@@ -52,7 +54,11 @@ function pmf(A::AbstractMatrix{T};
 
     # Iterate over window sizes and height tresholds
     for (ωₖ, dhₜ) in zip(windowsizes, height_tresholds)
-        opening!(Af, ωₖ, out)
+        if circular
+            opening_circ!(Af, ωₖ, out)
+        else
+            opening!(Af, ωₖ, out)
+        end
         mask .= (A .- Af) .> dhₜ
         for I in eachindex(flags)
             if mask[I] && flags[I] == 0

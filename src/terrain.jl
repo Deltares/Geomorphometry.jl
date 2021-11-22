@@ -1,14 +1,14 @@
-const neib_8 = @SMatrix[1. 1 1; 1 0 1; 1 1 1]
+const neib_8 = @SMatrix [1.0 1 1; 1 0 1; 1 1 1]
 
-function buffer_array(A::Array)
-    oA = OffsetMatrix(fill(Inf, size(A) .+ 2), UnitRange.(0, size(A) .+ 1))
+function buffer_array(A::AbstractMatrix{<:Real})
+    oA = OffsetMatrix(fill(zero(eltype(A)), size(A) .+ 2), UnitRange.(0, size(A) .+ 1))
     # Update center
-    oA[begin + 1:end - 1,begin + 1:end - 1] .= A
+    oA[begin+1:end-1, begin+1:end-1] .= A
     # Set edges to mirror center
-    oA[begin, begin + 1:end - 1] .= A[begin, :]
-    oA[end, begin + 1:end - 1] .= A[end, :]
-    oA[begin + 1:end - 1, begin] .= A[:, begin]
-    oA[begin + 1:end - 1, end] .= A[:, end]
+    oA[begin, begin+1:end-1] .= A[begin, :]
+    oA[end, begin+1:end-1] .= A[end, :]
+    oA[begin+1:end-1, begin] .= A[:, begin]
+    oA[begin+1:end-1, end] .= A[:, end]
     # Set corners to mirror corners of center
     oA[begin, begin] = A[begin, begin]
     oA[begin, end] = A[begin, end]
@@ -29,10 +29,10 @@ function roughness(dem::AbstractMatrix{<:Real})
     x = @MMatrix zeros(3, 3)
 
     @inbounds for I ∈ CartesianIndices(size(roughness))
-        patch = I - Δ:I + Δ
+        patch = I-Δ:I+Δ
         rdata = view(ex_dem, patch)
 
-        x .= rdata .- rdata[2,2]
+        x .= rdata .- rdata[2, 2]
         roughness[I] = maximum(abs.(x))
     end
     roughness
@@ -50,11 +50,11 @@ function TPI(dem::AbstractMatrix{<:Real})
     x = @MMatrix zeros(3, 3)
 
     @inbounds for I ∈ CartesianIndices(size(tpi))
-        patch = I - Δ:I + Δ
+        patch = I-Δ:I+Δ
         rdata = view(ex_dem, patch)
 
         x .= rdata .* neib_8
-        tpi[I] = rdata[2,2] - mean(x)
+        tpi[I] = rdata[2, 2] - mean(x)
     end
     return tpi
 end
@@ -73,10 +73,10 @@ function TRI(dem::AbstractMatrix{<:Real})
     x = @MMatrix zeros(3, 3)
 
     @inbounds for I ∈ CartesianIndices(size(tri))
-        patch = I - Δ:I + Δ
+        patch = I-Δ:I+Δ
         rdata = view(ex_dem, patch)
 
-        x .= (rdata .- rdata[2,2]).^2
+        x .= (rdata .- rdata[2, 2]) .^ 2
         tri[I] = sqrt(sum(x))
     end
     return tri
