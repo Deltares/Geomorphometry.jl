@@ -71,7 +71,7 @@ function mapwindowcirc!(f, img, window, out, fill = Inf)
 end
 
 function maximum_mask(x, m)
-    o = x[1]
+    o = -Inf
     for I in eachindex(x)
         if m[I]
             o = max(o, x[I])
@@ -81,7 +81,7 @@ function maximum_mask(x, m)
 end
 
 function minimum_mask(x, m)
-    o = x[1]
+    o = Inf
     for I in eachindex(x)
         if m[I]
             o = min(o, x[I])
