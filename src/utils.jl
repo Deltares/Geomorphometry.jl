@@ -47,7 +47,7 @@ function mapwindow!(f, img, window, out)
     R = CartesianIndices(img)
     I_first, I_last = first(R), last(R)
     Δ = CartesianIndex(ntuple(x -> window ÷ 2, ndims(img)))
-    for I in R
+    Threads.@threads for I in R
         patch = max(I_first, I - Δ):min(I_last, I + Δ)
         out[I] = f(view(img, patch))
     end
@@ -63,29 +63,25 @@ function mapwindowcirc!(f, img, window, out, fill = Inf)
 
     patch = (-Δ):(Δ)
     m = euclidean.(Tuple.(patch), Ref((0, 0))) .<= Δ[1]
-    for I in R
+    Threads.@threads for I in R
         patch = (I-Δ):(I+Δ)
         out[I] = f(view(A, patch), m)
     end
     out
 end
 
-function maximum_mask(x, m)
+@inline function maximum_mask(x, m)
     o = -Inf
-    for I in eachindex(x)
-        if m[I]
-            o = max(o, x[I])
-        end
+    @inbounds for I in eachindex(x)
+        o = ifelse(m[I], max(o, x[I]), o)
     end
     o
 end
 
-function minimum_mask(x, m)
+@inline function minimum_mask(x, m)
     o = Inf
-    for I in eachindex(x)
-        if m[I]
-            o = min(o, x[I])
-        end
+    @inbounds for I in eachindex(x)
+        o = ifelse(m[I], min(o, x[I]), o)
     end
     o
 end
