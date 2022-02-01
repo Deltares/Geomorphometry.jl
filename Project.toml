@@ -1,7 +1,7 @@
 name = "GeoArrayOps"
 uuid = "e6005643-8f00-58df-85c5-7d93a3520d70"
 authors = ["Maarten Pronk <git@evetion.nl>", "Deltares"]
-version = "0.2.0"
+version = "0.3.0"
 
 [deps]
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
@@ -11,6 +11,7 @@ ImageCore = "a09fc81d-aa75-5fe9-8630-4744c3626534"
 ImageFiltering = "6a3955dd-da59-5b1f-98d4-e7296123deb5"
 OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
 PaddedViews = "5432bcbf-9aad-5242-b902-cca2824c8663"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
@@ -18,12 +19,13 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 DataStructures = "0.18"
 Distances = "0.10"
 FillArrays = "0.12"
-ImageCore = "^0.9"
-ImageFiltering = "^0.7"
-OffsetArrays = "^1.10"
+ImageCore = "0.9"
+ImageFiltering = "0.7"
+OffsetArrays = "1.10"
+ProgressMeter = "1.7"
 PaddedViews = "0.5"
 StaticArrays = "1"
-julia = "1.5, 1.6"
+julia = "1.5, 1.6, 1.7"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

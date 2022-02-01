@@ -1,4 +1,5 @@
 const neib_8 = @SMatrix [1.0 1 1; 1 0 1; 1 1 1]
+const neib_8_inf = @SMatrix [1.0 1 1; 1 Inf 1; 1 1 1]
 
 function buffer_array(A::AbstractMatrix{<:Real})
     oA = OffsetMatrix(fill(zero(eltype(A)), size(A) .+ 2), UnitRange.(0, size(A) .+ 1))
@@ -48,6 +49,7 @@ function TPI(dem::AbstractMatrix{<:Real})
     ex_dem = buffer_array(dem)
     tpi = similar(dem)
     x = @MMatrix zeros(3, 3)
+    Δ = CartesianIndex(1, 1)
 
     @inbounds for I ∈ CartesianIndices(size(tpi))
         patch = I-Δ:I+Δ
@@ -71,6 +73,7 @@ function TRI(dem::AbstractMatrix{<:Real})
     ex_dem = buffer_array(dem)
     tri = similar(dem)
     x = @MMatrix zeros(3, 3)
+    Δ = CartesianIndex(1, 1)
 
     @inbounds for I ∈ CartesianIndices(size(tri))
         patch = I-Δ:I+Δ
@@ -80,4 +83,35 @@ function TRI(dem::AbstractMatrix{<:Real})
         tri[I] = sqrt(sum(x))
     end
     return tri
+end
+
+
+"""
+pitremoval(dem::Matrix{<:Real})
+
+Remove pits from a DEM Array if the center cell of a 3x3 patch is `limit` lower or than the surrounding cells.
+"""
+function pitremoval(dem::AbstractMatrix{<:Real}, limit = 2.0)
+
+    ex_dem = buffer_array(dem)
+    tri = similar(dem)
+    x = @MMatrix zeros(3, 3)
+    Δ = CartesianIndex(1, 1)
+
+    @inbounds for I ∈ CartesianIndices(size(tri))
+        patch = I-Δ:I+Δ
+        x .= view(ex_dem, patch)
+        tri[I] = _pitremoval(x, limit)
+    end
+    return tri
+end
+
+@inline function _pitremoval(x, limit)
+    A = vec(x)
+    order = sortperm(A)
+    ifelse(
+        (order[1] == 5) &&
+            ((A[order[2]] - A[order[1]]) >= limit),
+        Inf,
+        x[2, 2])
 end

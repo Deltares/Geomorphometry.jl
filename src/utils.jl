@@ -104,6 +104,7 @@ function mapwindowcirc!(f, img, window, out, fill = Inf)
     out
 end
 
+
 function mapwindowcirc_approx!(f, img, window, out, fill = Inf)
     R = CartesianIndices(img)
     Δ = CartesianIndex(1, 1)
@@ -124,22 +125,18 @@ function mapwindowcirc_approx!(f, img, window, out, fill = Inf)
     out
 end
 
-function maximum_mask(x, m)
+@inline function maximum_mask(x, m)
     o = -Inf
-    for I in eachindex(x)
-        if m[I]
-            o = max(o, x[I])
-        end
+    @inbounds for I in eachindex(x)
+        o = ifelse(m[I], max(o, x[I]), o)
     end
     o
 end
 
-function minimum_mask(x, m)
+@inline function minimum_mask(x, m)
     o = Inf
-    for I in eachindex(x)
-        if m[I]
-            o = min(o, x[I])
-        end
+    @inbounds for I in eachindex(x)
+        o = ifelse(m[I], min(o, x[I]), o)
     end
     o
 end

@@ -19,6 +19,12 @@ end
 @testset "pssm" begin
     B = pssm(rand(25, 25))
 end
+@testset "psf" begin
+    B = psf(rand(25, 25))
+end
+@testset "pitremoval" begin
+    B = pitremoval(rand(25, 25))
+end
 @testset "spread" begin
     points = [0.0 0 0 0 2; 0 0 0 0 0; 0 0 0 0 0; 0 1 0 0 0; 0 0 0 0 0]
     initial = [8.0 8 8 8 4; 8 8 8 8 8; 8 8 8 8 8; 0 0 8 8 8; 0 0 8 8 8]
