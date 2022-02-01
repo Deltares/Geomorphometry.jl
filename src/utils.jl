@@ -12,8 +12,8 @@ end
 
 """Apply the opening operation to `A` with window size `ω`."""
 function opening!(A::Array{T,2}, ω::Integer, out::Array{T,2}) where {T<:Real}
-    mapwindow!(minimum, A, ω, out)  # erosion
-    mapwindow!(maximum, out, ω, A)  # dilation
+    mapwindow_sep!(minimum, A, ω, out, Inf)  # erosion
+    mapwindow_sep!(maximum, out, ω, A, -Inf)  # dilation
     A
 end
 
@@ -47,12 +47,47 @@ function mapwindow!(f, img, window, out)
     R = CartesianIndices(img)
     I_first, I_last = first(R), last(R)
     Δ = CartesianIndex(ntuple(x -> window ÷ 2, ndims(img)))
-    for I in R
+    @inbounds for I in R
         patch = max(I_first, I - Δ):min(I_last, I + Δ)
         out[I] = f(view(img, patch))
     end
     out
 end
+
+function mapwindow_stack!(f, img, window, out)
+    R = CartesianIndices(img)
+    I_first, I_last = first(R), last(R)
+    Δ = CartesianIndex(1, 1)
+    out2 = copy(img)
+    iterations = window:-2:3
+    @inbounds for _ in iterations  # repeat 3x3 window
+        for I in R
+            patch = max(I_first, I - Δ):min(I_last, I + Δ)
+            out[I] = f(view(out2, patch))
+        end
+        out2 .= out
+    end
+    out
+end
+
+function mapwindow_sep!(f, img, window, out, fill = Inf)
+    Δ = window ÷ 2
+
+    w, h = size(img)
+    A = PaddedView(fill, img, (-Δ+1:w+Δ, -Δ+1:h+Δ))
+    out2 = copy(out)
+
+    # Maximum/minimum is seperable into 1d
+    @inbounds for i in 1:h, j in 1:w
+        out2[j, i] = f(@view A[j-Δ:j+Δ, i])
+    end
+    A = PaddedView(fill, out2, (-Δ+1:w+Δ, -Δ+1:h+Δ))
+    @inbounds for j in 1:w, i in 1:h
+        out[j, i] = f(@view A[j, i-Δ:i+Δ])
+    end
+    out
+end
+
 
 function mapwindowcirc!(f, img, window, out, fill = Inf)
     R = CartesianIndices(img)
@@ -61,17 +96,36 @@ function mapwindowcirc!(f, img, window, out, fill = Inf)
     w, h = size(img)
     A = PaddedView(fill, img, (-Δ[1]+1:w+Δ[1], -Δ[2]+1:h+Δ[2]))
 
-    patch = (-Δ):(Δ)
-    m = euclidean.(Tuple.(patch), Ref((0, 0))) .<= Δ[1]
-    for I in R
+    m = euclidean.(Tuple.(-Δ:Δ), Ref((0, 0))) .<= Δ[1]
+    @inbounds for I in R
         patch = (I-Δ):(I+Δ)
         out[I] = f(view(A, patch), m)
     end
     out
 end
 
+function mapwindowcirc_approx!(f, img, window, out, fill = Inf)
+    R = CartesianIndices(img)
+    Δ = CartesianIndex(1, 1)
+
+    w, h = size(img)
+
+    iterations = window:-2:3
+    A = PaddedView(fill, img, (-Δ[1]+1:w+Δ[1], -Δ[2]+1:h+Δ[2]))
+
+    m = euclidean.(Tuple.(-Δ:Δ), Ref((0, 0))) .<= Δ[1]
+    @inbounds for _ in iterations  # repeat 3x3 window
+        for I in R
+            patch = (I-Δ):(I+Δ)
+            out[I] = f(view(A, patch), m)
+        end
+        img .= out
+    end
+    out
+end
+
 function maximum_mask(x, m)
-    o = x[1]
+    o = -Inf
     for I in eachindex(x)
         if m[I]
             o = max(o, x[I])
@@ -81,7 +135,7 @@ function maximum_mask(x, m)
 end
 
 function minimum_mask(x, m)
-    o = x[1]
+    o = Inf
     for I in eachindex(x)
         if m[I]
             o = min(o, x[I])
