@@ -55,9 +55,9 @@ function psf(A::AbstractMatrix{T};
     progress = 0
     for (ωₖ, dhₜ) in zip(windowsizes, height_tresholds)
         if circular
-            mapwindowcirc!(minimum_mask, A, ωₖ, Af, Inf)
+            mapwindowcirc_approx!(minimum_mask, A, ωₖ, Af, Inf)
         else
-            mapwindow!(minimum, A, ωₖ, Af)
+            mapwindow_stack!(minimum, A, ωₖ, Af)
         end
         mask .= (A .- Af) .> dhₜ
         for I in eachindex(flags)
