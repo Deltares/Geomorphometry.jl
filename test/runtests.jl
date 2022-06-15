@@ -1,26 +1,14 @@
 using GeoArrayOps
 using Test
-using Aqua
 
 @testset "GeoArrayOps" begin
-    @testset "Aqua" begin
-        # This detects ambiguties in FillArrays and ChainRulesCore :(
-        # Aqua.test_ambiguities([GeoArrayOps, Base, Core]; exclude = [GeoArrayOps.FillArrays.AbstractFill])
-        Aqua.test_unbound_args(GeoArrayOps)
-        Aqua.test_undefined_exports(GeoArrayOps)
-        Aqua.test_project_extras(GeoArrayOps)
-        Aqua.test_stale_deps(GeoArrayOps)
-        Aqua.test_deps_compat(GeoArrayOps)
-        Aqua.test_project_toml_formatting(GeoArrayOps)
-    end
-
     @testset "pmf" begin
         # Write your own tests here.
         A = rand(25, 25)
         A[2, 2] = NaN
         B, flags = pmf(A)
         @test (A .<= B) == (flags .== 0.0)
-        B, flags = pmf(A; circular = true)
+        B, flags = pmf(A; circular=true)
         @test (A .<= B) == (flags .== 0.0)
     end
     @testset "smf" begin
@@ -34,9 +22,6 @@ using Aqua
     end
     @testset "psf" begin
         B = psf(rand(25, 25))
-    end
-    @testset "csf" begin
-        B = csf(rand(25, 25))
     end
     @testset "pitremoval" begin
         B = pitremoval(rand(25, 25))

@@ -1,5 +1,4 @@
 # Skewness balancing as by Bartels (2006)
-using StatsBase
 """
 ```
 mask = skb(A, mean)
@@ -14,7 +13,7 @@ Afterwards, one can retrieve the resulting mask for `A` by `A .<= B` or `flags .
 
 [^bartels2006]: Bartels, M., Hong Wei, and D.C. Mason. 2006. “DTM Generation from LIDAR Data Using Skewness Balancing.” In 18th International Conference on Pattern Recognition (ICPR’06), 1:566–69. https://doi.org/10/cwk4v2.
 """
-function skb(A::AbstractMatrix{T}, mean::T) where {T<:Real}
+function skb(A::AbstractArray{T}, mean::T) where {T<:Real}
     I = sortperm(vec(A))
     AA = A[I]
     s = 1
@@ -29,6 +28,7 @@ function skb(A::AbstractMatrix{T}, mean::T) where {T<:Real}
     m[I[s+1:end]] .= false
     return m
 end
-function skb(A::AbstractMatrix{T}) where {T<:Real}
+
+function skb(A::AbstractArray{T}) where {T<:Real}
     return skb(A, mean(A))
 end

@@ -16,9 +16,9 @@ Applies the simple morphological filter by *Pingel et al. (2013)* [^pingel2013] 
 [^pingel2013]: Pingel, Thomas J., Keith C. Clarke, and William A. McBride. 2013. ‘An Improved Simple Morphological Filter for the Terrain Classification of Airborne LIDAR Data’. ISPRS Journal of Photogrammetry and Remote Sensing 77 (March): 21–30. <https://doi.org/10.1016/j.isprsjprs.2012.12.002>.
 """
 function smf(A::AbstractMatrix{T};
-    ω::Real = 17.0,
-    slope::Real = 0.01,
-    cellsize::Real = 1.0) where {T<:Real}
+    ω::Real=17.0,
+    slope::Real=0.01,
+    cellsize::Real=1.0) where {T<:Real}
 
     lastsurface = -copy(A)
     is_low = falses(size(A))
