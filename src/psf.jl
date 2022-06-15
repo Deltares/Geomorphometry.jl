@@ -1,4 +1,3 @@
-
 """
 ```
 B, flags = psf(A; ωₘ, slope, dhₘ, dh₀, cellsize)
@@ -19,13 +18,13 @@ Afterwards, one can retrieve the resulting mask for `A` by `A .<= B` or `flags .
 - `dh₀::Float64=0.2` Initial elevation threshold [m]
 - `cellsize::Float64=1.` Cellsize in [m]
 """
-function psf(A::AbstractMatrix{T};
-    ωₘ::Float64 = 20.0,
-    slope::Float64 = 0.01,
-    dhₘ::Float64 = 2.5,
-    dh₀::Float64 = 0.2,
-    cellsize::Float64 = 1.0,
-    circular = false) where {T<:Real}
+function apsf(A::AbstractMatrix{T};
+    ωₘ::Float64=20.0,
+    slope::Matrix{Float64},
+    dhₘ::Float64=2.5,
+    dh₀::Float64=0.2,
+    cellsize::Float64=1.0,
+    circular=false) where {T<:Real}
 
     # Compute windowsizes and thresholds
     ωₘ = round(Int, ωₘ / cellsize)
@@ -35,8 +34,8 @@ function psf(A::AbstractMatrix{T};
     # Compute tresholds
     dwindows = vcat(windowsizes[1], windowsizes)  # prepend first element so we get 0 as diff
     window_diffs = [dwindows[i] - dwindows[i-1] for i = 2:length(dwindows)]
-    height_tresholds = [min(dhₘ, slope * window_diff * cellsize + dh₀) for window_diff in window_diffs]
-    @info "Using the following thresholds: $height_tresholds for the following windows: $windowsizes"
+    # height_tresholds = [min(dhₘ, slope[1] * window_diff * cellsize + dh₀) for window_diff in window_diffs]
+    # @debug "Using the following thresholds: $height_tresholds for the following windows: $windowsizes"
 
     # Set up arrays
     Af = copy(A)  # array to be morphed
@@ -49,15 +48,15 @@ function psf(A::AbstractMatrix{T};
     flags[nan_mask] .= NaN
 
     mask = falses(size(A))
+    dhₜ = min.(dhₘ, slope * window_diffs[1] * cellsize .+ dh₀)
 
     # Iterate over window sizes and height tresholds
-    p = Progress(sum(windowsizes .^ 2))
-    progress = 0
-    for (ωₖ, dhₜ) in zip(windowsizes, height_tresholds)
+    for (i, ωₖ) in enumerate(windowsizes)
+        dhₜ = min.(dhₘ, slope * window_diffs[i] * cellsize .+ dh₀)
         if circular
-            mapwindowcirc!(minimum_mask, A, ωₖ, Af, Inf)
+            mapwindowcirc_approx!(minimum_mask, A, ωₖ, Af, Inf)
         else
-            mapwindow!(minimum, A, ωₖ, Af)
+            mapwindow_stack!(minimum, A, ωₖ, Af)
         end
         mask .= (A .- Af) .> dhₜ
         for I in eachindex(flags)
@@ -66,9 +65,25 @@ function psf(A::AbstractMatrix{T};
             end
         end
         B .= min.(B, Af .+ dhₜ)
-        progress += ωₖ^2
-        ProgressMeter.update!(p, progress)
     end
 
-    B, flags
+    B, flags, dhₜ
+end
+
+
+
+function psf(A::AbstractMatrix{T};
+    ωₘ::Float64=20.0,
+    slope::Float64=0.01,
+    dhₘ::Float64=2.5,
+    dh₀::Float64=0.2,
+    cellsize::Float64=1.0,
+    circular=false) where {T<:Real}
+    return apsf(A;
+        ωₘ=ωₘ,
+        slope=fill(slope, size(A)),
+        dhₘ=dhₘ,
+        dh₀=dh₀,
+        cellsize=cellsize,
+        circular=circular)
 end

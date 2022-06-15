@@ -4,3 +4,7 @@
 .DS_Store
 Manifest.toml
 docs/build/
+*.tif
+*.gif
+test/benchmark.jl
+.vscode

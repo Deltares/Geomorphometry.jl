@@ -91,7 +91,7 @@ pitremoval(dem::Matrix{<:Real})
 
 Remove pits from a DEM Array if the center cell of a 3x3 patch is `limit` lower or than the surrounding cells.
 """
-function pitremoval(dem::AbstractMatrix{<:Real}, limit = 2.0)
+function pitremoval(dem::AbstractMatrix{<:Real}, limit=2.0)
 
     ex_dem = buffer_array(dem)
     tri = similar(dem)

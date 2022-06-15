@@ -1,11 +1,3 @@
-
-using FillArrays
-using StaticArrays
-using Distances
-using OffsetArrays
-using DataStructures
-using Statistics
-
 const sqrt2 = sqrt(2.0)
 const distance_8 = @SMatrix[sqrt2 1 sqrt2; 1 Inf 1; sqrt2 1 sqrt2]
 const distance_4 = @SMatrix[Inf 1 Inf; 1 Inf 1; Inf 1 Inf]
@@ -33,16 +25,16 @@ This is also the method implemented by [PCRaster](https://pcraster.geo.uu.nl/pcr
 function spread(points::AbstractMatrix{<:Real}, initial::AbstractMatrix{<:Real}, friction::AbstractMatrix{<:Real}; res=1, limit=Inf)
 
     ofriction = OffsetMatrix(fill(Inf, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
-    ofriction[begin + 1:end - 1,begin + 1:end - 1] .= friction
+    ofriction[begin+1:end-1, begin+1:end-1] .= friction
 
     result = OffsetMatrix(fill(limit, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
-    r = @view result[1:end - 1,1:end - 1]
+    r = @view result[1:end-1, 1:end-1]
     locations = points .> 0
     r[locations] .= initial[locations]
 
     # Construct stack for locations
     mask = OffsetMatrix(trues(size(points) .+ 2), UnitRange.(0, size(points) .+ 1))
-    mask[begin + 1:end - 1,begin + 1:end - 1] .= false
+    mask[begin+1:end-1, begin+1:end-1] .= false
 
     II = CartesianIndices(size(points))
     stack = Deque{CartesianIndex}()
@@ -67,14 +59,14 @@ end
 function spread!(stack, mask, result, ofriction, sdata, mcell, res)
     I = popfirst!(stack)
     mask[I] = true
-    patch = I - Δ:I + Δ
+    patch = I-Δ:I+Δ
 
     rdata = view(result, patch)
     fdata = view(ofriction, patch)
 
     # New distance is cell_distance + average friction values
     for i ∈ eachindex(sdata)
-        sdata[i] = muladd(fdata[i] + fdata[2,2], res / 2 * distance_8[i], rdata[2,2])
+        sdata[i] = muladd(fdata[i] + fdata[2, 2], res / 2 * distance_8[i], rdata[2, 2])
         mcell[i] = sdata[i] < rdata[i]  # cells where new distance is lower
     end
     rdata[mcell] .= sdata[mcell]
@@ -111,31 +103,31 @@ This method should scale much better (linearly) than the [^tomlin1983] method, b
 function spread2(points::AbstractMatrix{<:Real}, initial::AbstractMatrix{<:Real}, friction::AbstractMatrix{<:Real}; res=1, limit=Inf, iterations=3)
 
     ofriction = OffsetMatrix(fill(Inf, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
-    ofriction[begin + 1:end - 1,begin + 1:end - 1] .= friction
+    ofriction[begin+1:end-1, begin+1:end-1] .= friction
 
     result = OffsetMatrix(fill(limit, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
-    r = @view result[1:end - 1,1:end - 1]
+    r = @view result[1:end-1, 1:end-1]
     locations = points .> 0
     r[locations] .= initial[locations]
 
     mask = OffsetMatrix(trues(size(points) .+ 2), UnitRange.(0, size(points) .+ 1))
-    mask[begin + 1:end - 1,begin + 1:end - 1] .= false
+    mask[begin+1:end-1, begin+1:end-1] .= false
 
-    minval, minidx = [0.], [CartesianIndex(1, 1)]
+    minval, minidx = [0.0], [CartesianIndex(1, 1)]
     x = @MMatrix zeros(3, 3)
 
     indices = CartesianIndices(size(points))
     for i in 1:iterations
         II = (i % 2 == 1) ? indices : reverse(indices)
         for I ∈ II
-            patch = I - Δ:I + Δ
+            patch = I-Δ:I+Δ
 
             rdata = view(result, patch)
             fdata = view(ofriction, patch)
 
-            x .= (fdata .+ fdata[2,2]) .* res ./ 2 .* distance_8 .+ rdata
+            x .= (fdata .+ fdata[2, 2]) .* res ./ 2 .* distance_8 .+ rdata
             findmin!(minval, minidx, x)
-            rdata[2,2] = min(rdata[2,2], minval[1])
+            rdata[2, 2] = min(rdata[2, 2], minval[1])
         end
     end
     r

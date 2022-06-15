@@ -1,8 +1,3 @@
-using OffsetArrays
-using ImageFiltering
-using Distances
-using PaddedViews
-
 """Apply the opening operation to `A` with window size `ω`."""
 function opening(A::Array{T,2}, ω::Integer) where {T<:Real}
     A = mapwindow(minimum, A, (ω, ω))  # erosion
@@ -70,7 +65,7 @@ function mapwindow_stack!(f, img, window, out)
     out
 end
 
-function mapwindow_sep!(f, img, window, out, fill = Inf)
+function mapwindow_sep!(f, img, window, out, fill=Inf)
     Δ = window ÷ 2
 
     w, h = size(img)
@@ -89,7 +84,7 @@ function mapwindow_sep!(f, img, window, out, fill = Inf)
 end
 
 
-function mapwindowcirc!(f, img, window, out, fill = Inf)
+function mapwindowcirc!(f, img, window, out, fill=Inf)
     R = CartesianIndices(img)
     Δ = CartesianIndex(ntuple(x -> window ÷ 2, ndims(img)))
 
@@ -105,7 +100,7 @@ function mapwindowcirc!(f, img, window, out, fill = Inf)
 end
 
 
-function mapwindowcirc_approx!(f, img, window, out, fill = Inf)
+function mapwindowcirc_approx!(f, img, window, out, fill=Inf)
     R = CartesianIndices(img)
     Δ = CartesianIndex(1, 1)
 
