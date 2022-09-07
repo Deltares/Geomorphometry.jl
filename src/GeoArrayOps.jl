@@ -5,7 +5,7 @@ using ImageFiltering: mapwindow, sobel, imgradients
 using Distances: Euclidean, euclidean, evaluate
 using PaddedViews: PaddedView
 using FillArrays: fill
-using StaticArrays: @SMatrix, @MMatrix, SMatrix, MMatrix
+using StaticArrays: @SMatrix, @MMatrix, SMatrix, MMatrix, MVector
 using DataStructures: Deque
 using Statistics: median, mean
 using ImageCore: scaleminmax, Gray
@@ -23,7 +23,7 @@ export pmf, smf, psf
 export pssm
 export pitremoval
 export spread, spread2
-export roughness, TRI, TPI
+export roughness, TRI, TPI, slope, aspect
 export skb
 
 end # module

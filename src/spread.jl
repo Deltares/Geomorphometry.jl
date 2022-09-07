@@ -4,9 +4,8 @@ const distance_4 = @SMatrix[Inf 1 Inf; 1 Inf 1; Inf 1 Inf]
 const Δ = CartesianIndex(1, 1)
 
 """
-```
-spread(points::Matrix{<:Real}, initial::Matrix{<:Real}, friction::Matrix{<:Real}; res=1, limit=Inf)
-```
+    spread(points::Matrix{<:Real}, initial::Matrix{<:Real}, friction::Matrix{<:Real}; res=1, limit=Inf)
+
 Total friction distance spread from `points` as by *Tomlin (1983)* [^tomlin1983].
 This is also the method implemented by [PCRaster](https://pcraster.geo.uu.nl/pcraster/4.0.2/doc/manual/op_spread.html).
 
@@ -61,8 +60,8 @@ function spread!(stack, mask, result, ofriction, sdata, mcell, res)
     mask[I] = true
     patch = I-Δ:I+Δ
 
-    rdata = view(result, patch)
-    fdata = view(ofriction, patch)
+    rdata = MMatrix{3,3}(view(result, patch))
+    fdata = SMatrix{3,3}(view(ofriction, patch))
 
     # New distance is cell_distance + average friction values
     for i ∈ eachindex(sdata)
@@ -79,9 +78,7 @@ function spread!(stack, mask, result, ofriction, sdata, mcell, res)
 end
 
 """
-```
-spread2(points::Matrix{<:Real}, initial::Matrix{<:Real}, friction::Matrix{<:Real}; res=1, limit=Inf, iterations=3)
-```
+    spread2(points::Matrix{<:Real}, initial::Matrix{<:Real}, friction::Matrix{<:Real}; res=1, limit=Inf, iterations=3)
 
 Pushbroom method for friction costs as discussed by *Eastman (1989) [^eastman1989].
 This method should scale much better (linearly) than the [^tomlin1983] method, but can require more
@@ -133,11 +130,6 @@ function spread2(points::AbstractMatrix{<:Real}, initial::AbstractMatrix{<:Real}
     r
 end
 
-"""
-```
-spread(points::Matrix{<:Real}, initial::Real, friction::Real; distance=Euclidean(), res=1.0)
-```
-"""
 function spread(points::AbstractMatrix{<:Real}, initial::Real, friction::Real; distance=Euclidean(), res=1.0)
     init = fill(initial, size(points))
     return spread(points, init, friction; distance, res)
@@ -145,9 +137,9 @@ end
 
 
 """
-```
-spread(points::Matrix{<:Real}, initial::Matrix{<:Real}, friction::Real; distance=Euclidean(), res=1.0)
-```
+    spread(points::Matrix{<:Real}, initial::Matrix{<:Real}, friction::Real; distance=Euclidean(), res=1.0)
+    spread(points::Matrix{<:Real}, initial::Real, friction::Real; distance=Euclidean(), res=1.0)
+
 Optimized (and more accurate) function based on the same friction everywhere.
 
 When the friction is the same everywhere, there's no need for searching the shortest cost path,

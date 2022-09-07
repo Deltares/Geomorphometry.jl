@@ -1,7 +1,6 @@
 """
-```
-B, flags = pmf(A; ωₘ, slope, dhₘ, dh₀, cellsize)
-```
+    B, flags = pmf(A; ωₘ, slope, dhₘ, dh₀, cellsize)
+
 Applies the progressive morphological filter by *Zhang et al. (2003)* [^zhang2003] to `A`.
 
 # Output

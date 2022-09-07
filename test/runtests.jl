@@ -25,6 +25,7 @@ using Test
     end
     @testset "pitremoval" begin
         B = pitremoval(rand(25, 25))
+        B = pitremoval(rand(25, 25), 0.1)
     end
     @testset "spread" begin
         points = [0.0 0 0 0 2; 0 0 0 0 0; 0 0 0 0 0; 0 1 0 0 0; 0 0 0 0 0]
@@ -37,5 +38,7 @@ using Test
         TRI(A)
         TPI(A)
         roughness(A)
+        slope(A)
+        aspect(A)
     end
 end

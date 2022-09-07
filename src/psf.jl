@@ -1,7 +1,6 @@
 """
-```
-B, flags = psf(A; ωₘ, slope, dhₘ, dh₀, cellsize)
-```
+    B, flags = psf(A; ωₘ, slope, dhₘ, dh₀, cellsize)
+
 Applies a progressive slope filter to `A`.
 
 # Output
