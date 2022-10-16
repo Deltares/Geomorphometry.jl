@@ -9,6 +9,7 @@ using StaticArrays: @SMatrix, @MMatrix, SMatrix, MMatrix, MVector
 using DataStructures: Deque
 using Statistics: median, mean
 using ImageCore: scaleminmax, Gray
+using LocalFilters
 
 include("utils.jl")
 include("pmf.jl")
@@ -19,11 +20,12 @@ include("spread.jl")
 include("terrain.jl")
 include("skew.jl")
 
+export ZevenbergenThorne, Horn, MDG
 export pmf, smf, psf
 export pssm
 export pitremoval
 export spread, spread2
-export roughness, TRI, TPI, slope, aspect
-export skb
+export roughness, TRI, TPI, slope, aspect, curvature, hillshade
+export skb, skbr
 
 end # module
