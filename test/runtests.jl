@@ -25,8 +25,8 @@ using Test
     end
     @testset "skb" begin
         B = skb(rand(25, 25))
-        B = skb(rand(25, 25), 0.25)
-        B = skbr(rand(25, 25), 5)
+        B = skb(rand(25, 25); mean=0.25)
+        B = skbr(rand(25, 25); iterations=5)
     end
     @testset "pitremoval" begin
         B = pitremoval(rand(25, 25))
