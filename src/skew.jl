@@ -66,8 +66,8 @@ function skbr(A; iterations=10)
     object_mask = .!terrain_mask
     while iterations > 1 && sum(object_mask) > 0
         # @info "$(round(Int, sum(object_mask) / length(object_mask) * 100))% objects..."
-        terrain_mask[object_mask] .|= skb(A[object_mask])
-        object_mask = .!terrain_mask
+        terrain_mask[object_mask] = terrain_mask[object_mask] .| skb(A[object_mask])
+        object_mask .= .!terrain_mask
         iterations -= 1
     end
     terrain_mask
