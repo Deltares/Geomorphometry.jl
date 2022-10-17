@@ -36,7 +36,6 @@ function pmf(A::AbstractMatrix{T};
     dwindows = vcat(windowsizes[1], windowsizes)  # prepend first element so we get 0 as diff
     window_diffs = [dwindows[i] - dwindows[i-1] for i = 2:length(dwindows)]
     height_tresholds = [min(dhₘ, slope * window_diff * cellsize + dh₀) for window_diff in window_diffs]
-    # @info "Using the following thresholds: $height_tresholds for the following windows: $windowsizes"
 
     # Set up arrays
     Af = copy(A)  # array to be morphed
@@ -56,7 +55,7 @@ function pmf(A::AbstractMatrix{T};
         if circular
             opening_circ!(Af, ωₖ, out)
         else
-            opening!(Af, ωₖ, out)
+            LocalFilters.opening!(Af, out, Af, ωₖ)
         end
         mask .= (A .- Af) .> dhₜ
         for I in eachindex(flags)
