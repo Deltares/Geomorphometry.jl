@@ -55,7 +55,7 @@ function apsf(A::AbstractMatrix{T};
         if circular
             mapwindowcirc_approx!(minimum_mask, A, ωₖ, Af, Inf)
         else
-            mapwindow_stack!(minimum, A, ωₖ, Af)
+            erode!(Af, A, ωₖ)
         end
         mask .= (A .- Af) .> dhₜ
         for I in eachindex(flags)
