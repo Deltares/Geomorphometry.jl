@@ -14,8 +14,8 @@ end
 
 """Apply the opening operation to `A` with window size `ω`."""
 function opening_circ!(A::Array{T,2}, ω::Integer, out::Array{T,2}) where {T<:Real}
-    mapwindowcirc!(minimum_mask, A, ω, out, Inf)  # erosion
-    mapwindowcirc!(maximum_mask, out, ω, A, -Inf)  # dilation
+    mapwindowcirc_approx!(minimum_mask, A, ω, out, Inf)  # erosion
+    mapwindowcirc_approx!(maximum_mask, out, ω, A, -Inf)  # dilation
     A
 end
 
@@ -119,6 +119,41 @@ function mapwindowcirc_approx!(f, img, window, out, fill=Inf)
     end
     out
 end
+
+# Functions for future changes, based on LocalFiltering
+# function opening_circ_approx2!(A::Array{T,2}, ω::Integer, out::Array{T,2}) where {T<:Real}
+#     iterations = ω:-2:3
+
+#     B = circmask(1)
+#     for _ in iterations
+#         localfilter!(out, A, B,
+#             (a) -> typemax(a),
+#             (v, a, b) -> b ? min(v, a) : v,
+#             (d, i, v) -> @inbounds(d[i] = v))
+#         A, out = out, A
+#     end
+#     for _ in iterations
+#         localfilter!(out, A, B,
+#             (a) -> typemin(a),
+#             (v, a, b) -> b ? max(v, a) : v,
+#             (d, i, v) -> @inbounds(d[i] = v))
+#         A, out = out, A
+#     end
+#     A
+# end
+
+# function opening_circ2!(A::Array{T,2}, ω::Integer, out::Array{T,2}) where {T<:Real}
+#     B = circmask(ω >> 1)
+#     localfilter!(out, A, B,
+#         (a) -> typemax(a),
+#         (v, a, b) -> b ? min(v, a) : v,
+#         (d, i, v) -> @inbounds(d[i] = v))
+#     localfilter!(A, out, B,
+#         (a) -> typemin(a),
+#         (v, a, b) -> b ? max(v, a) : v,
+#         (d, i, v) -> @inbounds(d[i] = v))
+#     A
+# end
 
 @inline function maximum_mask(x, m)
     o = -Inf
