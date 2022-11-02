@@ -2,6 +2,8 @@ const neib_8 = @SMatrix [1.0 1 1; 1 0 1; 1 1 1]
 const neib_8_inf = @SMatrix [1.0 1 1; 1 Inf 1; 1 1 1]
 const neib_8_mask = @SMatrix Bool[1 1 1; 1 0 1; 1 1 1]
 
+const nbkernel = LocalFilters.Kernel{Int8,2}(reshape(1:9, 3, 3))
+
 abstract type DerivativeMethod end
 
 """Second order finite difference estimator using all 4 neighbors (Zevenbergen and Thorne, 1987)."""
@@ -12,40 +14,6 @@ struct Horn <: DerivativeMethod end
 
 """Maximum Downward Gradient"""
 struct MDG <: DerivativeMethod end
-
-function noise(factor=0.01)
-    (rand() - 0.5) * factor
-end
-
-function buffer_array(A::AbstractMatrix{<:Real})
-    oA = OffsetMatrix(fill(zero(eltype(A)), size(A) .+ 2), UnitRange.(0, size(A) .+ 1))
-    # Update center
-    oA[begin+1:end-1, begin+1:end-1] .= A
-    # Set edges to mirror center
-    oA[begin, begin+1:end-1] .= A[begin, :]
-    oA[end, begin+1:end-1] .= A[end, :]
-    oA[begin+1:end-1, begin] .= A[:, begin]
-    oA[begin+1:end-1, end] .= A[:, end]
-    # Set corners to mirror corners of center
-    oA[begin, begin] = A[begin, begin] + noise()
-    oA[begin, end] = A[begin, end] + noise()
-    oA[end, begin] = A[end, begin] + noise()
-    oA[end, end] = A[end, end] + noise()
-    return oA
-end
-
-function terrain_kernel(dem::AbstractMatrix{T}, f::Function, t=T) where {T<:Real}
-    dembuffer = buffer_array(dem)
-    output = similar(dem, t)
-    Δ = CartesianIndex(1, 1)
-
-    @inbounds for I ∈ CartesianIndices(size(output))
-        patch = I-Δ:I+Δ
-        dempatch = SMatrix{3,3}(view(dembuffer, patch))
-        output[I] = f(dempatch)
-    end
-    output
-end
 
 """
     roughness(dem::Matrix{<:Real})
@@ -76,7 +44,6 @@ function TPI(dem::AbstractMatrix{<:Real})
 
     return localfilter!(dst, dem, 3, initial, update, store!)
 end
-
 
 """
     TRI(dem::Matrix{<:Real})
@@ -124,13 +91,43 @@ end
 Slope is the rate of change between a cell and its neighbors as defined in Burrough, P. A., and McDonell, R. A., (1998, Principles of Geographical Information Systems).
 """
 function slope(dem::AbstractMatrix{<:Real}; cellsize=1.0, method::DerivativeMethod=Horn())
-    terrain_kernel(dem, f -> slope_kernel(f, cellsize, method))
+    dst = copy(dem)
+    slope(method, dst, dem, cellsize)
 end
 
-function slope_kernel(A, cellsize=1.0, method::DerivativeMethod=Horn())
-    δzδx, δzδy = derivative(method, A, cellsize)
-    return atand(√(δzδx^2 + δzδy^2))
+
+function slope(::Horn, dst, dem::AbstractMatrix{<:Real}, cellsize)
+    initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
+    store!(d, i, v) = @inbounds d[i] = atand(
+        √(
+            ((v[1] - v[2]) / (8 * v[5]))^2 + ((v[3] - v[4]) / (8 * v[5]))^2
+        ))
+    return localfilter!(dst, dem, nbkernel, initial, horn, store!)
 end
+
+function slope(::ZevenbergenThorne, dst, dem::AbstractMatrix{<:Real}, cellsize)
+    initial(A) = (zero(eltype(A)), zero(eltype(A)), cellsize)
+    store!(d, i, v) = @inbounds d[i] = atand(
+        √(
+            (v[1] / (2 * v[3]))^2 + (v[2] / (2 * v[3]))^2
+        ))
+    return localfilter!(dst, dem, nbkernel, initial, zevenbergenthorne, store!)
+end
+
+function slope(::MDG, dst, dem::AbstractMatrix{<:Real}, cellsize)
+    initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
+    function store!(d, i, v)
+        m = max(
+            abs(v[1]) / (v[5] * sqrt2),
+            abs(v[2]) / v[5],
+            abs(v[3]) / (v[5] * sqrt2),
+            abs(v[4]) / v[5],
+        ) / 2
+        d[i] = atand(√(m^2 + m^2))
+    end
+    return localfilter!(dst, dem, nbkernel, initial, mdg, store!)
+end
+
 
 """
     aspect(dem::Matrix{<:Real}, method=Horn())
@@ -138,35 +135,103 @@ end
 Aspect is direction of [`slope`](@ref), as defined in Burrough, P. A., and McDonell, R. A., (1998, Principles of Geographical Information Systems).
 """
 function aspect(dem::AbstractMatrix{<:Real}; method::DerivativeMethod=Horn())
-    terrain_kernel(dem, f -> aspect_kernel(f, method))
+    dst = copy(dem)
+    aspect(method, dst, dem, 1)
 end
 
-function aspect_kernel(A, method::DerivativeMethod=Horn())
-    δzδx, δzδy = derivative(method, A, 1.0)
-    return compass(atand(δzδy, -δzδx))
+# Useless, as there's no x/y component.
+function aspect(::MDG, dst, dem::AbstractMatrix{<:Real}, cellsize)
+    initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
+    function store!(d, i, v)
+        δzδx = max(
+            abs(v[1]) / (v[5] * sqrt2),
+            abs(v[2]) / v[5],
+            abs(v[3]) / (v[5] * sqrt2),
+            abs(v[4]) / v[5],
+        ) / 2
+        d[i] = compass(atand(δzδx, -δzδx))
+    end
+    return localfilter!(dst, dem, nbkernel, initial, mdg, store!)
 end
 
-function derivative(::ZevenbergenThorne, A, cellsize=1.0)
-    δzδx = (A[1, 2] - A[3, 2]) / 2 * cellsize
-    δzδy = (A[2, 1] - A[2, 3]) / 2 * cellsize
-    return δzδx, δzδy
+function aspect(::Horn, dst, dem::AbstractMatrix{<:Real}, cellsize)
+    initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
+    function store!(d, i, v)
+        δzδx = (v[1] - v[2]) / (8 * v[5])
+        δzδy = (v[3] - v[4]) / (8 * v[5])
+        # @info δzδx, δzδy
+        d[i] = compass(atand(-δzδx, δzδy))
+    end
+    return localfilter!(dst, dem, nbkernel, initial, horn, store!)
 end
 
-function derivative(::Horn, A, cellsize=1.0)
-    δzδx = ((A[1, 3] + 2A[2, 3] + A[3, 3]) - (A[1, 1] + 2A[2, 1] + A[3, 1])) / (8 * cellsize)
-    δzδy = ((A[3, 1] + 2A[3, 2] + A[3, 3]) - (A[1, 1] + 2A[1, 2] + A[1, 3])) / (8 * cellsize)
-    return δzδx, δzδy
+function aspect(::ZevenbergenThorne, dst, dem::AbstractMatrix{<:Real}, cellsize)
+    initial(A) = (zero(eltype(A)), zero(eltype(A)), cellsize)
+    function store!(d, i, v)
+        δzδx = v[1] / 2
+        δzδy = v[2] / 2
+        # @info δzδx, δzδy
+        d[i] = compass(atand(δzδy, -δzδx))
+    end
+    return localfilter!(dst, dem, nbkernel, initial, zevenbergenthorne, store!)
 end
 
-function derivative(::MDG, A, cellsize=1.0)
-    δzδx = max(
-        abs(A[1, 1] - A[3, 3]) / (cellsize * sqrt2),
-        abs(A[1, 2] - A[3, 2]) / cellsize,
-        abs(A[1, 3] - A[3, 1]) / (cellsize * sqrt2),
-        abs(A[2, 1] - A[2, 3]) / cellsize,
-    ) / 2
+@inline @inbounds function zevenbergenthorne(v, a, b)
+    if b == 2
+        return (v[1], v[2] + a, v[3])
+    elseif b == 4
+        return (v[1] + a, v[2], v[3])
+    elseif b == 6
+        return (v[1] - a, v[2], v[3])
+    elseif b == 8
+        return (v[1], v[2] - a, v[3])
+    else
+        return v
+    end
+end
 
-    return δzδx, δzδx
+@inline @inbounds function horn(v, a, b)
+    if b == 1
+        return (v[1], v[2] + a, v[3], v[4] + a, v[5])
+    elseif b == 2
+        return (v[1], v[2] + 2a, v[3], v[4], v[5])
+    elseif b == 3
+        return (v[1], v[2] + a, v[3] + a, v[4], v[5])
+    elseif b == 4
+        return (v[1], v[2], v[3], v[4] + 2a, v[5])
+    elseif b == 5
+        return v
+    elseif b == 6
+        return (v[1], v[2], v[3] + 2a, v[4], v[5])
+    elseif b == 7
+        return (v[1] + a, v[2], v[3], v[4] + a, v[5])
+    elseif b == 8
+        return (v[1] + 2a, v[2], v[3], v[4], v[5])
+    elseif b == 9
+        return (v[1] + a, v[2], v[3] + a, v[4], v[5])
+    end
+end
+
+@inbounds function mdg(v, a, b)
+    if b == 1
+        return (v[1] + a, v[2], v[3], v[4], v[5])
+    elseif b == 2
+        return (v[1], v[2], v[3], v[4] + a, v[5])
+    elseif b == 3
+        return (v[1], v[2], v[3] - a, v[4], v[5])
+    elseif b == 4
+        return (v[1], v[2] + a, v[3], v[4], v[5])
+    elseif b == 5
+        return v
+    elseif b == 6
+        return (v[1], v[2] - a, v[3], v[4], v[5])
+    elseif b == 7
+        return (v[1], v[2], v[3] + a, v[4], v[5])
+    elseif b == 8
+        return (v[1], v[2], v[3], v[4] - a, v[5])
+    elseif b == 9
+        return (v[1] - a, v[2], v[3], v[4], v[5])
+    end
 end
 
 function compass(aspect)
@@ -176,7 +241,7 @@ function compass(aspect)
 end
 
 function aspect(compass::Real)
-    return (360 - compass + 90) % 360
+    return (450 - compass) % 360
 end
 
 """
@@ -185,44 +250,106 @@ end
 Curvature is derivative of [`slope`](@ref), so the second derivative of the DEM.
 """
 function curvature(dem::AbstractMatrix{<:Real}; cellsize=1.0)
-    return terrain_kernel(dem, f -> curvature_kernel(f, cellsize))
+    dst = copy(dem)
+
+    initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
+    function curvature(v, a, b)
+        if b == 2
+            return (v[1], v[2] + a, v[3], v[4])
+        elseif b == 4
+            return (v[1] + a, v[2], v[3], v[4])
+        elseif b == 5
+            return (v[1], v[2], v[3] + a, v[4])
+        elseif b == 6
+            return (v[1] + a, v[2], v[3], v[4])
+        elseif b == 8
+            return (v[1], v[2] + a, v[3], v[4])
+        else
+            return v
+        end
+    end
+    function store!(d, i, v)
+        δzδx = (v[1] / 2 - v[3]) / v[4]^2
+        δzδy = (v[2] / 2 - v[3]) / v[4]^2
+        d[i] = -2(δzδx + δzδy) * 100
+    end
+    return localfilter!(dst, dem, nbkernel, initial, curvature, store!)
 end
 
-function curvature_kernel(A, cellsize=1.0)
-    δzδx = ((A[1, 2] + A[3, 2]) / 2 - A[2, 2]) / cellsize^2
-    δzδy = ((A[2, 1] + A[2, 3]) / 2 - A[2, 2]) / cellsize^2
-
-    return -2(δzδx + δzδy) * 100
-end
 
 """
-    hillshade(dem::Matrix{<:Real}; azimuth=315.0, zenith=45.0, cellsize=1.0, method=Horn())
+    hillshade(dem::Matrix{<:Real}; azimuth=315.0, zenith=45.0, cellsize=1.0)
 
 hillshade is the simulated illumination of a surface based on its [`slope`](@ref) and
 [`aspect`](@ref) given a light source with azimuth and zenith angles in °, , as defined in
 Burrough, P. A., and McDonell, R. A., (1998, Principles of Geographical Information Systems).
 """
-function hillshade(dem::AbstractMatrix{<:Real}; azimuth=315.0, zenith=45.0, cellsize=1.0, method::DerivativeMethod=Horn())
-    return terrain_kernel(dem, f -> hillshade_kernel(f, cellsize, azimuth, zenith, method), UInt8)
+function hillshade(dem::AbstractMatrix{<:Real}; azimuth=315.0, zenith=45.0, cellsize=1.0)
+    dst = similar(dem, UInt8)
+    zenithr = deg2rad(zenith)
+    azimuthr = deg2rad(aspect(azimuth))
+
+    initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
+    function store!(d, i, v)
+        δzδx, δzδy = (v[1] - v[2]) / (8 * v[5]), (v[3] - v[4]) / (8 * v[5])
+        if δzδx != 0
+            a = atan(-δzδx, δzδy)
+            if a < 0
+                a += 2π
+            end
+        else
+            a = π / 2
+            if δzδy < 0
+                a += 2π
+            end
+        end
+        slope = atan(√(δzδx^2 + δzδy^2))
+        d[i] = round(UInt8, max(0, 255 * ((cos(zenithr) * cos(slope)) + (sin(zenithr) * sin(slope) * cos(azimuthr - a)))))
+    end
+    return localfilter!(dst, dem, nbkernel, initial, horn, store!)
 end
 
-function hillshade_kernel(A, cellsize=1.0, azimuth=315.0, zenith=45.0, method::DerivativeMethod=Horn())
-    z = deg2rad(zenith)
-    c = deg2rad(aspect(azimuth))
+"""
+    multihillshade(dem::Matrix{<:Real}; cellsize=1.0)
 
-    δzδx, δzδy = derivative(method, A, cellsize)
-    if δzδx != 0
-        a = atan(δzδy, -δzδx)
-        if a < 0
-            a += 2π
+multihillshade is the simulated illumination of a surface based on its [`slope`](@ref) and
+[`aspect`](@ref). Like [`hillshade`](@ref), but now using multiple sources as defined in
+https://pubs.usgs.gov/of/1992/of92-422/of92-422.pdf, similar to GDALs -multidirectional.
+"""
+function multihillshade(dem::AbstractMatrix{<:Real}; cellsize=1.0)
+    dst = similar(dem, UInt8)
+    zenithr = deg2rad(60)
+
+    initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
+    function store!(d, i, v)
+        δzδx, δzδy = (v[1] - v[2]) / (8 * v[5]), (v[3] - v[4]) / (8 * v[5])
+        if δzδx != 0
+            a = atan(-δzδx, δzδy)
+            if a < 0
+                a += 2π
+            end
+        else
+            a = π / 2
+            if δzδy < 0
+                a += 2π
+            end
         end
-    else
-        a = π / 2
-        if δzδy > 0
-            a += 2π
-        end
+        slope = atan(√(δzδx^2 + δzδy^2))
+
+        w225 = 0.5 * (1 - cos(2(a - deg2rad(aspect(225)))))
+        w270 = 0.5 * (1 - cos(2(a - deg2rad(aspect(270)))))
+        w315 = 0.5 * (1 - cos(2(a - deg2rad(aspect(315)))))
+        w360 = 0.5 * (1 - cos(2(a - deg2rad(aspect(360)))))
+
+        α = cos(zenithr) * cos(slope)
+        β = sin(zenithr) * sin(slope)
+        something = (
+            w225 * (α + β * cos(deg2rad(aspect(225)) - a)) +
+            w270 * (α + β * cos(deg2rad(aspect(270)) - a)) +
+            w315 * (α + β * cos(deg2rad(aspect(315)) - a)) +
+            w360 * (α + β * cos(deg2rad(aspect(360)) - a))) / 2
+
+        d[i] = round(UInt8, max(0, 255 * something))
     end
-
-    s = atan(√(δzδx^2 + δzδy^2))
-    return round(UInt8, 255 * ((cos(z) * cos(s)) + (sin(z) * sin(s) * cos(c - a))))
+    return localfilter!(dst, dem, nbkernel, initial, horn, store!)
 end
