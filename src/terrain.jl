@@ -159,7 +159,6 @@ function aspect(::Horn, dst, dem::AbstractMatrix{<:Real}, cellsize)
     function store!(d, i, v)
         δzδx = (v[1] - v[2]) / (8 * v[5])
         δzδy = (v[3] - v[4]) / (8 * v[5])
-        # @info δzδx, δzδy
         d[i] = compass(atand(-δzδx, δzδy))
     end
     return localfilter!(dst, dem, nbkernel, initial, horn, store!)
@@ -170,7 +169,6 @@ function aspect(::ZevenbergenThorne, dst, dem::AbstractMatrix{<:Real}, cellsize)
     function store!(d, i, v)
         δzδx = v[1] / 2
         δzδy = v[2] / 2
-        # @info δzδx, δzδy
         d[i] = compass(atand(δzδy, -δzδx))
     end
     return localfilter!(dst, dem, nbkernel, initial, zevenbergenthorne, store!)

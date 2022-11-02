@@ -25,7 +25,7 @@ export pmf, smf, psf
 export pssm
 export pitremoval
 export spread, spread2
-export roughness, TRI, TPI, slope, aspect, curvature, hillshade
+export roughness, TRI, TPI, slope, aspect, curvature, hillshade, multihillshade
 export skb, skbr
 
 end # module

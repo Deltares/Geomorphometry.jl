@@ -120,6 +120,7 @@ function mapwindowcirc_approx!(f, img, window, out, fill=Inf)
     out
 end
 
+# Functions for future changes, based on LocalFiltering
 # function opening_circ_approx2!(A::Array{T,2}, ω::Integer, out::Array{T,2}) where {T<:Real}
 #     iterations = ω:-2:3
 
