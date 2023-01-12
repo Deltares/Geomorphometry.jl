@@ -11,22 +11,26 @@ Afterwards, one can retrieve the resulting mask for `A` by `A .<= B` or `flags .
 
 # Arguments
 - `A::Array{T,2}` Input Array
-- `ωₘ::Float64=20.` Maximum window size [m]
-- `slope::Float64=0.01` Terrain slope [m/m]
-- `dhₘ::Float64=2.5` Maximum elevation threshold [m]
-- `dh₀::Float64=0.2` Initial elevation threshold [m]
-- `cellsize::Float64=1.` Cellsize in [m]
+- `ωₘ::Real=20.` Maximum window size [m]
+- `slope::Real=0.01` Terrain slope [m/m]
+- `dhₘ::Real=2.5` Maximum elevation threshold [m]
+- `dh₀::Real=0.2` Initial elevation threshold [m]
+- `cellsize::Real=1.` Cellsize in [m]
 
 [^zhang2003]: Zhang, Keqi, Shu-Ching Chen, Dean Whitman, Mei-Ling Shyu, Jianhua Yan, and Chengcui Zhang. “A Progressive Morphological Filter for Removing Nonground Measurements from Airborne LIDAR Data.” IEEE Transactions on Geoscience and Remote Sensing 41, no. 4 (2003): 872–82. <https://doi.org/10.1109/TGRS.2003.810682>.
 """
-function pmf(A::AbstractMatrix{T};
-    ωₘ::Float64=20.0,
-    slope::Float64=0.01,
-    dhₘ::Float64=2.5,
-    dh₀::Float64=0.2,
-    cellsize::Float64=1.0,
+function pmf(A::Union{AbstractMatrix{T},AbstractArray{T,3}};
+    ωₘ::Real=20.0,
+    slope::Real=0.01,
+    dhₘ::Real=2.5,
+    dh₀::Real=0.2,
+    cellsize::Real=1.0,
     circular=false) where {T<:Real}
 
+    s = size(A)
+    if length(s) == 3
+        s[3] == 1 || throw(ArgumentError("Input `A` must be 2D or 3D with a singleton dimension"))
+    end
     # Compute windowsizes and thresholds
     ωₘ = round(Int, ωₘ / cellsize)
     κ_max = floor(Int, log2(ωₘ - 1))  # determine # iterations based on exp growth
@@ -45,7 +49,8 @@ function pmf(A::AbstractMatrix{T};
     B = copy(A)  # max_elevation raster
     out = copy(A)  # max_elevation raster
 
-    flags = zeros(size(A))  # 0 = ground, other values indicate window size
+    flags = similar(A, Float64)  # 0 = ground, other values indicate window size
+    fill!(flags, 0.0)
     flags[nan_mask] .= NaN
 
     mask = falses(size(A))
