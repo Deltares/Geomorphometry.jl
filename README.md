@@ -1,5 +1,7 @@
 [![CI](https://github.com/Deltares/GeoRasterFiltering.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/Deltares/GeoRasterFiltering.jl/actions/workflows/CI.yml)
 [![Codecov](https://codecov.io/gh/Deltares/GeoArrayOps.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/Deltares/GeoArrayOps.jl)
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://deltares.github.io/GeoArrayOps.jl/stable/)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://deltares.github.io/GeoArrayOps.jl/dev/)
 
 # GeoArrayOps
 Geospatial operations, cost and filtering algorithms as used in for elevation rasters.
