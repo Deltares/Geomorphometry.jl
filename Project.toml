@@ -1,7 +1,7 @@
 name = "GeoArrayOps"
 uuid = "e6005643-8f00-58df-85c5-7d93a3520d70"
 authors = ["Maarten Pronk <git@evetion.nl>", "Deltares"]
-version = "0.5.1"
+version = "0.5.2"
 
 [deps]
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
@@ -19,8 +19,8 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 [compat]
 DataStructures = "0.18"
 Distances = "0.10"
-FillArrays = "0.12, 0.13"
-ImageCore = "0.9"
+FillArrays = "0.12, 0.13, 1"
+ImageCore = "0.9, 0.10"
 ImageFiltering = "0.6, 0.7"
 LocalFilters = "1.2"
 OffsetArrays = "1.10"
