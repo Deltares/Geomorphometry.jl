@@ -1,7 +1,7 @@
 name = "GeoArrayOps"
 uuid = "e6005643-8f00-58df-85c5-7d93a3520d70"
 authors = ["Maarten Pronk <git@evetion.nl>", "Deltares"]
-version = "0.5.2"
+version = "0.5.3"
 
 [deps]
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
