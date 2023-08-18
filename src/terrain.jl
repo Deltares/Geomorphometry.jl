@@ -13,7 +13,8 @@ struct ZevenbergenThorne <: DerivativeMethod end
 struct Horn <: DerivativeMethod end
 
 """Maximum Downward Gradient"""
-struct MDG <: DerivativeMethod end
+struct MaximumDownwardGradient <: DerivativeMethod end
+const MDG = MaximumDownwardGradient
 
 """
     roughness(dem::Matrix{<:Real})
@@ -86,17 +87,16 @@ function pitremoval(dem::AbstractMatrix{<:Real}; limit=0.0)
 end
 
 """
-    slope(dem::Matrix{<:Real}, cellsize=1.0, method=Horn())
+    slope(dem::Matrix{<:Real}; cellsize=1.0, method=Horn())
 
 Slope is the rate of change between a cell and its neighbors as defined in Burrough, P. A., and McDonell, R. A., (1998, Principles of Geographical Information Systems).
 """
 function slope(dem::AbstractMatrix{<:Real}; cellsize=1.0, method::DerivativeMethod=Horn())
     dst = copy(dem)
-    slope(method, dst, dem, cellsize)
+    slope!(method, dst, dem, cellsize)
 end
 
-
-function slope(::Horn, dst, dem::AbstractMatrix{<:Real}, cellsize)
+function slope!(::Horn, dst, dem::AbstractMatrix{<:Real}, cellsize)
     initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
     store!(d, i, v) = @inbounds d[i] = atand(
         √(
@@ -105,7 +105,7 @@ function slope(::Horn, dst, dem::AbstractMatrix{<:Real}, cellsize)
     return localfilter!(dst, dem, nbkernel, initial, horn, store!)
 end
 
-function slope(::ZevenbergenThorne, dst, dem::AbstractMatrix{<:Real}, cellsize)
+function slope!(::ZevenbergenThorne, dst, dem::AbstractMatrix{<:Real}, cellsize)
     initial(A) = (zero(eltype(A)), zero(eltype(A)), cellsize)
     store!(d, i, v) = @inbounds d[i] = atand(
         √(
@@ -114,7 +114,7 @@ function slope(::ZevenbergenThorne, dst, dem::AbstractMatrix{<:Real}, cellsize)
     return localfilter!(dst, dem, nbkernel, initial, zevenbergenthorne, store!)
 end
 
-function slope(::MDG, dst, dem::AbstractMatrix{<:Real}, cellsize)
+function slope!(::MaximumDownwardGradient, dst, dem::AbstractMatrix{<:Real}, cellsize)
     initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
     function store!(d, i, v)
         m = max(
@@ -136,11 +136,11 @@ Aspect is direction of [`slope`](@ref), as defined in Burrough, P. A., and McDon
 """
 function aspect(dem::AbstractMatrix{<:Real}; method::DerivativeMethod=Horn())
     dst = copy(dem)
-    aspect(method, dst, dem, 1)
+    aspect!(method, dst, dem, 1)
 end
 
 # Useless, as there's no x/y component.
-function aspect(::MDG, dst, dem::AbstractMatrix{<:Real}, cellsize)
+function aspect!(::MaximumDownwardGradient, dst, dem::AbstractMatrix{<:Real}, cellsize)
     initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
     function store!(d, i, v)
         δzδx = max(
@@ -154,7 +154,7 @@ function aspect(::MDG, dst, dem::AbstractMatrix{<:Real}, cellsize)
     return localfilter!(dst, dem, nbkernel, initial, mdg, store!)
 end
 
-function aspect(::Horn, dst, dem::AbstractMatrix{<:Real}, cellsize)
+function aspect!(::Horn, dst, dem::AbstractMatrix{<:Real}, cellsize)
     initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
     function store!(d, i, v)
         δzδx = (v[1] - v[2]) / (8 * v[5])
@@ -164,7 +164,7 @@ function aspect(::Horn, dst, dem::AbstractMatrix{<:Real}, cellsize)
     return localfilter!(dst, dem, nbkernel, initial, horn, store!)
 end
 
-function aspect(::ZevenbergenThorne, dst, dem::AbstractMatrix{<:Real}, cellsize)
+function aspect!(::ZevenbergenThorne, dst, dem::AbstractMatrix{<:Real}, cellsize)
     initial(A) = (zero(eltype(A)), zero(eltype(A)), cellsize)
     function store!(d, i, v)
         δzδx = v[1] / 2
@@ -210,7 +210,7 @@ end
     end
 end
 
-@inbounds function mdg(v, a, b)
+@inline @inbounds function mdg(v, a, b)
     if b == 1
         return (v[1] + a, v[2], v[3], v[4], v[5])
     elseif b == 2
@@ -243,12 +243,16 @@ function aspect(compass::Real)
 end
 
 """
-    curvature(dem::Matrix{<:Real})
+    curvature(dem::Matrix{<:Real}; cellsize=1.0)
 
 Curvature is derivative of [`slope`](@ref), so the second derivative of the DEM.
 """
 function curvature(dem::AbstractMatrix{<:Real}; cellsize=1.0)
     dst = copy(dem)
+    curvature!(dst, dem, cellsize)
+end
+
+function curvature!(dst::AbstractMatrix{<:Real}, dem::AbstractMatrix{<:Real}, cellsize=1.0)
 
     initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
     function curvature(v, a, b)
@@ -272,82 +276,4 @@ function curvature(dem::AbstractMatrix{<:Real}; cellsize=1.0)
         d[i] = -2(δzδx + δzδy) * 100
     end
     return localfilter!(dst, dem, nbkernel, initial, curvature, store!)
-end
-
-
-"""
-    hillshade(dem::Matrix{<:Real}; azimuth=315.0, zenith=45.0, cellsize=1.0)
-
-hillshade is the simulated illumination of a surface based on its [`slope`](@ref) and
-[`aspect`](@ref) given a light source with azimuth and zenith angles in °, , as defined in
-Burrough, P. A., and McDonell, R. A., (1998, Principles of Geographical Information Systems).
-"""
-function hillshade(dem::AbstractMatrix{<:Real}; azimuth=315.0, zenith=45.0, cellsize=1.0)
-    dst = similar(dem, UInt8)
-    zenithr = deg2rad(zenith)
-    azimuthr = deg2rad(aspect(azimuth))
-
-    initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
-    function store!(d, i, v)
-        δzδx, δzδy = (v[1] - v[2]) / (8 * v[5]), (v[3] - v[4]) / (8 * v[5])
-        if δzδx != 0
-            a = atan(-δzδx, δzδy)
-            if a < 0
-                a += 2π
-            end
-        else
-            a = π / 2
-            if δzδy < 0
-                a += 2π
-            end
-        end
-        slope = atan(√(δzδx^2 + δzδy^2))
-        d[i] = round(UInt8, max(0, 255 * ((cos(zenithr) * cos(slope)) + (sin(zenithr) * sin(slope) * cos(azimuthr - a)))))
-    end
-    return localfilter!(dst, dem, nbkernel, initial, horn, store!)
-end
-
-"""
-    multihillshade(dem::Matrix{<:Real}; cellsize=1.0)
-
-multihillshade is the simulated illumination of a surface based on its [`slope`](@ref) and
-[`aspect`](@ref). Like [`hillshade`](@ref), but now using multiple sources as defined in
-https://pubs.usgs.gov/of/1992/of92-422/of92-422.pdf, similar to GDALs -multidirectional.
-"""
-function multihillshade(dem::AbstractMatrix{<:Real}; cellsize=1.0)
-    dst = similar(dem, UInt8)
-    zenithr = deg2rad(60)
-
-    initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
-    function store!(d, i, v)
-        δzδx, δzδy = (v[1] - v[2]) / (8 * v[5]), (v[3] - v[4]) / (8 * v[5])
-        if δzδx != 0
-            a = atan(-δzδx, δzδy)
-            if a < 0
-                a += 2π
-            end
-        else
-            a = π / 2
-            if δzδy < 0
-                a += 2π
-            end
-        end
-        slope = atan(√(δzδx^2 + δzδy^2))
-
-        w225 = 0.5 * (1 - cos(2(a - deg2rad(aspect(225)))))
-        w270 = 0.5 * (1 - cos(2(a - deg2rad(aspect(270)))))
-        w315 = 0.5 * (1 - cos(2(a - deg2rad(aspect(315)))))
-        w360 = 0.5 * (1 - cos(2(a - deg2rad(aspect(360)))))
-
-        α = cos(zenithr) * cos(slope)
-        β = sin(zenithr) * sin(slope)
-        something = (
-            w225 * (α + β * cos(deg2rad(aspect(225)) - a)) +
-            w270 * (α + β * cos(deg2rad(aspect(270)) - a)) +
-            w315 * (α + β * cos(deg2rad(aspect(315)) - a)) +
-            w360 * (α + β * cos(deg2rad(aspect(360)) - a))) / 2
-
-        d[i] = round(UInt8, max(0, 255 * something))
-    end
-    return localfilter!(dst, dem, nbkernel, initial, horn, store!)
 end

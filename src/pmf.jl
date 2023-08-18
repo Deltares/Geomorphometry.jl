@@ -1,5 +1,5 @@
 """
-    B, flags = pmf(A; ωₘ, slope, dhₘ, dh₀, cellsize)
+    B, flags = pmf(A; ωₘ, slope, dhₘ, dh₀, cellsize, adjust, erode)
 
 Applies the progressive morphological filter by *Zhang et al. (2003)* [^zhang2003] to `A`.
 
@@ -19,18 +19,41 @@ Afterwards, one can retrieve the resulting mask for `A` by `A .<= B` or `flags .
 
 [^zhang2003]: Zhang, Keqi, Shu-Ching Chen, Dean Whitman, Mei-Ling Shyu, Jianhua Yan, and Chengcui Zhang. “A Progressive Morphological Filter for Removing Nonground Measurements from Airborne LIDAR Data.” IEEE Transactions on Geoscience and Remote Sensing 41, no. 4 (2003): 872–82. <https://doi.org/10.1109/TGRS.2003.810682>.
 """
-function pmf(A::Union{AbstractMatrix{T},AbstractArray{T,3}};
-    ωₘ::Real=20.0,
-    slope::Real=0.01,
-    dhₘ::Real=2.5,
-    dh₀::Real=0.2,
-    cellsize::Real=1.0,
-    circular=false) where {T<:Real}
+function pmf(A::AbstractMatrix{<:Real};
+    ωₘ=20.0,
+    slope=0.01,
+    dhₘ=2.5,
+    dh₀=0.2,
+    cellsize=1.0,
+    circular=false,
+    adjust=false,
+    erode=false)
+    _pmf(A, ωₘ, slope, dhₘ, dh₀, cellsize, circular, adjust, erode)
+end
 
-    s = size(A)
-    if length(s) == 3
-        s[3] == 1 || throw(ArgumentError("Input `A` must be 2D or 3D with a singleton dimension"))
-    end
+function _pmf(A::AbstractMatrix{<:Real},
+    ωₘ::Real,
+    slope::Real,
+    dhₘ::Real,
+    dh₀::Real,
+    cellsize::Real,
+    circular::Bool,
+    adjust::Bool,
+    erode::Bool)
+
+    _pmf(A, ωₘ, Fill(slope, size(A)), dhₘ, Fill(dh₀, size(A)), cellsize, circular, adjust, erode)
+end
+
+function _pmf(A::AbstractMatrix{<:Real},
+    ωₘ::Real,
+    slope::AbstractMatrix{<:Real},
+    dhₘ::Real,
+    dh₀::AbstractMatrix{<:Real},
+    cellsize::Real,
+    circular::Bool,
+    adjust::Bool,
+    erode::Bool)
+
     # Compute windowsizes and thresholds
     ωₘ = round(Int, ωₘ / cellsize)
     κ_max = floor(Int, log2(ωₘ - 1))  # determine # iterations based on exp growth
@@ -39,7 +62,7 @@ function pmf(A::Union{AbstractMatrix{T},AbstractArray{T,3}};
     # Compute tresholds
     dwindows = vcat(windowsizes[1], windowsizes)  # prepend first element so we get 0 as diff
     window_diffs = [dwindows[i] - dwindows[i-1] for i = 2:length(dwindows)]
-    height_tresholds = [min(dhₘ, slope * window_diff * cellsize + dh₀) for window_diff in window_diffs]
+    # height_tresholds = [min(dhₘ, slope * window_diff * cellsize + dh₀) for window_diff in window_diffs]
 
     # Set up arrays
     Af = copy(A)  # array to be morphed
@@ -56,11 +79,23 @@ function pmf(A::Union{AbstractMatrix{T},AbstractArray{T,3}};
     mask = falses(size(A))
 
     # Iterate over window sizes and height tresholds
-    for (ωₖ, dhₜ) in zip(windowsizes, height_tresholds)
-        if circular
-            opening_circ!(Af, ωₖ, out)
+    for (i, ωₖ) in enumerate(windowsizes)
+        s = (i > 1) && adjust ? dilate(slope, window_diffs[i]) : slope
+        @debug "Window $(ωₖ), $(window_diffs[i]) slope sum: $(sum(s))"
+        dhₜ = min.(dhₘ, s * window_diffs[i] * cellsize .+ dh₀)
+        if erode
+            if circular
+                mapwindowcirc_approx!(minimum_mask, A, ωₖ, Af, Inf)
+            else
+                # mapwindow_stack!(minimum, A, ωₖ, Af)
+                LocalFilters.erode!(Af, A, ωₖ)
+            end
         else
-            LocalFilters.opening!(Af, out, Af, ωₖ)
+            if circular
+                opening_circ!(Af, ωₖ, out)
+            else
+                LocalFilters.opening!(Af, out, Af, ωₖ)
+            end
         end
         mask .= (A .- Af) .> dhₜ
         for I in eachindex(flags)
@@ -72,4 +107,9 @@ function pmf(A::Union{AbstractMatrix{T},AbstractArray{T,3}};
     end
 
     B, flags
+end
+
+function pmf(A::AbstractArray{<:Real,3}; kwargs...)
+    size(A, 3) == 1 || throw(ArgumentError("Only singleton 3rd dimension allowed"))
+    pmf(view(A, :, :, 1); kwargs...)
 end

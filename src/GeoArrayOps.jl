@@ -4,7 +4,7 @@ using OffsetArrays: OffsetMatrix
 using ImageFiltering: mapwindow, sobel, imgradients
 using Distances: Euclidean, euclidean, evaluate
 using PaddedViews: PaddedView
-using FillArrays: fill
+using FillArrays: Fill
 using StaticArrays: @SMatrix, @MMatrix, SMatrix, MMatrix, MVector
 using DataStructures: Deque
 using Statistics: median, mean

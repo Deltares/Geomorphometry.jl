@@ -131,7 +131,7 @@ function spread2(points::AbstractMatrix{<:Real}, initial::AbstractMatrix{<:Real}
 end
 
 function spread(points::AbstractMatrix{<:Real}, initial::Real, friction::Real; distance=Euclidean(), res=1.0)
-    init = fill(initial, size(points))
+    init = Fill(initial, size(points))
     return spread(points, init, friction; distance, res)
 end
 

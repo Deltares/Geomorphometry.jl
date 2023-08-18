@@ -8,8 +8,16 @@ using Test
         A[2, 2] = NaN
         B, flags = pmf(A)
         @test (A .<= B) == (flags .== 0.0)
-        B, flags = pmf(A; circular=true)
-        @test (A .<= B) == (flags .== 0.0)
+
+        Bc, flagsc = pmf(A; circular=true)
+        @test (A .<= Bc) == (flagsc .== 0.0)
+        A = reshape(A, (size(A)..., 1))
+
+        B3, flags3 = pmf(A)
+        @test length(size(B3)) == 2
+        @test isnan.(B3) == isnan.(B)
+        @test B3[end] == B[end]
+        @test isnan.(flags3) == isnan.(flags)
     end
     @testset "smf" begin
         # Write your own tests here.
