@@ -1,5 +1,5 @@
 [![CI](https://github.com/Deltares/GeoRasterFiltering.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/Deltares/GeoRasterFiltering.jl/actions/workflows/CI.yml)
-[![Codecov](https://codecov.io/gh/Deltares/Geomorphometry.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/Deltares/Geomorphometry.jl)
+[![Codecov](https://codecov.io/gh/Deltares/Geomorphometry.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/Deltares/Geomorphometry.jl)
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://deltares.github.io/Geomorphometry.jl/stable/)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://deltares.github.io/Geomorphometry.jl/dev/)
 

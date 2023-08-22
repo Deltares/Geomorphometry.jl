@@ -1,5 +1,5 @@
 [![CI](https://github.com/Deltares/GeoRasterFiltering.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/Deltares/GeoRasterFiltering.jl/actions/workflows/CI.yml)
-[![Codecov](https://codecov.io/gh/Deltares/Geomorphometry.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/Deltares/Geomorphometry.jl)
+[![Codecov](https://codecov.io/gh/Deltares/Geomorphometry.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/Deltares/Geomorphometry.jl)
 
 # Geomorphometry
 Geospatial operations, cost and filtering algorithms as used in for elevation rasters.
