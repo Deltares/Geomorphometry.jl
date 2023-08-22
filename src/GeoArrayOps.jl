@@ -1,4 +1,4 @@
-module GeoArrayOps
+module Geomorphometry
 using StatsBase: skewness
 using OffsetArrays: OffsetMatrix
 using ImageFiltering: mapwindow, sobel, imgradients

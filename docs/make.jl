@@ -1,8 +1,8 @@
 push!(LOAD_PATH, "../src/")
-using Documenter, GeoArrayOps
+using Documenter, Geomorphometry
 
 makedocs(
-    sitename="GeoArrayOps.jl",
+    sitename="Geomorphometry.jl",
     pages=[
         "index.md",
         "Tutorials" => [],
@@ -13,5 +13,5 @@ makedocs(
 )
 
 deploydocs(
-    repo="github.com/Deltares/GeoArrayOps.jl.git",
+    repo="github.com/Deltares/Geomorphometry.jl.git",
 )

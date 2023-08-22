@@ -1,5 +1,5 @@
 ## Reference
 ```@autodocs
-Modules = [GeoArrayOps]
+Modules = [Geomorphometry]
 Order   = [:function, :type]
 ```

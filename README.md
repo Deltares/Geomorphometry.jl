@@ -1,9 +1,9 @@
 [![CI](https://github.com/Deltares/GeoRasterFiltering.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/Deltares/GeoRasterFiltering.jl/actions/workflows/CI.yml)
-[![Codecov](https://codecov.io/gh/Deltares/GeoArrayOps.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/Deltares/GeoArrayOps.jl)
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://deltares.github.io/GeoArrayOps.jl/stable/)
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://deltares.github.io/GeoArrayOps.jl/dev/)
+[![Codecov](https://codecov.io/gh/Deltares/Geomorphometry.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/Deltares/Geomorphometry.jl)
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://deltares.github.io/Geomorphometry.jl/stable/)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://deltares.github.io/Geomorphometry.jl/dev/)
 
-# GeoArrayOps
+# Geomorphometry
 Geospatial operations, cost and filtering algorithms as used in for elevation rasters.
 
 ## Functionality
@@ -17,5 +17,5 @@ The package can be installed with the Julia package manager.
 From the Julia REPL, type `]` to enter the Pkg REPL mode and run:
 
 ```
-pkg> add GeoArrayOps
+pkg> add Geomorphometry
 ```

@@ -1,7 +1,7 @@
-using GeoArrayOps
+using Geomorphometry
 using Test
 
-@testset "GeoArrayOps" begin
+@testset "Geomorphometry" begin
     @testset "pmf" begin
         # Write your own tests here.
         A = rand(25, 25)
