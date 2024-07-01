@@ -1,19 +1,19 @@
 """Apply the opening operation to `A` with window size `ω`."""
-function opening(A::Array{T,2}, ω::Integer) where {T<:Real}
+function opening(A::AbstractArray{T,2}, ω::Integer) where {T<:Real}
     A = mapwindow(minimum, A, (ω, ω))  # erosion
     A = mapwindow(maximum, A, (ω, ω))  # dilation
     A
 end
 
 """Apply the opening operation to `A` with window size `ω`."""
-function opening!(A::Array{T,2}, ω::Integer, out::Array{T,2}) where {T<:Real}
+function opening!(A::AbstractArray{T,2}, ω::Integer, out::AbstractArray{T,2}) where {T<:Real}
     mapwindow_sep!(minimum, A, ω, out, Inf)  # erosion
     mapwindow_sep!(maximum, out, ω, A, -Inf)  # dilation
     A
 end
 
 """Apply the opening operation to `A` with window size `ω`."""
-function opening_circ!(A::Array{T,2}, ω::Integer, out::Array{T,2}) where {T<:Real}
+function opening_circ!(A::AbstractArray{T,2}, ω::Integer, out::AbstractArray{T,2}) where {T<:Real}
     mapwindowcirc_approx!(minimum_mask, A, ω, out, Inf)  # erosion
     mapwindowcirc_approx!(maximum_mask, out, ω, A, -Inf)  # dilation
     A

@@ -6,10 +6,11 @@ using Distances: Euclidean, euclidean, evaluate
 using PaddedViews: PaddedView
 using FillArrays: Fill
 using StaticArrays: @SMatrix, @MMatrix, SMatrix, MMatrix, MVector
-using DataStructures: Deque
+# using DataStructures: Deque, PriorityQueue, enqueue!, dequeue!
 using Statistics: median, mean
 using ImageCore: scaleminmax, Gray
 using LocalFilters
+using QuickHeaps: FastPriorityQueue, PriorityQueue, enqueue!, dequeue!
 
 include("utils.jl")
 include("pmf.jl")

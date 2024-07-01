@@ -23,57 +23,62 @@ This is also the method implemented by [PCRaster](https://pcraster.geo.uu.nl/pcr
 """
 function spread(points::AbstractMatrix{<:Real}, initial::AbstractMatrix{<:Real}, friction::AbstractMatrix{<:Real}; res=1, limit=Inf)
 
-    ofriction = OffsetMatrix(fill(Inf, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
-    ofriction[begin+1:end-1, begin+1:end-1] .= friction
+    # ofriction = OffsetMatrix(fill(Inf, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
+    # ofriction[begin+1:end-1, begin+1:end-1] .= friction
 
-    result = OffsetMatrix(fill(limit, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
-    r = @view result[1:end-1, 1:end-1]
+    # result = OffsetMatrix(fill(limit, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
+    result = fill(limit, size(friction))
+    # r = @view result[1:end-1, 1:end-1]
     locations = points .> 0
-    r[locations] .= initial[locations]
+    result[locations] .= initial[locations]
+
+    # zone = OffsetMatrix(fill(0, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
+    # ozone = @view zone[1:end-1, 1:end-1]
+    # ozone .= points
+    zone = copy(points)
 
     # Construct stack for locations
-    mask = OffsetMatrix(trues(size(points) .+ 2), UnitRange.(0, size(points) .+ 1))
-    mask[begin+1:end-1, begin+1:end-1] .= false
+    # mask = OffsetMatrix(trues(size(points) .+ 2), UnitRange.(0, size(points) .+ 1))
+    # mask[begin+1:end-1, begin+1:end-1] .= false
+    mask = falses(size(points))
 
     II = CartesianIndices(size(points))
-    stack = Deque{CartesianIndex}()
+    # pq = PriorityQueue{CartesianIndex,eltype(friction)}()
+    pq = FastPriorityQueue{eltype(friction)}(size(locations)...)
+    # pq = PriorityQueue{CartesianIndex{2},eltype(friction)}()
     for I in II[locations]
-        push!(stack, I)
+        enqueue!(pq, Tuple(I), result[I])
+        mask[I] = true
     end
-
     # Step 1: Set the distance of the starting node to 0 and the distances of all other nodes to the highest value possible.
-    sdata = zeros(MMatrix{3,3})
-    mcell = MMatrix{3,3}(false, false, false, false, false, false, false, false, false)
 
     # Step 3: For each of the active node’s adjacent neighbors, set its distance to whichever is
     # less: its current distance value or the sum of the distance of the active node plus the
     # weight of the arc from the active node to that neighbor.
-    while !isempty(stack)
-        spread!(stack, mask, result, ofriction, sdata, mcell, res)
+    while !isempty(pq)
+        spread!(pq, mask, result, friction, zone, res)
     end
-    r
+    result, zone
 end
 
+# TODO Spread should iterate on one point source first, than from the lowest next one etc.
 
-function spread!(stack, mask, result, ofriction, sdata, mcell, res)
-    I = popfirst!(stack)
+function spread!(pq, mask, result, friction, zone, res)
+    I = CartesianIndices(pq.index)[dequeue!(pq)]
+    # I = dequeue!(pq)
     mask[I] = true
     patch = I-Δ:I+Δ
 
-    rdata = MMatrix{3,3}(view(result, patch))
-    fdata = SMatrix{3,3}(view(ofriction, patch))
-
     # New distance is cell_distance + average friction values
-    for i ∈ eachindex(sdata)
-        sdata[i] = muladd(fdata[i] + fdata[2, 2], res / 2 * distance_8[i], rdata[2, 2])
-        mcell[i] = sdata[i] < rdata[i]  # cells where new distance is lower
-    end
-    rdata[mcell] .= sdata[mcell]
-    result[patch] .= rdata
-
-    # Add new cells to stack
-    for I in patch[mcell]
-        mask[I] || push!(stack, I)
+    for (li, i) in enumerate(patch)
+        i in CartesianIndices(result) || continue
+        mask[i] && continue
+        nr = muladd(friction[i] + friction[I], res / 2 * distance_8[li], result[I])
+        if nr < result[i]  # cells where new distance is lower
+            result[i] = nr
+            zone[i] = zone[I]
+            haskey(pq, Tuple(i)) || enqueue!(pq, Tuple(i), result[i])
+        end
     end
 end
 
@@ -97,37 +102,50 @@ This method should scale much better (linearly) than the [^tomlin1983] method, b
 
 [^eastman1989]: Eastman, J. Ronald. 1989. ‘Pushbroom Algorithms for Calculating Distances in Raster Grids’. In Proceedings, Autocarto, 9:288–97.
 """
-function spread2(points::AbstractMatrix{<:Real}, initial::AbstractMatrix{<:Real}, friction::AbstractMatrix{<:Real}; res=1, limit=Inf, iterations=3)
+function spread2(points::AbstractMatrix{<:Real}, initial::AbstractMatrix{<:Real}, friction::AbstractMatrix{<:Real}; res=1, limit=Inf, iterations=3, epsilon=1e-6)
 
-    ofriction = OffsetMatrix(fill(Inf, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
-    ofriction[begin+1:end-1, begin+1:end-1] .= friction
+    # ofriction = OffsetMatrix(fill(Inf, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
+    # ofriction[begin+1:end-1, begin+1:end-1] .= friction
 
-    result = OffsetMatrix(fill(limit, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
-    r = @view result[1:end-1, 1:end-1]
+    # result = OffsetMatrix(fill(limit, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
+    result = fill(limit, size(friction))
+
+    # r = @view result[1:end-1, 1:end-1]
     locations = points .> 0
-    r[locations] .= initial[locations]
+    result[locations] .= initial[locations]
 
-    mask = OffsetMatrix(trues(size(points) .+ 2), UnitRange.(0, size(points) .+ 1))
-    mask[begin+1:end-1, begin+1:end-1] .= false
+    # mask = OffsetMatrix(trues(size(points) .+ 2), UnitRange.(0, size(points) .+ 1))
+    # mask[begin+1:end-1, begin+1:end-1] .= false
+    # mask = falses(size(points))
 
-    minval, minidx = [0.0], [CartesianIndex(1, 1)]
-    x = @MMatrix zeros(3, 3)
-
+    # zone = OffsetMatrix(fill(0, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
+    # ozone = @view zone[1:end-1, 1:end-1]
+    # ozone .= points
+    zone = copy(points)
+    # minval, minidx = [0.0], [CartesianIndex(1, 1)]
+    # x = @MMatrix zeros(3, 3)
     indices = CartesianIndices(size(points))
+    counts = 1
     for i in 1:iterations
+        if iszero(counts)
+            break
+        end
+        counts -= counts
         II = (i % 2 == 1) ? indices : reverse(indices)
         for I ∈ II
             patch = I-Δ:I+Δ
-
-            rdata = view(result, patch)
-            fdata = view(ofriction, patch)
-
-            x .= (fdata .+ fdata[2, 2]) .* res ./ 2 .* distance_8 .+ rdata
-            findmin!(minval, minidx, x)
-            rdata[2, 2] = min(rdata[2, 2], minval[1])
+            for (li, i) in enumerate(patch)
+                i in CartesianIndices(result) || continue
+                nr = muladd(friction[i] + friction[I], res / 2 * distance_8[li], result[I])
+                if nr < result[i]  # cells where new distance is lower
+                    counts += 1
+                    result[i] = nr
+                    zone[i] = zone[I]
+                end
+            end
         end
     end
-    r
+    result, zone
 end
 
 function spread(points::AbstractMatrix{<:Real}, initial::Real, friction::Real; distance=Euclidean(), res=1.0)

@@ -9,7 +9,7 @@ Improved the performance by applying a binary search to find the threshold value
 
 [^bartels2006]: Bartels, M., Hong Wei, and D.C. Mason. 2006. “DTM Generation from LIDAR Data Using Skewness Balancing.” In 18th International Conference on Pattern Recognition (ICPR’06), 1:566–69. https://doi.org/10/cwk4v2.
 """
-function skb(iA::AbstractArray{T}; mean::T=mean(iA)) where {T<:Real}
+function skb(iA::AbstractArray; mean=mean(iA))
     m = .!isfinite.(iA)
     if sum(m) > 0
         A = copy(iA)
