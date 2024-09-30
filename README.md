@@ -4,7 +4,7 @@
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://deltares.github.io/Geomorphometry.jl/dev/)
 
 # Geomorphometry
-Geospatial operations, cost and filtering algorithms as used in for elevation rasters.
+Geospatial operations, cost and filtering algorithms as used for elevation rasters.
 
 ## Functionality
 - Terrain filters, such as Progressive Morphological Filters (PMF, SMF) and Skewness balancing
