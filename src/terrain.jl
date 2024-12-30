@@ -1,8 +1,10 @@
+using Stencils
+
 const neib_8 = @SMatrix [1.0 1 1; 1 0 1; 1 1 1]
 const neib_8_inf = @SMatrix [1.0 1 1; 1 Inf 1; 1 1 1]
 const neib_8_mask = @SMatrix Bool[1 1 1; 1 0 1; 1 1 1]
 
-const nbkernel = LocalFilters.Kernel{Int8,2}(reshape(1:9, 3, 3))
+const nbkernel = LocalFilters.Kernel{Int8, 2}(reshape(1:9, 3, 3))
 
 abstract type DerivativeMethod end
 
@@ -36,14 +38,25 @@ end
 
 TPI stands for Topographic Position Index, which is defined as the difference between a central pixel and the mean of its surrounding cells (see Wilson et al 2007, Marine Geodesy 30:3-35).
 """
-function TPI(dem::AbstractMatrix{<:Real})
+function TPI3(dem::AbstractMatrix{<:Real}, window::Int = 1)
     dst = copy(dem)
 
     initial(a) = zero(a)
     update(v, a, b) = v + a
-    store!(d, i, v) = @inbounds d[i] = d[i] - (v - d[i]) / 8
+    store!(d, i, v) = @inbounds d[i] = d[i] - (v - d[i]) / ((window * 2 + 1)^2 - 1)
 
-    return localfilter!(dst, dem, 3, initial, update, store!)
+    return localfilter!(dst, dem, window * 2 + 1, initial, update, store!)
+end
+
+function TPI2(dem::AbstractMatrix{<:Real}, window::Stencil = Moore(1))
+    sa = StencilArray(dem, window)
+    X = mapstencil(mean, sa)
+    dem - X
+end
+
+function BPI(dem::AbstractMatrix{<:Real}, window = Annulus(3, 2))
+    X = mapstencil(mean, window, dem)
+    dem - X
 end
 
 """
@@ -68,7 +81,7 @@ end
 
 Remove pits from a DEM Array if the center cell of a 3x3 patch is `limit` lower or than the surrounding cells.
 """
-function pitremoval(dem::AbstractMatrix{<:Real}; limit=0.0)
+function pitremoval(dem::AbstractMatrix{<:Real}; limit = 0.0)
     dst = copy(dem)
 
     initial(a) = (true, typemax(a), a, limit)  # (is_pit, min, center, limit)
@@ -87,75 +100,94 @@ function pitremoval(dem::AbstractMatrix{<:Real}; limit=0.0)
 end
 
 """
-    slope(dem::Matrix{<:Real}; cellsize=1.0, method=Horn())
+    slope(dem::Matrix{<:Real}; cellsize=1.0, method=Horn(), exaggeration=1.0)
 
 Slope is the rate of change between a cell and its neighbors as defined in Burrough, P. A., and McDonell, R. A., (1998, Principles of Geographical Information Systems).
 """
-function slope(dem::AbstractMatrix{<:Real}; cellsize=1.0, method::DerivativeMethod=Horn())
+function slope(
+    dem::AbstractMatrix{<:Real};
+    cellsize = 1.0,
+    method::DerivativeMethod = Horn(),
+    exaggeration = 1.0,
+)
     dst = copy(dem)
-    slope!(method, dst, dem, cellsize)
+    slope!(method, dst, dem, cellsize, exaggeration)
 end
 
-function slope!(::Horn, dst, dem::AbstractMatrix{<:Real}, cellsize)
-    initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
+function slope!(::Horn, dst, dem::AbstractMatrix{<:Real}, cellsize, exaggeration)
+    initial(A) =
+        (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
     store!(d, i, v) = @inbounds d[i] = atand(
-        √(
-            ((v[1] - v[2]) / (8 * v[5]))^2 + ((v[3] - v[4]) / (8 * v[5]))^2
-        ))
+        √(((v[1] - v[2]) / (8 * v[5]))^2 + ((v[3] - v[4]) / (8 * v[5]))^2) * exaggeration,
+    )
     return localfilter!(dst, dem, nbkernel, initial, horn, store!)
 end
 
-function slope!(::ZevenbergenThorne, dst, dem::AbstractMatrix{<:Real}, cellsize)
+function slope!(
+    ::ZevenbergenThorne,
+    dst,
+    dem::AbstractMatrix{<:Real},
+    cellsize,
+    exaggeration,
+)
     initial(A) = (zero(eltype(A)), zero(eltype(A)), cellsize)
-    store!(d, i, v) = @inbounds d[i] = atand(
-        √(
-            (v[1] / (2 * v[3]))^2 + (v[2] / (2 * v[3]))^2
-        ))
+    store!(d, i, v) = @inbounds d[i] =
+        atand(√((v[1] / (2 * v[3]))^2 + (v[2] / (2 * v[3]))^2) * exaggeration)
     return localfilter!(dst, dem, nbkernel, initial, zevenbergenthorne, store!)
 end
 
-function slope!(::MaximumDownwardGradient, dst, dem::AbstractMatrix{<:Real}, cellsize)
-    initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
+function slope!(
+    ::MaximumDownwardGradient,
+    dst,
+    dem::AbstractMatrix{<:Real},
+    cellsize,
+    exaggeration,
+)
+    initial(A) =
+        (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
     function store!(d, i, v)
-        m = max(
-            abs(v[1]) / (v[5] * sqrt2),
-            abs(v[2]) / v[5],
-            abs(v[3]) / (v[5] * sqrt2),
-            abs(v[4]) / v[5],
-        ) / 2
-        d[i] = atand(√(m^2 + m^2))
+        m =
+            max(
+                abs(v[1]) / (v[5] * sqrt2),
+                abs(v[2]) / v[5],
+                abs(v[3]) / (v[5] * sqrt2),
+                abs(v[4]) / v[5],
+            ) / 2
+        d[i] = atand(√(m^2 + m^2) * exaggeration)
     end
     return localfilter!(dst, dem, nbkernel, initial, mdg, store!)
 end
-
 
 """
     aspect(dem::Matrix{<:Real}, method=Horn())
 
 Aspect is direction of [`slope`](@ref), as defined in Burrough, P. A., and McDonell, R. A., (1998, Principles of Geographical Information Systems).
 """
-function aspect(dem::AbstractMatrix{<:Real}; method::DerivativeMethod=Horn())
+function aspect(dem::AbstractMatrix{<:Real}; method::DerivativeMethod = Horn())
     dst = copy(dem)
     aspect!(method, dst, dem, 1)
 end
 
 # Useless, as there's no x/y component.
 function aspect!(::MaximumDownwardGradient, dst, dem::AbstractMatrix{<:Real}, cellsize)
-    initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
+    initial(A) =
+        (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
     function store!(d, i, v)
-        δzδx = max(
-            abs(v[1]) / (v[5] * sqrt2),
-            abs(v[2]) / v[5],
-            abs(v[3]) / (v[5] * sqrt2),
-            abs(v[4]) / v[5],
-        ) / 2
+        δzδx =
+            max(
+                abs(v[1]) / (v[5] * sqrt2),
+                abs(v[2]) / v[5],
+                abs(v[3]) / (v[5] * sqrt2),
+                abs(v[4]) / v[5],
+            ) / 2
         d[i] = compass(atand(δzδx, -δzδx))
     end
     return localfilter!(dst, dem, nbkernel, initial, mdg, store!)
 end
 
 function aspect!(::Horn, dst, dem::AbstractMatrix{<:Real}, cellsize)
-    initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
+    initial(A) =
+        (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
     function store!(d, i, v)
         δzδx = (v[1] - v[2]) / (8 * v[5])
         δzδy = (v[3] - v[4]) / (8 * v[5])
@@ -247,13 +279,16 @@ end
 
 Curvature is derivative of [`slope`](@ref), so the second derivative of the DEM.
 """
-function curvature(dem::AbstractMatrix{<:Real}; cellsize=1.0)
+function curvature(dem::AbstractMatrix{<:Real}; cellsize = 1.0)
     dst = copy(dem)
     curvature!(dst, dem, cellsize)
 end
 
-function curvature!(dst::AbstractMatrix{<:Real}, dem::AbstractMatrix{<:Real}, cellsize=1.0)
-
+function curvature!(
+    dst::AbstractMatrix{<:Real},
+    dem::AbstractMatrix{<:Real},
+    cellsize = 1.0,
+)
     initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
     function curvature(v, a, b)
         if b == 2

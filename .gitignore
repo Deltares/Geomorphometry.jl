@@ -8,3 +8,8 @@ docs/build/
 *.gif
 test/benchmark.jl
 .vscode
+docs/node_modules
+docs/final_site
+_extensions
+
+

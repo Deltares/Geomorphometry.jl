@@ -1,5 +1,27 @@
-## Reference
+```@meta
+DocTestSetup= quote
+using Geomorphometry
+end
+
+```
+## Index
+```@index
+Modules = [Geomorphometry]
+Private = false
+```
+
+## Reference - Exported functions
 ```@autodocs
 Modules = [Geomorphometry]
-Order   = [:function, :type]
+Private = false
+```
+
+## Reference - Internal functions
+```@autodocs
+Modules = [Geomorphometry]
+Public = false
+```
+
+## Bibliography
+```@bibliography
 ```

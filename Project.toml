@@ -17,6 +17,7 @@ QuickHeaps = "30b38841-0f52-47f8-a5f8-18d5d4064379"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+Stencils = "264155e8-78a8-466a-aa59-c9b28c34d21a"
 
 [compat]
 DataStructures = "0.18"
@@ -29,7 +30,8 @@ OffsetArrays = "1.10"
 PaddedViews = "0.5"
 StaticArrays = "1"
 StatsBase = "0.33, 0.34"
-julia = "1.6, 1.7, 1.8"
+Stencils = "0.3.4"
+julia = "1.10"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

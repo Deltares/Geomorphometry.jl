@@ -14,14 +14,14 @@ Perceptually Shaded Slope Map by *Pingel, Clarke. 2014* [^pingel2014].
 
 [^pingel2014]: Pingel, Thomas, and Clarke, Keith. 2014. ‘Perceptually Shaded Slope Maps for the Visualization of Digital Surface Models’. Cartographica: The International Journal for Geographic Information and Geovisualization 49 (4): 225–40. <https://doi.org/10/ggnthv>.
 """
-function pssm(A::AbstractMatrix{<:Real}; exaggeration=2.3, cellsize=1.0, method=Horn())
-    G = slope(A * exaggeration; cellsize, method)
-    f = scaleminmax(0, 1)
-    clamped = f.(G)
-    Gray.(1 .- clamped)
+function pssm(
+    A::AbstractMatrix{<:Real};
+    exaggeration = 2.3,
+    cellsize = 1.0,
+    method = Horn(),
+)
+    slope(A; cellsize, method, exaggeration)
 end
-
-
 
 """
     hillshade(dem::Matrix{<:Real}; azimuth=315.0, zenith=45.0, cellsize=1.0)
@@ -30,12 +30,18 @@ hillshade is the simulated illumination of a surface based on its [`slope`](@ref
 [`aspect`](@ref) given a light source with azimuth and zenith angles in °, , as defined in
 Burrough, P. A., and McDonell, R. A., (1998, Principles of Geographical Information Systems).
 """
-function hillshade(dem::AbstractMatrix{<:Real}; azimuth=315.0, zenith=45.0, cellsize=1.0)
+function hillshade(
+    dem::AbstractMatrix{<:Real};
+    azimuth = 315.0,
+    zenith = 45.0,
+    cellsize = 1.0,
+)
     dst = similar(dem, UInt8)
     zenithr = deg2rad(zenith)
     azimuthr = deg2rad(aspect(azimuth))
 
-    initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
+    initial(A) =
+        (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
     function store!(d, i, v)
         δzδx, δzδy = (v[1] - v[2]) / (8 * v[5]), (v[3] - v[4]) / (8 * v[5])
         if δzδx != 0
@@ -50,7 +56,16 @@ function hillshade(dem::AbstractMatrix{<:Real}; azimuth=315.0, zenith=45.0, cell
             end
         end
         slope = atan(√(δzδx^2 + δzδy^2))
-        d[i] = round(UInt8, max(0, 255 * ((cos(zenithr) * cos(slope)) + (sin(zenithr) * sin(slope) * cos(azimuthr - a)))))
+        d[i] = round(
+            UInt8,
+            max(
+                0,
+                255 * (
+                    (cos(zenithr) * cos(slope)) +
+                    (sin(zenithr) * sin(slope) * cos(azimuthr - a))
+                ),
+            ),
+        )
     end
     return localfilter!(dst, dem, nbkernel, initial, horn, store!)
 end
@@ -62,11 +77,12 @@ multihillshade is the simulated illumination of a surface based on its [`slope`]
 [`aspect`](@ref). Like [`hillshade`](@ref), but now using multiple sources as defined in
 https://pubs.usgs.gov/of/1992/of92-422/of92-422.pdf, similar to GDALs -multidirectional.
 """
-function multihillshade(dem::AbstractMatrix{<:Real}; cellsize=1.0)
+function multihillshade(dem::AbstractMatrix{<:Real}; cellsize = 1.0)
     dst = similar(dem, UInt8)
     zenithr = deg2rad(60)
 
-    initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
+    initial(A) =
+        (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
     function store!(d, i, v)
         δzδx, δzδy = (v[1] - v[2]) / (8 * v[5]), (v[3] - v[4]) / (8 * v[5])
         if δzδx != 0
@@ -89,11 +105,13 @@ function multihillshade(dem::AbstractMatrix{<:Real}; cellsize=1.0)
 
         α = cos(zenithr) * cos(slope)
         β = sin(zenithr) * sin(slope)
-        something = (
-            w225 * (α + β * cos(deg2rad(aspect(225)) - a)) +
-            w270 * (α + β * cos(deg2rad(aspect(270)) - a)) +
-            w315 * (α + β * cos(deg2rad(aspect(315)) - a)) +
-            w360 * (α + β * cos(deg2rad(aspect(360)) - a))) / 2
+        something =
+            (
+                w225 * (α + β * cos(deg2rad(aspect(225)) - a)) +
+                w270 * (α + β * cos(deg2rad(aspect(270)) - a)) +
+                w315 * (α + β * cos(deg2rad(aspect(315)) - a)) +
+                w360 * (α + β * cos(deg2rad(aspect(360)) - a))
+            ) / 2
 
         d[i] = round(UInt8, max(0, 255 * something))
     end
