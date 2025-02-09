@@ -25,13 +25,11 @@ function skb(iA::AbstractArray; mean=mean(iA))
     len = length(AA) - sum(m)
     step = length(AA) - sum(m)
     i = length(AA) - sum(m)
-    @info i
 
     while step >= 1
         s = skewness(AA[begin:i], mean)
         d <<= 1
         step = len ÷ d
-        @info s, i, d
         if s > 0
             i -= step
         else
@@ -74,7 +72,6 @@ function skb2(iA::AbstractArray; mean=mean(iA))
         end
         i -= 1
     end
-    @info i
     fill!(m, true)
     m[I[i:end]] .= false
     return m
@@ -97,7 +94,6 @@ function skbr(A; iterations=10, mean=mean(A))
     terrain_mask = skb(A; mean=mean)
     object_mask = .!terrain_mask
     while iterations > 1 && sum(object_mask) > 0
-        # @info "$(round(Int, sum(object_mask) / length(object_mask) * 100))% objects..."
         terrain_mask[object_mask] = terrain_mask[object_mask] .| skb(A[object_mask])
         object_mask .= .!terrain_mask
         iterations -= 1

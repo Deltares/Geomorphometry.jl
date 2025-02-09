@@ -1,8 +1,7 @@
-using Stencils
-
 const neib_8 = @SMatrix [1.0 1 1; 1 0 1; 1 1 1]
 const neib_8_inf = @SMatrix [1.0 1 1; 1 Inf 1; 1 1 1]
 const neib_8_mask = @SMatrix Bool[1 1 1; 1 0 1; 1 1 1]
+const neib_8_dist = @SMatrix [√2 1 √2; 1 0 1; √2 1 √2]
 
 const nbkernel = LocalFilters.Kernel{Int8, 2}(reshape(1:9, 3, 3))
 
@@ -18,86 +17,7 @@ struct Horn <: DerivativeMethod end
 struct MaximumDownwardGradient <: DerivativeMethod end
 const MDG = MaximumDownwardGradient
 
-"""
-    roughness(dem::Matrix{<:Real})
-
-Roughness is the largest inter-cell difference of a central pixel and its surrounding cell, as defined in Wilson et al (2007, Marine Geodesy 30:3-35).
-"""
-function roughness(dem::AbstractMatrix{<:Real})
-    dst = copy(dem)
-
-    initial(a) = (zero(a), a)
-    update(v, a, _) = (max(v[1], abs(a - v[2])), v[2])
-    store!(d, i, v) = @inbounds d[i] = v[1]
-
-    return localfilter!(dst, dem, 3, initial, update, store!)
-end
-
-"""
-    TPI(dem::Matrix{<:Real})
-
-TPI stands for Topographic Position Index, which is defined as the difference between a central pixel and the mean of its surrounding cells (see Wilson et al 2007, Marine Geodesy 30:3-35).
-"""
-function TPI3(dem::AbstractMatrix{<:Real}, window::Int = 1)
-    dst = copy(dem)
-
-    initial(a) = zero(a)
-    update(v, a, b) = v + a
-    store!(d, i, v) = @inbounds d[i] = d[i] - (v - d[i]) / ((window * 2 + 1)^2 - 1)
-
-    return localfilter!(dst, dem, window * 2 + 1, initial, update, store!)
-end
-
-function TPI2(dem::AbstractMatrix{<:Real}, window::Stencil = Moore(1))
-    sa = StencilArray(dem, window)
-    X = mapstencil(mean, sa)
-    dem - X
-end
-
-function BPI(dem::AbstractMatrix{<:Real}, window = Annulus(3, 2))
-    X = mapstencil(mean, window, dem)
-    dem - X
-end
-
-"""
-    TRI(dem::Matrix{<:Real})
-
-TRI stands for Terrain Ruggedness Index, which measures the difference between a central pixel and its surrounding cells.
-This algorithm uses the square root of the sum of the square of the difference between a central pixel and its surrounding cells.
-This is recommended for terrestrial use cases.
-"""
-function TRI(dem::AbstractMatrix{<:Real})
-    dst = copy(dem)
-
-    initial(a) = (zero(a), a)
-    update(v, a, _) = (v[1] + (a - v[2])^2, v[2])
-    store!(d, i, v) = @inbounds d[i] = sqrt(v[1])
-
-    return localfilter!(dst, dem, 3, initial, update, store!)
-end
-
-"""
-    pitremoval(dem::Matrix{<:Real})
-
-Remove pits from a DEM Array if the center cell of a 3x3 patch is `limit` lower or than the surrounding cells.
-"""
-function pitremoval(dem::AbstractMatrix{<:Real}; limit = 0.0)
-    dst = copy(dem)
-
-    initial(a) = (true, typemax(a), a, limit)  # (is_pit, min, center, limit)
-    @inbounds function update(v, a, _)
-        if v[3] == a
-            return v
-        elseif (a - v[3]) > v[4]
-            return (v[1] & true, min(a, v[2]), v[3], v[4])
-        else
-            (false, v[2], v[3], v[4])
-        end
-    end
-    store!(d, i, v) = @inbounds d[i] = v[1] ? v[2] : v[3]
-
-    return localfilter!(dst, dem, 3, initial, update, store!)
-end
+struct LandSerf <: DerivativeMethod end
 
 """
     slope(dem::Matrix{<:Real}; cellsize=1.0, method=Horn(), exaggeration=1.0)
@@ -109,12 +29,13 @@ function slope(
     cellsize = 1.0,
     method::DerivativeMethod = Horn(),
     exaggeration = 1.0,
+    xyratio=xyratio(dem)
 )
     dst = copy(dem)
-    slope!(method, dst, dem, cellsize, exaggeration)
+    slope!(method, dst, dem, cellsize, exaggeration, xyratio)
 end
 
-function slope!(::Horn, dst, dem::AbstractMatrix{<:Real}, cellsize, exaggeration)
+function slope!(::Horn, dst, dem::AbstractMatrix{<:Real}, cellsize, exaggeration, xyratio)
     initial(A) =
         (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
     store!(d, i, v) = @inbounds d[i] = atand(
@@ -129,6 +50,7 @@ function slope!(
     dem::AbstractMatrix{<:Real},
     cellsize,
     exaggeration,
+    xyratio
 )
     initial(A) = (zero(eltype(A)), zero(eltype(A)), cellsize)
     store!(d, i, v) = @inbounds d[i] =
@@ -142,6 +64,7 @@ function slope!(
     dem::AbstractMatrix{<:Real},
     cellsize,
     exaggeration,
+    xyratio
 )
     initial(A) =
         (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
@@ -163,13 +86,13 @@ end
 
 Aspect is direction of [`slope`](@ref), as defined in Burrough, P. A., and McDonell, R. A., (1998, Principles of Geographical Information Systems).
 """
-function aspect(dem::AbstractMatrix{<:Real}; method::DerivativeMethod = Horn())
+function aspect(dem::AbstractMatrix{<:Real}; method::DerivativeMethod = Horn(), xyratio=xyratio(dem))
     dst = copy(dem)
-    aspect!(method, dst, dem, 1)
+    aspect!(method, dst, dem, 1, xyratio)
 end
 
 # Useless, as there's no x/y component.
-function aspect!(::MaximumDownwardGradient, dst, dem::AbstractMatrix{<:Real}, cellsize)
+function aspect!(::MaximumDownwardGradient, dst, dem::AbstractMatrix{<:Real}, cellsize, xyratio)
     initial(A) =
         (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
     function store!(d, i, v)
@@ -185,7 +108,7 @@ function aspect!(::MaximumDownwardGradient, dst, dem::AbstractMatrix{<:Real}, ce
     return localfilter!(dst, dem, nbkernel, initial, mdg, store!)
 end
 
-function aspect!(::Horn, dst, dem::AbstractMatrix{<:Real}, cellsize)
+function aspect!(::Horn, dst, dem::AbstractMatrix{<:Real}, cellsize, xyratio)
     initial(A) =
         (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
     function store!(d, i, v)
@@ -196,7 +119,7 @@ function aspect!(::Horn, dst, dem::AbstractMatrix{<:Real}, cellsize)
     return localfilter!(dst, dem, nbkernel, initial, horn, store!)
 end
 
-function aspect!(::ZevenbergenThorne, dst, dem::AbstractMatrix{<:Real}, cellsize)
+function aspect!(::ZevenbergenThorne, dst, dem::AbstractMatrix{<:Real}, cellsize, xyratio)
     initial(A) = (zero(eltype(A)), zero(eltype(A)), cellsize)
     function store!(d, i, v)
         δzδx = v[1] / 2
@@ -274,41 +197,155 @@ function aspect(compass::Real)
     return (450 - compass) % 360
 end
 
-"""
-    curvature(dem::Matrix{<:Real}; cellsize=1.0)
+@deprecate curvature(args...; kwargs...) laplacian(args...; gis=true, kwargs...)
 
-Curvature is derivative of [`slope`](@ref), so the second derivative of the DEM.
-"""
-function curvature(dem::AbstractMatrix{<:Real}; cellsize = 1.0)
-    dst = copy(dem)
-    curvature!(dst, dem, cellsize)
+function laplacian(dem::AbstractMatrix{<:Real}; cellsize = 1.0, radius=1, gis=false)
+    mapstencil(x -> -2(_D(ZevenbergenThorne(),x,cellsize,cellsize) + _E(ZevenbergenThorne(),x,cellsize,cellsize)) * (gis ? 100 : 1), fitns(radius), dem)
 end
 
-function curvature!(
-    dst::AbstractMatrix{<:Real},
-    dem::AbstractMatrix{<:Real},
-    cellsize = 1.0,
+fitns(R::Int) = NamedStencil(;
+    Z1 = (-1R, -1R),
+    Z2 = (-1R, 0),
+    Z3 = (-1R, 1R),
+    Z4 = (0, -1R),
+    Z5 = (0, 0),
+    Z6 = (0, 1R),
+    Z7 = (1R, -1R),
+    Z8 = (1R, 0),
+    Z9 = (1R, 1R),
 )
-    initial(A) = (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
-    function curvature(v, a, b)
-        if b == 2
-            return (v[1], v[2] + a, v[3], v[4])
-        elseif b == 4
-            return (v[1] + a, v[2], v[3], v[4])
-        elseif b == 5
-            return (v[1], v[2], v[3] + a, v[4])
-        elseif b == 6
-            return (v[1] + a, v[2], v[3], v[4])
-        elseif b == 8
-            return (v[1], v[2] + a, v[3], v[4])
-        else
-            return v
-        end
-    end
-    function store!(d, i, v)
-        δzδx = (v[1] / 2 - v[3]) / v[4]^2
-        δzδy = (v[2] / 2 - v[3]) / v[4]^2
-        d[i] = -2(δzδx + δzδy) * 100
-    end
-    return localfilter!(dst, dem, nbkernel, initial, curvature, store!)
+
+
+# https://www.spatialanalysisonline.com/HTML/index.html?profiles_and_curvature.htm
+# https://pro.arcgis.com/en/pro-app/latest/tool-reference/spatial-analyst/how-surface-parameters-works.htm
+
+# Zevenbergen and Thorne (1987) method
+# Surface fit by $Z = Ax²y² + Bx²y + Cxy² + Dx² + Ey² + Fxy + Gx + Hy + I$
+_A(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) =
+    ((s.Z1 + s.Z3 + s.Z7 + s.Z9) / 4 - (s.Z2 + s.Z4 + s.Z6 + s.Z8) / 2 + s.Z5) / δy^2*δx^2 
+_B(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = ((s.Z1 + s.Z3 - s.Z7 - s.Z9) / 4 - (s.Z2 - s.Z8) / 2) / (δx^1.5 * δy^1.5)
+_C(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = ((-s.Z1 + s.Z3 - s.Z7 + s.Z9) / 4 + (s.Z4 - s.Z6) / 2) / (δx ^1.5 * δy^1.5)
+_D(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = ((s.Z4 + s.Z6) / 2 - s.Z5) / δx^2  # δ²z/δx²
+_E(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = ((s.Z2 + s.Z8) / 2 - s.Z5) / δy^2  # δ²z/δy²
+_F(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = (-s.Z1 + s.Z3 + s.Z7 - s.Z9) / (4δx * δy)   # δ²z/δxδy
+_G(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = (-s.Z4 + s.Z6) / 2δx  # δz/δx
+_H(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = (s.Z2 - s.Z8) / 2δy  # δz/δy
+_I(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = s.Z5
+
+# Landserf 
+# Surface fit by $ z = Ax² + By² + Cxy + Dx + Ey + F $
+# Note that the approximations ABCDEF here are (almost) identical to the DEFGHI in Zevenbergen and Thorne
+_A(::LandSerf, s::Stencil, δx = 1, δy = 1) = (s.Z6 + s.Z4 - 2s.Z5) / δx^2 # δ²z/δx²
+_B(::LandSerf, s::Stencil, δx = 1, δy = 1) = (s.Z8 + s.Z2 - 2s.Z5) / δy^2 # δ²z/δy²
+_C(::LandSerf, s::Stencil, δx = 1, δy = 1) = (s.Z9 - s.Z7 - s.Z3 + s.Z1) / (4δx * δy)  # δ²z/δxδy
+_D(::LandSerf, s::Stencil, δx = 1, δy = 1) = (s.Z6 - s.Z4) / 2δx  # δz/δx
+_E(::LandSerf, s::Stencil, δx = 1, δy = 1) = (s.Z8 - s.Z2) / 2δy  # δz/δy
+_F(::LandSerf, s::Stencil) = s.Z5
+
+coefficients(::LandSerf, s::Stencil, δx = 1, δy = 1) = (;
+    a=_A(LandSerf(), s, δx, δy),
+    b=_B(LandSerf(), s, δx, δy),
+    c=_C(LandSerf(), s, δx, δy),
+    d=_D(LandSerf(), s, δx, δy),
+    e=_E(LandSerf(), s, δx, δy),
+    f=_F(LandSerf(), s),
+)
+
+function profile(a, b, c, d, e)
+    (-2 * (a * d^2 + c * d * e + b * e^2)) / ((d^2 + e^2) * (1 + d^2 + e^2)^1.5)
 end
+
+function _profile(s, cellsize)
+    a, b, c, d, e = coefficients(LandSerf(), s, cellsize)
+    profile(a, b, c, d, e)
+end
+
+"""
+    profile_curvature(dem::AbstractMatrix{<:Real}; cellsize = 1.0, radius=1)
+
+Calculate normal slope line curvature (profile curvature)[^minar2020].
+
+[^minar2020]: Minár, J., Evans, I.S., Jenčo, M., 2020. A comprehensive system of definitions of land surface (topographic) curvatures, with implications for their application in geoscience modelling and prediction. Earth-Science Reviews 211, 103414. https://doi.org/10.1016/j.earscirev.2020.103414
+"""
+function profile_curvature(dem::AbstractMatrix{<:Real}; cellsize = 1.0, radius=1)
+    mapstencil(x->_profile(x, cellsize), fitns(radius), dem)
+end
+
+function tangential(a, b, c, d, e)
+    -2 * (a * (e^2) - c * d * e + b * d^2) / ((d^2 + e^2) * sqrt(1 + d^2 + e^2))
+end
+
+function _tangential(s, cellsize)
+    a, b, c, d, e = coefficients(LandSerf(), s, cellsize)
+    tangential(a, b, c, d, e)
+end
+
+"""
+    tangential_curvature(dem::AbstractMatrix{<:Real}; cellsize = 1.0, radius=1)
+
+Calculate normal contour curvature (tangential curvature)[^minar2020].
+
+[^minar2020]: Minár, J., Evans, I.S., Jenčo, M., 2020. A comprehensive system of definitions of land surface (topographic) curvatures, with implications for their application in geoscience modelling and prediction. Earth-Science Reviews 211, 103414. https://doi.org/10.1016/j.earscirev.2020.103414
+"""
+function tangential_curvature(dem::AbstractMatrix{<:Real}; cellsize = 1.0, radius=1)
+    mapstencil(x->_tangential(x, cellsize), fitns(radius), dem)
+end
+
+
+function plan(a, b, c, d, e)
+    (2 * (b * d^2 - c * d * e + a * e^2)) / ((1 + d^2 + e^2)^1.5)
+end
+
+function _plan(s, cellsize)
+    a, b, c, d, e = coefficients(LandSerf(), s, cellsize)
+    plan(a, b, c, d, e)
+end
+
+"""
+    plan_curvature(dem::AbstractMatrix{<:Real}; cellsize = 1.0, radius=1)
+
+Calculate projected contour curvature (plan curvature)[^minar2020].
+
+[^minar2020]: Minár, J., Evans, I.S., Jenčo, M., 2020. A comprehensive system of definitions of land surface (topographic) curvatures, with implications for their application in geoscience modelling and prediction. Earth-Science Reviews 211, 103414. https://doi.org/10.1016/j.earscirev.2020.103414
+"""
+function plan_curvature(dem::AbstractMatrix{<:Real}; cellsize = 1.0, radius=1)
+    mapstencil(x->_plan(x, cellsize), fitns(radius), dem)
+end
+
+# """Calculate contour geodesic torsion or twisting curvature
+# Minár, J., Evans, I.S., Jenčo, M., 2020. A comprehensive system of definitions of land surface (topographic) curvatures, with implications for their application in geoscience modelling and prediction. Earth-Science Reviews 211, 103414. https://doi.org/10.1016/j.earscirev.2020.103414
+# """
+# function tgc(a, b, c, d, e)
+#     2 * d * e * (a - b) - c * (d^2 - e^2) / ((d^2 + e^2) * (1 + d^2 + e^2))
+# end
+
+# """Calculate mean curvature
+# Minár, J., Evans, I.S., Jenčo, M., 2020. A comprehensive system of definitions of land surface (topographic) curvatures, with implications for their application in geoscience modelling and prediction. Earth-Science Reviews 211, 103414. https://doi.org/10.1016/j.earscirev.2020.103414
+# """
+# function kmean(a, b, c, d, e)
+#     -(a * (1 + e^2) - c * d * e + b * (1 + d^2)) / (2sqrt((1 + d^2 + e^2)^3))
+# end
+
+# """Calculate unsphericity curvature
+# Minár, J., Evans, I.S., Jenčo, M., 2020. A comprehensive system of definitions of land surface (topographic) curvatures, with implications for their application in geoscience modelling and prediction. Earth-Science Reviews 211, 103414. https://doi.org/10.1016/j.earscirev.2020.103414
+# """
+# function ku(a, b, c, d, e)
+#     sqrt(
+#         ((a * (1 + e^2) - c * d * e + b * (1 + d^2)) / (sqrt((1 + d^2 + e^2)^3)))^2 -
+#         ((4 * a * b - c^2) / (1 + d^2 + e^2)^2),
+#     )
+# end
+
+# """Calculate min curvature
+# Minár, J., Evans, I.S., Jenčo, M., 2020. A comprehensive system of definitions of land surface (topographic) curvatures, with implications for their application in geoscience modelling and prediction. Earth-Science Reviews 211, 103414. https://doi.org/10.1016/j.earscirev.2020.103414
+# """
+# function kmin(a, b, c, d, e)
+#     kmean(a, b, c, d, e) - ku(a, b, c, d, e)
+# end
+
+# """Calculate max curvature
+# Minár, J., Evans, I.S., Jenčo, M., 2020. A comprehensive system of definitions of land surface (topographic) curvatures, with implications for their application in geoscience modelling and prediction. Earth-Science Reviews 211, 103414. https://doi.org/10.1016/j.earscirev.2020.103414
+# """
+# function kmax(a, b, c, d, e)
+#     kmean(a, b, c, d, e) + ku(a, b, c, d, e)
+# end

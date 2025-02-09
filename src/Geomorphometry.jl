@@ -8,12 +8,15 @@ using FillArrays: Fill
 using StaticArrays: @SMatrix, @MMatrix, SMatrix, MMatrix, MVector
 # using DataStructures: Deque, PriorityQueue, enqueue!, dequeue!
 import DataStructures
-using Statistics: median, mean
-using ImageCore: scaleminmax, Gray
+using Stencils
+using Statistics: median, mean, std
+# using ImageCore: scaleminmax, Gray
 using LocalFilters
 using QuickHeaps: FastPriorityQueue, PriorityQueue, enqueue!, dequeue!
+import Eikonal
 
 include("utils.jl")
+include("relative.jl")
 include("pmf.jl")
 include("smf.jl")
 include("psf.jl")
@@ -24,13 +27,14 @@ include("skew.jl")
 include("hydrology.jl")
 
 export ZevenbergenThorne, Horn, MDG
-export D8, Dinf
+export D8, DInf, FD8
 export pmf, smf, psf
-export pssm
+export pssm, hillshade, multihillshade
 export pitremoval
-export spread, spread2
-export roughness, TRI, TPI, BPI, slope, aspect, curvature, hillshade, multihillshade
+export spread, Eastman, FastSweeping, Tomlin
+export roughness, TRI, TPI, BPI, RIE
+export slope, aspect, curvature, plan_curvature, profile_curvature, tangential_curvature
 export skb, skbr
-export priorityflood, streamflow
+export filldepressions, flowaccumulation, TWI, SPI
 
 end # module

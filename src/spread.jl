@@ -27,7 +27,7 @@ This is also the method implemented by [PCRaster](https://pcraster.geo.uu.nl/pcr
 [^tomlin1983]: Tomlin, Charles Dana. 1983. Digital Cartographic Modeling Techniques in Environmental Planning. Yale University.
 """
 function spread(
-    t::Tomlin,
+    ::Tomlin,
     locations::Vector{CartesianIndex{2}},
     initial::AbstractMatrix{T},
     friction::AbstractMatrix{<:Real};
@@ -116,8 +116,9 @@ This method should scale much better (linearly) than the [^tomlin1983] method, b
 [^eastman1989]: Eastman, J. Ronald. 1989. ‘Pushbroom Algorithms for Calculating Distances in Raster Grids’. In Proceedings, Autocarto, 9:288–97.
 """
 function spread(
-    ::Eastman,
-    points::AbstractMatrix{<:Real},
+    e::Eastman,
+    # points::AbstractMatrix{<:Real},
+    locations::Vector{CartesianIndex{2}},
     initial::AbstractMatrix{<:Real},
     friction::AbstractMatrix{<:Real};
     res = 1,
@@ -131,7 +132,7 @@ function spread(
     result = fill(limit, size(friction))
 
     # r = @view result[1:end-1, 1:end-1]
-    locations = points .> 0
+    # locations = points .> 0
     result[locations] .= initial[locations]
 
     # mask = OffsetMatrix(trues(size(points) .+ 2), UnitRange.(0, size(points) .+ 1))
@@ -141,12 +142,14 @@ function spread(
     # zone = OffsetMatrix(fill(0, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
     # ozone = @view zone[1:end-1, 1:end-1]
     # ozone .= points
-    zone = copy(points)
+    # zone = copy(points)
+    zone = zeros(Int32, size(friction))
+
     # minval, minidx = [0.0], [CartesianIndex(1, 1)]
     # x = @MMatrix zeros(3, 3)
-    indices = CartesianIndices(size(points))
+    indices = CartesianIndices(size(friction))
     counts = 1
-    for i in 1:iterations
+    for i in 1:e.iterations
         if iszero(counts)
             break
         end
@@ -227,13 +230,13 @@ See SpreadMethod for other algorithms.
 
 [^hongkai20025]: Zhao, Hongkai (2005). "A fast sweeping method for Eikonal equations". Mathematics of Computation. 74 (250): 603–627. DOI: 10.1090/S0025-5718-04-01678-3
 """
-function spread(fs::FastSweeping, points, initial, friction)
+function spread(fs::FastSweeping, points, initial, friction; kwargs...)
     solver = Eikonal.FastSweeping(friction)
     for I in points
         solver.t[I] = initial[I]
     end
-    sweep!(solver; nsweeps = fs.iterations, fs.debug, fs.eps)
-    @view solver.t[2:end, 2:end]
+    Eikonal.sweep!(solver; nsweeps = fs.iterations, verbose=fs.debug, epsilon=fs.eps)
+    @view(solver.t[2:end, 2:end]), 1
 end
 
 """
@@ -248,15 +251,15 @@ function spread(
     friction::AbstractMatrix{<:Real};
     res = 1,
     limit = Inf,
-    algorithm = Tomlin(),
+    method = Tomlin(),
 )
-    spread(algorithm, points, initial, friction; res, limit)
+    spread(method, points, initial, friction; res, limit)
 end
 
 function spread(
     points::AbstractMatrix{<:Real},
     initial::AbstractMatrix{<:Real},
-    friction::AbstractMatrix{<:Real},
+    friction::AbstractMatrix{<:Real};
     kwargs...,
 )
     I = findall(>(0), points)

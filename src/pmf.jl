@@ -73,7 +73,6 @@ function _pmf(
     ωₘ = round(Int, ωₘ / cellsize)
     κ_max = floor(Int, log2(ωₘ - 1))  # determine # iterations based on exp growth
     windowsizes = Int.(exp2.(1:κ_max)) .+ 1
-    @info windowsizes
 
     # Compute tresholds
     dwindows = vcat(windowsizes[1], windowsizes)  # prepend first element so we get 0 as diff
@@ -114,7 +113,6 @@ function _pmf(
             end
         end
         mask .= (A .- Af) .> dhₜ
-        @info sum(mask)
         for I in eachindex(flags)
             if mask[I] && (flags[I] <= 0)
                 flags[I] = ωₖ
@@ -200,11 +198,9 @@ function _pmf2(
     # Compute windowsizes and thresholds
     iwindows = round.(Int, windows ./ cellsize) .+ 3
     ωₘ = maximum(iwindows)
-    # @info ωₘ
     # κ_max = floor(Int, log2(ωₘ - 1))  # determine # iterations based on exp growth
     # windowsizes = Int.(exp2.(1:κ_max)) .+ 1
     windowsizes = halve_range(ωₘ)
-    # @info windowsizes
 
     # Compute tresholds
     dwindows = vcat(windowsizes[1], windowsizes)  # prepend first element so we get 0 as diff
@@ -227,7 +223,6 @@ function _pmf2(
 
     # Iterate over window sizes and height tresholds
     for (i, ωₖ) in enumerate(windowsizes)
-        # @info i, ωₖ
         s = (i > 1) && adjust ? dilate(slope, window_diffs[i]) : slope
         @debug "Window $(ωₖ), $(window_diffs[i]) slope sum: $(sum(s))"
         dhₜ = min.(dhₘ, s * window_diffs[i] * cellsize .+ dh₀)

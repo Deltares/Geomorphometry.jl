@@ -22,11 +22,11 @@ hero:
       
 features:
   - title: Common operations
-    details: Defines common methods for reading, writing and manipulating geospatial vector data, as one-liners, and as fast as possible.
-    link: /tutorials/usage
+    details: Defines common methods for analyzing, filtering and visualizing (global) elevation models. All methods are implemented in Julia and are fast and scalable.
+    link: /usage
   - title: Multiple algorithms
-    details: Supports hillshade, multihillshade and perceptual shading for visualisation of elevation models.
-    link: /background/formats
+    details: Choose from multiple algorithms, ranging from different derivations of slope to multiresolution stencils. This enables the user to select the most appropriate method for their use case.
+    link: /concepts
   - title: Seamless integration
     details: Geomorphometry.jl is fully compatible with the AbstractArray and GeoInterface.jl ecosystems. This enables plotting, operations and analysis using the full power of the Julia ecosystem.
 

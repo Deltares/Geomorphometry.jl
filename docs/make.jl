@@ -4,10 +4,18 @@ using Documenter
 using DocumenterVitepress
 using CairoMakie
 using DocumenterCitations
+using Revise
+using Downloads
 
-bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"))
+Revise.revise()
 
+# bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"))
+dir = @__DIR__
+# cp(joinpath(dir, "../CHANGELOG.md"), joinpath(dir, "src/CHANGELOG.md"), force = true)
 CairoMakie.activate!(; type = "png")
+
+fn = joinpath(dir, "src", "saba.tif")
+isfile(fn) && Downloads.download("https://github.com/Deltares/Geomorphometry.jl/releases/download/v0.6.0/saba.tif", fn)
 
 # DocMeta.setdocmeta!(
 #     Geomorphometry,
@@ -30,13 +38,22 @@ makedocs(;
     checkdocs = :all,
     pages = [
         "Home" => "index.md",
-        "Get Started" => "tutorial.md",
-        "Concepts" => "concepts.md",
-        "Reference" => "reference.md",
-        "Guides" => "guide.md",
+        "Getting started" => Any[
+            "Installation" => "installation.md",
+            "Usage" => "usage.md",
+        ],
+        "Background" => Any[
+            "Concepts" => "concepts.md",
+            "Future plans" => "todo.md",
+        ],
+        "Reference" => Any[
+            "API" => "reference.md"
+            "Changelog" => "CHANGELOG.md"
+        ],
     ],
     clean = false,
-    plugins = [bib],
+    # plugins = [bib],
+    warnonly = [:missing_docs, :cross_references],
 )
 
 deploydocs(;

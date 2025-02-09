@@ -113,7 +113,7 @@ function multihillshade(dem::AbstractMatrix{<:Real}; cellsize = 1.0)
                 w360 * (α + β * cos(deg2rad(aspect(360)) - a))
             ) / 2
 
-        d[i] = round(UInt8, max(0, 255 * something))
+        d[i] = isfinite(something) ? round(UInt8, max(0, 255 * something)) : 0
     end
     return localfilter!(dst, dem, nbkernel, initial, horn, store!)
 end

@@ -2,27 +2,74 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.7.0] - 2025-02-01
 
 ### Added
-- Initial release of the Geomorphometry package.
-- Basic terrain analysis functions.
-- Support for DEM (Digital Elevation Model) data input.
+- Improved documentation and feel
+- Added hydrology operators: `priorityflood`, `streamflow`
+- Added *multiscale* options to some filters using Stencils.jl package
+- Added `BPI`
+- Overhauled curvature methods, deprecated `curvature` for `mean_curvature`
+- Added this `CHANGELOG.md`
 
 ### Changed
-- N/A
+- Using Stencils instead of LocalFilters.
+- Refactored spread to choose from multiple algorithms
 
 ### Fixed
-- N/A
+- Relaxed `Array` input to `AbstractArray` for `opening`
 
-## [0.1.0] - YYYY-MM-DD
+## [0.6.0] - 2023-08-25
+### Changed
+- Renamed package to Geomorphometry
+
 ### Added
-- Initial release of the Geomorphometry package.
-- Basic terrain analysis functions.
-- Support for DEM (Digital Elevation Model) data input.
+- Added `erosion` parameter in PMF
+
+## [0.5.2] - 2023-08-14
+### Changed
+- Light maintenance to CI scripts
+- Compat updates
+
+## [0.5.1] - 2023-01-12
+### Added
+- Relaxed input for PMF
+
+## [0.5.0] - 2022-11-02
+
+### Added
+- Added multihillshade
 
 ### Changed
-- N/A
+- Uses LocalFilters for terrain filters, improving performance, but changing the edge behaviour of some filters.
+
+## [0.4.0] - 2022-10-17
+### Added
+- Added hillshade, curvature
+
+### Changed
+- Used LocalFilters for PMF.
+
+## [0.3.2] - 2022-09-07
+### Added
+- Added terrain kernels for different algorithms.
 
 ### Fixed
-- N/A
+- Fixed bug in TPI
+
+## [0.3.1] - 2022-06-15
+### 
+- Added skewness filter
+
+## [0.3.0] - 2022-02-01
+### Added
+- Added PSF (Progressive Slope Filter) function.
+
+### Changed
+- Improved performance of mapwindow function used in most filters.
+
+## [0.2.0] - 2021-11-22
+### Added
+- Initial release of the GeoArrayOps package.
+- Basic terrain analysis functions.
+

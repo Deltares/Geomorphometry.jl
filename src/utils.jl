@@ -170,3 +170,12 @@ end
     end
     o
 end
+
+"""
+    xyratio(dem::AbstractArray)
+
+Return an Array with the xyratio for each cell of the dem.
+"""
+function xyratio(dem::AbstractArray)
+    Fill(1.0, size(dem))
+end

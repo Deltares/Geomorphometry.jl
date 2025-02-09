@@ -2,12 +2,10 @@
 DocTestSetup= quote
 using Geomorphometry
 end
-
 ```
 ## Index
 ```@index
 Modules = [Geomorphometry]
-Private = false
 ```
 
 ## Reference - Exported functions
@@ -22,6 +20,5 @@ Modules = [Geomorphometry]
 Public = false
 ```
 
-## Bibliography
 ```@bibliography
 ```
