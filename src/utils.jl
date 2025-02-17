@@ -19,6 +19,21 @@ function opening_circ!(A::AbstractArray{T,2}, ω::Integer, out::AbstractArray{T,
     A
 end
 
+# circmask(n::Integer) = circmask(Val(n))
+
+# circmask(n::Val{1}) = BitMatrix([0 1 0; 1 1 1; 0 1 0])
+# function circmask(n::Val{3})
+#     BitMatrix(
+#         [0 0 0 1 0 0 0
+#             0 1 1 1 1 1 0
+#             0 1 1 1 1 1 0
+#             1 1 1 1 1 1 1
+#             0 1 1 1 1 1 0
+#             0 1 1 1 1 1 0
+#             0 0 0 1 0 0 0]
+#     )
+# end
+
 function circmask(n::Integer)
     # TODO This could be precomputed for first N integers
     kern = falses(-n:n, -n:n)
@@ -100,7 +115,7 @@ function mapwindowcirc!(f, img, window, out, fill=Inf)
 end
 
 
-function mapwindowcirc_approx!(f, img, window, out, fill=Inf)
+function mapwindowcirc_approx!(f, img, window, out=copy(img), fill=Inf)
     R = CartesianIndices(img)
     Δ = CartesianIndex(1, 1)
 
@@ -119,28 +134,41 @@ function mapwindowcirc_approx!(f, img, window, out, fill=Inf)
     end
     out
 end
+edge(x) = x == 1 || x == 3 || x == 7 || x == 9
+const xx = circmask(1)
+function mapwindowcirc_approx2!(f, A, window, out, fill=Inf)
+    iterations = window:-2:3
+    for _ in iterations
+        localfilter!(out, A, 3,
+            (a) -> (fill, 1),
+            (v, a, _) -> ((edge(v[2]) ? f(v[1], a) : v[1]), v[2] + 1),
+            (d, i, v) -> d[i] = v[1])
+        A .= out
+    end
+    out
+end
 
 # Functions for future changes, based on LocalFiltering
-# function opening_circ_approx2!(A::Array{T,2}, ω::Integer, out::Array{T,2}) where {T<:Real}
-#     iterations = ω:-2:3
+function opening_circ_approx2!(A::Array{T,2}, ω::Integer, out::Array{T,2}) where {T<:Real}
+    iterations = ω:-2:3
 
-#     B = circmask(1)
-#     for _ in iterations
-#         localfilter!(out, A, B,
-#             (a) -> typemax(a),
-#             (v, a, b) -> b ? min(v, a) : v,
-#             (d, i, v) -> @inbounds(d[i] = v))
-#         A, out = out, A
-#     end
-#     for _ in iterations
-#         localfilter!(out, A, B,
-#             (a) -> typemin(a),
-#             (v, a, b) -> b ? max(v, a) : v,
-#             (d, i, v) -> @inbounds(d[i] = v))
-#         A, out = out, A
-#     end
-#     A
-# end
+    B = circmask(1)
+    for _ in iterations
+        localfilter!(out, A, B,
+            (a) -> typemax(a),
+            (v, a, b) -> b ? min(v, a) : v,
+            (d, i, v) -> @inbounds(d[i] = v))
+        A, out = out, A
+    end
+    for _ in iterations
+        localfilter!(out, A, B,
+            (a) -> typemin(a),
+            (v, a, b) -> b ? max(v, a) : v,
+            (d, i, v) -> @inbounds(d[i] = v))
+        A, out = out, A
+    end
+    A
+end
 
 # function opening_circ2!(A::Array{T,2}, ω::Integer, out::Array{T,2}) where {T<:Real}
 #     B = circmask(ω >> 1)

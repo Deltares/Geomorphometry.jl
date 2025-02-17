@@ -39,8 +39,6 @@ struct DInf <: FlowDirectionMethod end
 
 """FD8 Flow Direction method (Quinn et al., 1991)."""
 Base.@kwdef struct FD8 <: FlowDirectionMethod
-    L1::Float32 = 0.5
-    L2::Float32 = 0.354
     p::Float32 = 1
 end
 
@@ -87,7 +85,10 @@ function watersheds(dem::AbstractMatrix, queued = falses(size(dem)))
     end
     @inbounds while !isempty(open) || !isempty(pit)
         cell = !isempty(pit) ? DataStructures.dequeue!(pit) : dequeue!(open)
-        if queued[cell] && !ismissing(dem[cell]) && isfinite(dem[cell]) && iszero(labels[cell])
+        if queued[cell] &&
+           !ismissing(dem[cell]) &&
+           isfinite(dem[cell]) &&
+           iszero(labels[cell])
             labels[cell] = label
             label += 1
         end
@@ -149,12 +150,21 @@ const directions = centered([1 2 3; 4 5 6; 7 8 9])
 Computes the flow accumulation of a digital elevation model (DEM) `dem` with an optional `closed` mask and a `method` for flow direction.
 Returns the flow accumulation and the flow direction (local drainage direction or ldd)
 """
-function flowaccumulation(dem::AbstractMatrix, closed = falses(size(dem)); method = D8(), cellsize=cellsize(dem))
+function flowaccumulation(
+    dem::AbstractMatrix,
+    closed = falses(size(dem));
+    method = D8(),
+    cellsize = cellsize(dem),
+)
     flowaccumulation!(dem, copy(closed); method, cellsize)
 end
 
-function flowaccumulation!(dem::AbstractMatrix, closed = falses(size(dem)); method=D8(), cellsize=cellsize(dem))
-
+function flowaccumulation!(
+    dem::AbstractMatrix,
+    closed = falses(size(dem));
+    method = D8(),
+    cellsize = cellsize(dem),
+)
     dir = fill(CartesianIndex{2}(0, 0), size(dem))
     order = ones(Int64, length(closed) - sum(closed))
 
@@ -188,18 +198,18 @@ function flowaccumulation!(dem::AbstractMatrix, closed = falses(size(dem)); meth
         end
     end
 
-    _accumulate!(method, acc, order, dir, R, dem)
+    _accumulate!(method, acc, order, dir, R, dem, cellsize)
     output .= getindex.(Ref(directions), dir)
     return acc, output
 end
 
-function _accumulate!(::D8, acc, order, dir, R, dem)
+function _accumulate!(::D8, acc, order, dir, R, dem, cellsize)
     for i in reverse(order)
         acc[R[i] + dir[i]] += acc[i]
     end
 end
-function _accumulate!(::DInf, acc, order, dir, R, dem)
-    asp = aspect(dem; method = Horn())
+function _accumulate!(::DInf, acc, order, dir, R, dem, cellsize)
+    asp = aspect(dem; method = Horn(), cellsize)
     for i in reverse(order)
         aspect = asp[i]
 
@@ -226,12 +236,18 @@ function _accumulate!(::DInf, acc, order, dir, R, dem)
     end
 end
 
-function _accumulate!(fd8::FD8, acc, order, dir, R, dem)
+function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
+    # Derive contour lengths, which is used to calculate the weights
+    # Uses the algorithm by Quinn et al. (1991), L1=0.5 L2=0.354 for δx=δy=1
+    # TODO Check whether just using the angles is enough.
+    δx, δy = cellsize
+    δxy = sqrt((δx / 4)^2 + (δy / 4)^2)
     contour_lengths = @SMatrix [
-        fd8.L2 fd8.L1 fd8.L2
-        fd8.L1 0 fd8.L1
-        fd8.L2 fd8.L1 fd8.L2
+        δxy δx δxy
+        δy 0 δy
+        δxy δx δxy
     ]
+
     weights = zeros(size(contour_lengths))
     Σw = 0.0
     for i in reverse(order)
@@ -267,7 +283,7 @@ end
 
 Computes the Topographic Wetness Index (TWI) of a digital elevation model (DEM) `dem` with an optional `method` for flow direction and a `cellsize`.
 """
-function TWI(dem::AbstractMatrix; method=D8(), cellsize=cellsize(dem))
+function TWI(dem::AbstractMatrix; method = D8(), cellsize = cellsize(dem))
     s = slope(dem; cellsize)
     acc, _ = flowaccumulation(dem; method, cellsize)
     return @. log(acc / tand(s))
@@ -278,7 +294,7 @@ end
 
 Computes the Stream Power Index (SPI) of a digital elevation model (DEM) `dem` with an optional `method` for flow direction and a `cellsize`.
 """
-function SPI(dem::AbstractMatrix; method=D8(), cellsize=cellsize(dem))
+function SPI(dem::AbstractMatrix; method = D8(), cellsize = cellsize(dem))
     s = slope(dem; cellsize)
     acc, _ = flowaccumulation(dem; method, cellsize)
     return @. log(acc * tand(s))

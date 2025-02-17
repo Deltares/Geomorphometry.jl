@@ -2,10 +2,10 @@ module Geomorphometry
 using StatsBase: skewness
 using OffsetArrays: OffsetMatrix
 using ImageFiltering: mapwindow, sobel, imgradients
-using Distances: Euclidean, euclidean, evaluate, colwise!
+using Distances: Euclidean, euclidean, evaluate
 using PaddedViews: PaddedView
 using FillArrays: Fill
-using StaticArrays: @SMatrix, @MMatrix, SMatrix, MMatrix, MVector
+using StaticArrays: @SMatrix, @MMatrix, @MVector
 # using DataStructures: Deque, PriorityQueue, enqueue!, dequeue!
 import DataStructures
 using Stencils
@@ -32,7 +32,7 @@ export pmf, smf, psf
 export pssm, hillshade, multihillshade
 export pitremoval
 export spread, Eastman, FastSweeping, Tomlin
-export roughness, TRI, TPI, BPI, RIE
+export roughness, TRI, TPI, BPI, RIE, prominence, rugosity, entropy
 export slope, aspect, curvature, plan_curvature, profile_curvature, tangential_curvature
 export skb, skbr
 export filldepressions, flowaccumulation, TWI, SPI

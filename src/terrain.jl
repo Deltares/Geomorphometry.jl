@@ -39,9 +39,18 @@ function slope!(::Horn, dst, dem::AbstractMatrix{<:Real}, cellsize, exaggeration
     initial(A) =
         (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
 
-    store!(d, i, v) = @inbounds d[i] = isnothing(direction) ? atand(
-        √(((v[1] - v[2]) / (8 * v[5][1]))^2 + ((v[3] - v[4]) / (8 * v[5][2]))^2) * exaggeration) : 
-        atand((((v[1] - v[2]) / (8 * v[5][1])) * cosd(direction) + ((v[3] - v[4]) / (8 * v[5][2])) * sind(direction)) * exaggeration)
+    store!(d, i, v) = @inbounds d[i] =
+        isnothing(direction) ?
+        atand(
+            √(((v[1] - v[2]) / (8 * v[5][1]))^2 + ((v[3] - v[4]) / (8 * v[5][2]))^2) *
+            exaggeration,
+        ) :
+        atand(
+            (
+                ((v[1] - v[2]) / (8 * v[5][1])) * cosd(direction) +
+                ((v[3] - v[4]) / (8 * v[5][2])) * sind(direction)
+            ) * exaggeration,
+        )
 
     return localfilter!(dst, dem, nbkernel, initial, horn, store!)
 end
@@ -56,7 +65,12 @@ function slope!(
 )
     initial(A) = (zero(eltype(A)), zero(eltype(A)), cellsize)
     store!(d, i, v) = @inbounds d[i] =
-        atand(√((v[1] / (2 * v[3]))^2 + (v[2] / (2 * v[3]))^2) * exaggeration)
+        isnothing(direction) ?
+        atand(√((v[1] / (2 * v[3][1]))^2 + (v[2] / (2 * v[3][2]))^2) * exaggeration) :
+        atand(
+            (v[1] / (2 * v[3][1])) * cosd(direction) +
+            (v[2] / (2 * v[3][2])) * sind(direction),
+        ) * exaggeration
     return localfilter!(dst, dem, nbkernel, initial, zevenbergenthorne, store!)
 end
 
@@ -68,15 +82,16 @@ function slope!(
     exaggeration,
     direction,
 )
+    isnothing(direction) || throw(ArgumentError("Direction is not supported for MDG."))
     initial(A) =
         (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
     function store!(d, i, v)
         m =
             max(
-                abs(v[1]) / (v[5] * sqrt2),
-                abs(v[2]) / v[5],
-                abs(v[3]) / (v[5] * sqrt2),
-                abs(v[4]) / v[5],
+                abs(v[1]) / sqrt(v[5][1]^2 * v[5][2]^2),  # \
+                abs(v[2]) / v[5][2],  # |
+                abs(v[3]) / sqrt(v[5][1]^2 * v[5][2]^2),  # /
+                abs(v[4]) / v[5][1],  # -
             ) / 2
         d[i] = atand(√(m^2 + m^2) * exaggeration)
     end
@@ -90,7 +105,7 @@ Aspect is direction of [`slope`](@ref), as defined in Burrough, P. A., and McDon
 """
 function aspect(dem::AbstractMatrix{<:Real}; method::DerivativeMethod = Horn())
     dst = similar(dem, Float32)
-    aspect!(method, dst, dem, (1,1))
+    aspect!(method, dst, dem, (1, 1))
 end
 
 # Useless, as there's no x/y component.
@@ -100,9 +115,9 @@ function aspect!(::MaximumDownwardGradient, dst, dem::AbstractMatrix{<:Real}, ce
     function store!(d, i, v)
         δzδx =
             max(
-                abs(v[1]) / (v[5][1] * sqrt2), # \
+                abs(v[1]) / sqrt(v[5][1]^2 * v[5][2]^2), # \
                 abs(v[2]) / v[5][2], # |
-                abs(v[3]) / (v[5][1] * sqrt2), # /
+                abs(v[3]) / sqrt(v[5][1]^2 * v[5][2]^2), # /
                 abs(v[4]) / v[5][1], # -
             ) / 2
         d[i] = compass(atand(δzδx, -δzδx))
@@ -199,10 +214,23 @@ function aspect(compass::Real)
     return (450 - compass) % 360
 end
 
-@deprecate curvature(args...; kwargs...) laplacian(args...; gis=true, kwargs...)
+@deprecate curvature(args...; kwargs...) laplacian(args...; gis = true, kwargs...)
 
-function laplacian(dem::AbstractMatrix{<:Real}; cellsize = 1.0, radius=1, gis=false)
-    mapstencil(x -> -2(_D(ZevenbergenThorne(),x,cellsize,cellsize) + _E(ZevenbergenThorne(),x,cellsize,cellsize)) * (gis ? 100 : 1), fitns(radius), dem)
+function laplacian(
+    dem::AbstractMatrix{<:Real};
+    cellsize = cellsize(dem),
+    radius = 1,
+    gis = false,
+)
+    mapstencil(
+        x ->
+            -2(
+                _D(ZevenbergenThorne(), x, cellsize[1], cellsize[2]) +
+                _E(ZevenbergenThorne(), x, cellsize[1], cellsize[2])
+            ) * (gis ? 100 : 1),
+        fitns(radius),
+        dem,
+    )
 end
 
 fitns(R::Int) = NamedStencil(;
@@ -217,19 +245,21 @@ fitns(R::Int) = NamedStencil(;
     Z9 = (1R, 1R),
 )
 
-
 # https://www.spatialanalysisonline.com/HTML/index.html?profiles_and_curvature.htm
 # https://pro.arcgis.com/en/pro-app/latest/tool-reference/spatial-analyst/how-surface-parameters-works.htm
 
 # Zevenbergen and Thorne (1987) method
 # Surface fit by $Z = Ax²y² + Bx²y + Cxy² + Dx² + Ey² + Fxy + Gx + Hy + I$
 _A(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) =
-    ((s.Z1 + s.Z3 + s.Z7 + s.Z9) / 4 - (s.Z2 + s.Z4 + s.Z6 + s.Z8) / 2 + s.Z5) / δy^2*δx^2 
-_B(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = ((s.Z1 + s.Z3 - s.Z7 - s.Z9) / 4 - (s.Z2 - s.Z8) / 2) / (δx^1.5 * δy^1.5)
-_C(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = ((-s.Z1 + s.Z3 - s.Z7 + s.Z9) / 4 + (s.Z4 - s.Z6) / 2) / (δx ^1.5 * δy^1.5)
+    ((s.Z1 + s.Z3 + s.Z7 + s.Z9) / 4 - (s.Z2 + s.Z4 + s.Z6 + s.Z8) / 2 + s.Z5) / δy^2 * δx^2
+_B(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) =
+    ((s.Z1 + s.Z3 - s.Z7 - s.Z9) / 4 - (s.Z2 - s.Z8) / 2) / (δx^1.5 * δy^1.5)
+_C(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) =
+    ((-s.Z1 + s.Z3 - s.Z7 + s.Z9) / 4 + (s.Z4 - s.Z6) / 2) / (δx^1.5 * δy^1.5)
 _D(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = ((s.Z4 + s.Z6) / 2 - s.Z5) / δx^2  # δ²z/δx²
 _E(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = ((s.Z2 + s.Z8) / 2 - s.Z5) / δy^2  # δ²z/δy²
-_F(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = (-s.Z1 + s.Z3 + s.Z7 - s.Z9) / (4δx * δy)   # δ²z/δxδy
+_F(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) =
+    (-s.Z1 + s.Z3 + s.Z7 - s.Z9) / (4δx * δy)   # δ²z/δxδy
 _G(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = (-s.Z4 + s.Z6) / 2δx  # δz/δx
 _H(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = (s.Z2 - s.Z8) / 2δy  # δz/δy
 _I(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = s.Z5
@@ -244,74 +274,101 @@ _D(::LandSerf, s::Stencil, δx = 1, δy = 1) = (s.Z6 - s.Z4) / 2δx  # δz/δx
 _E(::LandSerf, s::Stencil, δx = 1, δy = 1) = (s.Z8 - s.Z2) / 2δy  # δz/δy
 _F(::LandSerf, s::Stencil) = s.Z5
 
-coefficients(::LandSerf, s::Stencil, δx = 1, δy = 1) = (;
-    a=_A(LandSerf(), s, δx, δy),
-    b=_B(LandSerf(), s, δx, δy),
-    c=_C(LandSerf(), s, δx, δy),
-    d=_D(LandSerf(), s, δx, δy),
-    e=_E(LandSerf(), s, δx, δy),
-    f=_F(LandSerf(), s),
-)
+function coefficients(::LandSerf, s::Stencil, δx = 1, δy = 1, direction = nothing)
+    if isnothing(direction)
+        (;
+            a = _A(LandSerf(), s, δx, δy),
+            b = _B(LandSerf(), s, δx, δy),
+            c = _C(LandSerf(), s, δx, δy),
+            d = _D(LandSerf(), s, δx, δy),
+            e = _E(LandSerf(), s, δx, δy),
+            f = _F(LandSerf(), s),
+        )
+    else
+        (;
+            a = _A(LandSerf(), s, δx, δy) * cos(direction)^2,
+            b = _B(LandSerf(), s, δx, δy) * sin(direction)^2,
+            c = _C(LandSerf(), s, δx, δy) * sin(direction) * cos(direction),
+            d = _D(LandSerf(), s, δx, δy) * cos(direction),
+            e = _E(LandSerf(), s, δx, δy) * sin(direction),
+            f = _F(LandSerf(), s),
+        )
+    end
+end
 
 function profile(a, b, c, d, e)
     (-2 * (a * d^2 + c * d * e + b * e^2)) / ((d^2 + e^2) * (1 + d^2 + e^2)^1.5)
 end
 
-function _profile(s, cellsize)
-    a, b, c, d, e = coefficients(LandSerf(), s, cellsize)
+function _profile(s, δx, δy, direction)
+    a, b, c, d, e = coefficients(LandSerf(), s, δx, δy, direction)
     profile(a, b, c, d, e)
 end
 
 """
-    profile_curvature(dem::AbstractMatrix{<:Real}; cellsize = 1.0, radius=1)
+    profile_curvature(dem::AbstractMatrix{<:Real}; cellsize = cellsize(dem), radius=1)
 
 Calculate normal slope line curvature (profile curvature)[^minar2020].
 
 [^minar2020]: Minár, J., Evans, I.S., Jenčo, M., 2020. A comprehensive system of definitions of land surface (topographic) curvatures, with implications for their application in geoscience modelling and prediction. Earth-Science Reviews 211, 103414. https://doi.org/10.1016/j.earscirev.2020.103414
 """
-function profile_curvature(dem::AbstractMatrix{<:Real}; cellsize = 1.0, radius=1)
-    mapstencil(x->_profile(x, cellsize), fitns(radius), dem)
+function profile_curvature(
+    dem::AbstractMatrix{<:Real};
+    cellsize = cellsize(dem),
+    radius = 1,
+    direction = nothing,
+)
+    mapstencil(x -> _profile(x, cellsize[1], cellsize[2], direction), fitns(radius), dem)
 end
 
 function tangential(a, b, c, d, e)
     -2 * (a * (e^2) - c * d * e + b * d^2) / ((d^2 + e^2) * sqrt(1 + d^2 + e^2))
 end
 
-function _tangential(s, cellsize)
-    a, b, c, d, e = coefficients(LandSerf(), s, cellsize)
+function _tangential(s, δx, δy, direction)
+    a, b, c, d, e = coefficients(LandSerf(), s, δx, δy, direction)
     tangential(a, b, c, d, e)
 end
 
 """
-    tangential_curvature(dem::AbstractMatrix{<:Real}; cellsize = 1.0, radius=1)
+    tangential_curvature(dem::AbstractMatrix{<:Real}; cellsize = cellsize(dem), radius=1)
 
 Calculate normal contour curvature (tangential curvature)[^minar2020].
 
 [^minar2020]: Minár, J., Evans, I.S., Jenčo, M., 2020. A comprehensive system of definitions of land surface (topographic) curvatures, with implications for their application in geoscience modelling and prediction. Earth-Science Reviews 211, 103414. https://doi.org/10.1016/j.earscirev.2020.103414
 """
-function tangential_curvature(dem::AbstractMatrix{<:Real}; cellsize = 1.0, radius=1)
-    mapstencil(x->_tangential(x, cellsize), fitns(radius), dem)
+function tangential_curvature(
+    dem::AbstractMatrix{<:Real};
+    cellsize = cellsize(dem),
+    radius = 1,
+    direction = nothing,
+)
+    mapstencil(x -> _tangential(x, cellsize[1], cellsize[2], direction), fitns(radius), dem)
 end
-
 
 function plan(a, b, c, d, e)
     (2 * (b * d^2 - c * d * e + a * e^2)) / ((1 + d^2 + e^2)^1.5)
 end
 
-function _plan(s, cellsize)
-    a, b, c, d, e = coefficients(LandSerf(), s, cellsize)
+function _plan(s, δx, δy, direction)
+    a, b, c, d, e = coefficients(LandSerf(), s, δx, δy, direction)
     plan(a, b, c, d, e)
 end
 
 """
-    plan_curvature(dem::AbstractMatrix{<:Real}; cellsize = 1.0, radius=1)
+    plan_curvature(dem::AbstractMatrix{<:Real}; cellsize = cellsize(dem), radius=1)
 
 Calculate projected contour curvature (plan curvature)[^minar2020].
 
 [^minar2020]: Minár, J., Evans, I.S., Jenčo, M., 2020. A comprehensive system of definitions of land surface (topographic) curvatures, with implications for their application in geoscience modelling and prediction. Earth-Science Reviews 211, 103414. https://doi.org/10.1016/j.earscirev.2020.103414
 """
-function plan_curvature(dem::AbstractMatrix{<:Real}; cellsize = 1.0, radius=1)
-    mapstencil(x->_plan(x, cellsize), fitns(radius), dem)
+function plan_curvature(
+    dem::AbstractMatrix{<:Real};
+    cellsize = cellsize(dem),
+    radius = 1,
+    direction = nothing,
+)
+    mapstencil(x -> _plan(x, cellsize[1], cellsize[2], direction), fitns(radius), dem)
 end
 
 # """Calculate contour geodesic torsion or twisting curvature

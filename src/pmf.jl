@@ -93,23 +93,33 @@ function _pmf(
 
     mask = falses(size(A))
 
+    # @info window_diffs
+    # @info windowsizes
     # Iterate over window sizes and height tresholds
     for (i, ωₖ) in enumerate(windowsizes)
         s = (i > 1) && adjust ? dilate(slope, window_diffs[i]) : slope
-        @debug "Window $(ωₖ), $(window_diffs[i]) slope sum: $(sum(s))"
+        nωₖ = (i > 1) ? window_diffs[i] : ωₖ
+        # @info "Window $nωₖ, $(ωₖ), $(window_diffs[i]) slope sum: $(sum(s))"
         dhₜ = min.(dhₘ, s * window_diffs[i] * cellsize .+ dh₀)
         if erode
             if circular
-                mapwindowcirc_approx!(minimum_mask, A, ωₖ, Af, Inf)
+                # mapwindowcirc_approx!(minimum_mask, copy(A), ωₖ, Af, Inf)
+                mapwindowcirc_approx2!(min, Af, ωₖ - window_diffs[i], out, Inf)
+                # mapwindowcirc_approx2!(min, copy(A), ωₖ, Af, Inf)
+
+
+                Af .= out
             else
                 # mapwindow_stack!(minimum, A, ωₖ, Af)
                 LocalFilters.erode!(Af, A, ωₖ)
+                # LocalFilters.erode!(Af, out, ωₖ - window_diffs[i])
+                # out .= Af
             end
         else
             if circular
                 opening_circ!(Af, ωₖ, out)
             else
-                LocalFilters.opening!(Af, out, Af, ωₖ)
+                LocalFilters.opening!(Af, out, A, ωₖ)
             end
         end
         mask .= (A .- Af) .> dhₜ
@@ -119,6 +129,7 @@ function _pmf(
             end
         end
         B .= min.(B, Af .+ dhₜ)
+        # out .= A
     end
 
     B, flags
