@@ -17,14 +17,14 @@ Perceptually Shaded Slope Map by *Pingel, Clarke. 2014* [^pingel2014].
 function pssm(
     A::AbstractMatrix{<:Real};
     exaggeration = 2.3,
-    cellsize = 1.0,
+    cellsize = cellsize(dem),
     method = Horn(),
 )
     slope(A; cellsize, method, exaggeration)
 end
 
 """
-    hillshade(dem::Matrix{<:Real}; azimuth=315.0, zenith=45.0, cellsize=1.0)
+    hillshade(dem::Matrix{<:Real}; azimuth=315.0, zenith=45.0, cellsize=cellsize(dem))
 
 hillshade is the simulated illumination of a surface based on its [`slope`](@ref) and
 [`aspect`](@ref) given a light source with azimuth and zenith angles in °, , as defined in
@@ -34,7 +34,7 @@ function hillshade(
     dem::AbstractMatrix{<:Real};
     azimuth = 315.0,
     zenith = 45.0,
-    cellsize = 1.0,
+    cellsize = cellsize(dem),
 )
     dst = similar(dem, UInt8)
     zenithr = deg2rad(zenith)
@@ -43,7 +43,7 @@ function hillshade(
     initial(A) =
         (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
     function store!(d, i, v)
-        δzδx, δzδy = (v[1] - v[2]) / (8 * v[5]), (v[3] - v[4]) / (8 * v[5])
+        δzδx, δzδy = (v[1] - v[2]) / (8 * v[5][1]), (v[3] - v[4]) / (8 * v[5][2])
         if δzδx != 0
             a = atan(-δzδx, δzδy)
             if a < 0
@@ -71,20 +71,20 @@ function hillshade(
 end
 
 """
-    multihillshade(dem::Matrix{<:Real}; cellsize=1.0)
+    multihillshade(dem::Matrix{<:Real}; cellsize=cellsize(dem))
 
 multihillshade is the simulated illumination of a surface based on its [`slope`](@ref) and
 [`aspect`](@ref). Like [`hillshade`](@ref), but now using multiple sources as defined in
 https://pubs.usgs.gov/of/1992/of92-422/of92-422.pdf, similar to GDALs -multidirectional.
 """
-function multihillshade(dem::AbstractMatrix{<:Real}; cellsize = 1.0)
+function multihillshade(dem::AbstractMatrix{<:Real}; cellsize = cellsize(dem))
     dst = similar(dem, UInt8)
     zenithr = deg2rad(60)
 
     initial(A) =
         (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
     function store!(d, i, v)
-        δzδx, δzδy = (v[1] - v[2]) / (8 * v[5]), (v[3] - v[4]) / (8 * v[5])
+        δzδx, δzδy = (v[1] - v[2]) / (8 * v[5][1]), (v[3] - v[4]) / (8 * v[5][2])
         if δzδx != 0
             a = atan(-δzδx, δzδy)
             if a < 0

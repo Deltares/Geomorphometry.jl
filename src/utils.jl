@@ -172,10 +172,11 @@ end
 end
 
 """
-    xyratio(dem::AbstractArray)
+    cellsize(dem)
 
-Return an Array with the xyratio for each cell of the dem.
+Return an Tuple with the x and y length of each cell of the dem.
+Set them negatively to flip the image.
 """
-function xyratio(dem::AbstractArray)
-    Fill(1.0, size(dem))
+function cellsize(dem)
+    return (1.0, 1.0)
 end

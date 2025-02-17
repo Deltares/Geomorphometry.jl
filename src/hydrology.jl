@@ -149,17 +149,17 @@ const directions = centered([1 2 3; 4 5 6; 7 8 9])
 Computes the flow accumulation of a digital elevation model (DEM) `dem` with an optional `closed` mask and a `method` for flow direction.
 Returns the flow accumulation and the flow direction (local drainage direction or ldd)
 """
-function flowaccumulation(dem::AbstractMatrix, closed = falses(size(dem)); method = D8(), cellsize=1)
+function flowaccumulation(dem::AbstractMatrix, closed = falses(size(dem)); method = D8(), cellsize=cellsize(dem))
     flowaccumulation!(dem, copy(closed); method, cellsize)
 end
 
-function flowaccumulation!(dem::AbstractMatrix, closed = falses(size(dem)); method=D8(), cellsize=1)
+function flowaccumulation!(dem::AbstractMatrix, closed = falses(size(dem)); method=D8(), cellsize=cellsize(dem))
 
     dir = fill(CartesianIndex{2}(0, 0), size(dem))
     order = ones(Int64, length(closed) - sum(closed))
 
     acc = similar(dem, Float32)
-    acc .= cellsize^2
+    acc .= cellsize[1] * cellsize[2]
     output = similar(dem, eltype(directions))
 
     open = PriorityQueue{CartesianIndex{2}, eltype(dem)}()
@@ -263,22 +263,22 @@ function _accumulate!(fd8::FD8, acc, order, dir, R, dem)
 end
 
 """
-    TWI(dem::AbstractMatrix; method=D8(), cellsize=1)
+    TWI(dem::AbstractMatrix; method=D8(), cellsize=cellsize(dem))
 
 Computes the Topographic Wetness Index (TWI) of a digital elevation model (DEM) `dem` with an optional `method` for flow direction and a `cellsize`.
 """
-function TWI(dem::AbstractMatrix; method=D8(), cellsize=1)
+function TWI(dem::AbstractMatrix; method=D8(), cellsize=cellsize(dem))
     s = slope(dem; cellsize)
     acc, _ = flowaccumulation(dem; method, cellsize)
     return @. log(acc / tand(s))
 end
 
 """
-    SPI(dem::AbstractMatrix; method=D8(), cellsize=1)
+    SPI(dem::AbstractMatrix; method=D8(), cellsize=cellsize(dem))
 
 Computes the Stream Power Index (SPI) of a digital elevation model (DEM) `dem` with an optional `method` for flow direction and a `cellsize`.
 """
-function SPI(dem::AbstractMatrix; method=D8(), cellsize=1)
+function SPI(dem::AbstractMatrix; method=D8(), cellsize=cellsize(dem))
     s = slope(dem; cellsize)
     acc, _ = flowaccumulation(dem; method, cellsize)
     return @. log(acc * tand(s))
