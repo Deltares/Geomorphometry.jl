@@ -54,7 +54,7 @@ export default defineConfig({
   },
   themeConfig: {
     outline: 'deep',
-    logo: '/logo.png',
+    logo: '/logo.svg',
     search: {
       provider: 'local',
       options: {
@@ -65,10 +65,9 @@ export default defineConfig({
     sidebar: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
     editLink: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/evetion' },
+      { icon: 'github', link: 'https://github.com/Deltares/Geomorphometry.jl' },
       { icon: 'linkedin', link: 'https://www.linkedin.com/in/mjpronk/' },
       { icon: 'mastodon', link: 'https://fosstodon.org/@evetion' },
-      { icon: 'twitter', link: 'https://twitter.com/3vetion' }
     ],
     footer: {
       message: 'Made with <a href="https://luxdl.github.io/DocumenterVitepress.jl/dev/" target="_blank"><strong>DocumenterVitepress.jl</strong></a><br>',

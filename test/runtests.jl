@@ -9,7 +9,7 @@ using Test
         B, flags = pmf(A)
         @test (A .<= B) == (flags .== 0.0)
 
-        Bc, flagsc = pmf(A; circular=true)
+        Bc, flagsc = pmf(A; circular = true)
         @test (A .<= Bc) == (flagsc .== 0.0)
         A = reshape(A, (size(A)..., 1))
 
@@ -33,12 +33,12 @@ using Test
     end
     @testset "skb" begin
         B = skb(rand(25, 25))
-        B = skb(rand(25, 25); mean=0.25)
-        B = skbr(rand(25, 25); iterations=5)
+        B = skb(rand(25, 25); mean = 0.25)
+        B = skbr(rand(25, 25); iterations = 5)
     end
     @testset "pitremoval" begin
         B = pitremoval(rand(25, 25))
-        B = pitremoval(rand(25, 25); limit=0.1)
+        B = pitremoval(rand(25, 25); limit = 0.1)
     end
     @testset "spread" begin
         points = [0.0 0 0 0 2; 0 0 0 0 0; 0 0 0 0 0; 0 1 0 0 0; 0 0 0 0 0]
@@ -51,11 +51,11 @@ using Test
         TRI(A)
         TPI(A)
         roughness(A)
-        slope(A; method=Horn())
-        slope(A; cellsize=(5,5), method=ZevenbergenThorne())
-        slope(A; cellsize=(10,10), method=MDG())
+        slope(A; method = Horn())
+        slope(A; cellsize = (5, 5), method = ZevenbergenThorne())
+        slope(A; cellsize = (10, 10), method = MDG())
         aspect(A)
-        aspect(A, method=MDG())
+        aspect(A; method = MDG())
         curvature(A)
         hillshade(A)
     end

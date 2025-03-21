@@ -19,6 +19,3 @@ Private = false
 Modules = [Geomorphometry]
 Public = false
 ```
-
-```@bibliography
-```

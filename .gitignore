@@ -13,3 +13,7 @@ docs/final_site
 _extensions
 
 
+scripts
+.documenter
+docs/src/CHANGELOG.md
+*.png

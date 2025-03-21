@@ -168,9 +168,10 @@ surface area divided by the planimetric area.
 Jenness 2019 https://onlinelibrary.wiley.com/doi/abs/10.2193/0091-7648%282004%29032%5B0829%3ACLSAFD%5D2.0.CO%3B2
 """
 function rugosity(dem::AbstractMatrix{<:Real}; cellsize = cellsize(dem))
-    dst = zeros(Float32, size(dem))
+    dst = similar(dem, eltype(dem))
+    fill!(dst, 0)
 
-    δx, δy = cellsize
+    δx, δy = abs.(cellsize)
 
     # Manually setup buffers to avoid allocations.
     values = @MVector zeros(Float32, 9)

@@ -6,9 +6,7 @@ version = "0.7.0"
 [deps]
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
-Eikonal = "a6aab1ba-8f88-4217-b671-4d0788596809"
 FillArrays = "1a297f60-69ca-5386-bcde-b61e274b549b"
-ImageFiltering = "6a3955dd-da59-5b1f-98d4-e7296123deb5"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LocalFilters = "085fde7c-5f94-55e4-8448-8bbb5db6dde9"
 OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
@@ -21,10 +19,12 @@ Stencils = "264155e8-78a8-466a-aa59-c9b28c34d21a"
 
 [weakdeps]
 ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
+Eikonal = "a6aab1ba-8f88-4217-b671-4d0788596809"
 GeoArrays = "2fb1d81b-e6a0-5fc5-82e6-8e06903437ab"
 Rasters = "a3a2b9e3-a471-40c9-b274-f788e487c689"
 
 [extensions]
+GeomorphometryEikonalExt = "Eikonal"
 GeomorphometryGeoArraysExt = "GeoArrays"
 GeomorphometryRastersExt = ["Rasters", "ArchGDAL"]
 
@@ -35,7 +35,6 @@ Distances = "0.10"
 Eikonal = "0.1.1"
 FillArrays = "0.12, 0.13, 1"
 GeoArrays = "0.9"
-ImageFiltering = "0.6, 0.7"
 LocalFilters = "1.2"
 OffsetArrays = "1.10"
 PaddedViews = "0.5"
@@ -46,7 +45,11 @@ Stencils = "0.3.4"
 julia = "1.10"
 
 [extras]
+ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
+Eikonal = "a6aab1ba-8f88-4217-b671-4d0788596809"
+GeoArrays = "2fb1d81b-e6a0-5fc5-82e6-8e06903437ab"
+Rasters = "a3a2b9e3-a471-40c9-b274-f788e487c689"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "GeoArrays", "Rasters"]
+test = ["Test", "GeoArrays", "Rasters", "ArchGDAL", "Eikonal"]

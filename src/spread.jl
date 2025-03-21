@@ -11,7 +11,7 @@ Base.@kwdef struct Tomlin <: SpreadMethod end
 """
     spread(::Tomlin, points::Matrix{<:Real}, initial::Matrix{<:Real}, friction::Matrix{<:Real}; res=1, limit=Inf, method=Tomlin())
 
-Total friction distance spread from `points` as by *Tomlin (1983)* [^tomlin1983].
+Total friction distance spread from `points` as by [Tomlin (1983)](@cite tomlin1983digital).
 This is also the method implemented by [PCRaster](https://pcraster.geo.uu.nl/pcraster/4.0.2/doc/manual/op_spread.html).
 
 # Output
@@ -23,57 +23,43 @@ This is also the method implemented by [PCRaster](https://pcraster.geo.uu.nl/pcr
 - `friction::Matrix{<:Real}` Resolution of cell size
 - `res=1` Resolution or cell size
 - `limit=Inf` Initial fill value
-
-[^tomlin1983]: Tomlin, Charles Dana. 1983. Digital Cartographic Modeling Techniques in Environmental Planning. Yale University.
 """
 function spread(
     ::Tomlin,
     locations::Vector{CartesianIndex{2}},
     initial::AbstractMatrix{T},
     friction::AbstractMatrix{<:Real};
-    res = 1,
+    cellsize = cellsize(friction),
     limit = typemax(T),
 ) where {T <: Real}
-
-    # ofriction = OffsetMatrix(fill(Inf, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
-    # ofriction[begin+1:end-1, begin+1:end-1] .= friction
-
-    # result = OffsetMatrix(fill(limit, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
-    result = fill(limit, size(friction))
-    # r = @view result[1:end-1, 1:end-1]
-    # locations = points .> 0
+    result = similar(friction)
+    fill!(result, limit)
     result[locations] .= initial[locations]
-
-    # zone = OffsetMatrix(fill(0, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
-    # ozone = @view zone[1:end-1, 1:end-1]
-    # ozone .= points
     zone = zeros(Int32, size(friction))
-
-    # Construct stack for locations
-    # mask = OffsetMatrix(trues(size(points) .+ 2), UnitRange.(0, size(points) .+ 1))
-    # mask[begin+1:end-1, begin+1:end-1] .= false
     mask = falses(size(friction))
 
     II = CartesianIndices(size(friction))
-    # pq = PriorityQueue{CartesianIndex,eltype(friction)}()
-    pq = FastPriorityQueue{eltype(friction)}(size(locations)...)
-    # pq = PriorityQueue{CartesianIndex{2},eltype(friction)}()
+    pq = FastPriorityQueue{eltype(friction)}(size(friction)...)
     for I in II[locations]
         enqueue!(pq, Tuple(I), result[I])
         mask[I] = true
     end
-    # Step 1: Set the distance of the starting node to 0 and the distances of all other nodes to the highest value possible.
 
-    # Step 3: For each of the active node’s adjacent neighbors, set its distance to whichever is
-    # less: its current distance value or the sum of the distance of the active node plus the
-    # weight of the arc from the active node to that neighbor.
+    δx, δy = abs.(cellsize)
+    δxy = sqrt(δx^2 + δy^2)
+    distances = @SMatrix[
+        δxy δx δxy
+        δy Inf δy
+        δxy δx δxy
+    ]
+
     while !isempty(pq)
-        spread!(pq, mask, result, friction, zone, res)
+        spread!(pq, mask, result, friction, zone, distances)
     end
-    result, zone
+    result
 end
 
-function spread!(pq, mask, result, friction, zone, res)
+function spread!(pq, mask, result, friction, zone, distances)
     I = CartesianIndices(pq.index)[dequeue!(pq)]
     # I = dequeue!(pq)
     mask[I] = true
@@ -83,7 +69,7 @@ function spread!(pq, mask, result, friction, zone, res)
     for (li, i) in enumerate(patch)
         i in CartesianIndices(result) || continue
         mask[i] && continue
-        nr = muladd(friction[i] + friction[I], res / 2 * distance_8[li], result[I])
+        nr = muladd(friction[i] + friction[I], distances[li] / 2, result[I])
         if nr < result[i]  # cells where new distance is lower
             result[i] = nr
             zone[i] = zone[I]
@@ -99,8 +85,8 @@ end
 """
     spread(::Eastman, points::Matrix{<:Real}, initial::Matrix{<:Real}, friction::Matrix{<:Real}; res=1, limit=Inf, iterations=3)
 
-Pushbroom method for friction costs as discussed by *Eastman (1989) [^eastman1989].
-This method should scale much better (linearly) than the [^tomlin1983] method, but can require more
+Pushbroom method for friction costs as discussed by [Eastman (1989)](@cite eastman1989pushbroom).
+This method should scale better (linearly) than the [Tomlin (1983)](@cite tomlin1983digital) method, but can require more
 `iterations` than set by default (3) in the case of maze-like, uncrossable obstacles.
 
 # Output
@@ -112,8 +98,6 @@ This method should scale much better (linearly) than the [^tomlin1983] method, b
 - `friction::Matrix{<:Real}` Resolution of cell size
 - `res=1` Resolution or cell size
 - `limit=Inf` Initial fill value
-
-[^eastman1989]: Eastman, J. Ronald. 1989. ‘Pushbroom Algorithms for Calculating Distances in Raster Grids’. In Proceedings, Autocarto, 9:288–97.
 """
 function spread(
     e::Eastman,
@@ -121,7 +105,7 @@ function spread(
     locations::Vector{CartesianIndex{2}},
     initial::AbstractMatrix{<:Real},
     friction::AbstractMatrix{<:Real};
-    res = 1,
+    cellsize = cellsize(friction),
     limit = Inf,
 )
 
@@ -129,7 +113,8 @@ function spread(
     # ofriction[begin+1:end-1, begin+1:end-1] .= friction
 
     # result = OffsetMatrix(fill(limit, size(friction) .+ 2), UnitRange.(0, size(points) .+ 1))
-    result = fill(limit, size(friction))
+    result = similar(friction)
+    fill!(result, limit)
 
     # r = @view result[1:end-1, 1:end-1]
     # locations = points .> 0
@@ -145,11 +130,19 @@ function spread(
     # zone = copy(points)
     zone = zeros(Int32, size(friction))
 
+    δx, δy = abs.(cellsize)
+    δxy = sqrt(δx^2 + δy^2)
+    distances = @SMatrix[
+        δxy δx δxy
+        δy Inf δy
+        δxy δx δxy
+    ]
+
     # minval, minidx = [0.0], [CartesianIndex(1, 1)]
     # x = @MMatrix zeros(3, 3)
     indices = CartesianIndices(size(friction))
     counts = 1
-    for i in 1:e.iterations
+    for i in 1:(e.iterations)
         if iszero(counts)
             break
         end
@@ -159,7 +152,7 @@ function spread(
             patch = (I - Δ):(I + Δ)
             for (li, i) in enumerate(patch)
                 i in CartesianIndices(result) || continue
-                nr = muladd(friction[i] + friction[I], res / 2 * distance_8[li], result[I])
+                nr = muladd(friction[i] + friction[I], distances[li] / 2, result[I])
                 if nr < result[i]  # cells where new distance is lower
                     counts += 1
                     result[i] = nr
@@ -168,7 +161,7 @@ function spread(
             end
         end
     end
-    result, zone
+    result
 end
 
 """
@@ -187,7 +180,7 @@ function spread(
     initial::AbstractMatrix{<:Real},
     friction::Real;
     distance = Euclidean(),
-    res = 1.0,
+    cellsize = cellsize(friction),
     kwargs...,
 )
     locations = findall(>(0), points)
@@ -197,7 +190,7 @@ function spread(
     for location in I[locations]
         for cell in I
             result[cell] = min(
-                evaluate(distance, location.I, cell.I) * res * friction + initial[location],
+                evaluate(distance, location.I, cell.I) * first(abs(cellsize)) * friction + initial[location],
                 result[cell],
             )
         end
@@ -214,33 +207,7 @@ Base.@kwdef struct FastSweeping <: SpreadMethod
 end
 
 """
-    spread(::FastSweeping, points::Matrix{<:Real}, initial::Matrix{<:Real}, friction::Matrix{<:Real}; res=1, limit=Inf)
-
-Total friction distance spread from `points` as by algorithm *Tomlin (1983)* [^tomlin1983].
-This is also the method implemented by [PCRaster](https://pcraster.geo.uu.nl/pcraster/4.0.2/doc/manual/op_spread.html).
-See SpreadMethod for other algorithms.
-
-# Output
-- `Array{Float64,2}` Total friction distance
-
-# Arguments
-- `points::Vector{CartesianIndex}` Input Array
-- `initial::AbstractVector{<:Real}` Initial values of the result
-- `friction::Matrix{<:Real}` Friction map
-
-[^hongkai20025]: Zhao, Hongkai (2005). "A fast sweeping method for Eikonal equations". Mathematics of Computation. 74 (250): 603–627. DOI: 10.1090/S0025-5718-04-01678-3
-"""
-function spread(fs::FastSweeping, points, initial, friction; kwargs...)
-    solver = Eikonal.FastSweeping(friction)
-    for I in points
-        solver.t[I] = initial[I]
-    end
-    Eikonal.sweep!(solver; nsweeps = fs.iterations, verbose=fs.debug, epsilon=fs.eps)
-    @view(solver.t[2:end, 2:end]), 1
-end
-
-"""
-    spread(points::Matrix{<:Real}, initial::Matrix{<:Real}, friction::Matrix{<:Real}; res=1, limit=Inf, method=Tomlin())
+    spread(points::Matrix{<:Real}, initial::Matrix{<:Real}, friction::Matrix{<:Real}; cellsize=(1,1), limit=Inf, method=Tomlin())
 
 Total friction distance spread from `points` from `initial` with `friction`.
 By default uses Tomlin, see SpreadMethod for other algorithms.
@@ -249,11 +216,11 @@ function spread(
     points::Vector{CartesianIndex{2}},
     initial::AbstractMatrix{<:Real},
     friction::AbstractMatrix{<:Real};
-    res = 1,
+    cellsize = cellsize(friction),
     limit = Inf,
     method = Tomlin(),
 )
-    spread(method, points, initial, friction; res, limit)
+    spread(method, points, initial, friction; cellsize, limit)
 end
 
 function spread(

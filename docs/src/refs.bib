@@ -1,0 +1,239 @@
+
+@article{barnesPriorityFloodOptimalDepressionFilling2014,
+  title         = {Priority-{{Flood}}: {{An Optimal Depression-Filling}} and {{Watershed-Labeling Algorithm}} for {{Digital Elevation Models}}},
+  shorttitle    = {Priority-{{Flood}}},
+  author        = {Barnes, Richard and Lehman, Clarence and Mulla, David},
+  year          = {2014},
+  month         = jan,
+  journal       = {Computers \& Geosciences},
+  volume        = {62},
+  eprint        = {1511.04463},
+  primaryclass  = {cs},
+  pages         = {117--127},
+  issn          = {00983004},
+  doi           = {10.1016/j.cageo.2013.04.024},
+  urldate       = {2023-11-24},
+  abstract      = {Depressions (or pits) are low areas within a digital elevation model that are surrounded by higher terrain, with no outlet to lower areas. Filling them so they are level, as fluid would fill them if the terrain were impermeable, is often necessary in preprocessing DEMs. The depression-filling algorithm presented here---called Priority-Flood---unifies and improves on the work of a number of previous authors who have published similar algorithms. The algorithm operates by flooding DEMs inwards from their edges using a priority queue to determine the next cell to be flooded. The resultant DEM has no depressions or digital dams: every cell is guaranteed to drain. The algorithm is optimal for both integer and floating-point data, working in O(n) and O(n lg n) time, respectively. It is shown that by using a plain queue to fill depressions once they have been found, an O(m lg m) time-complexity can be achieved, where m does not exceed the number of cells n. This is the lowest time complexity of any known floating-point depression-filling algorithm. In testing, this improved variation of the algorithm performed up to 37\% faster than the original. Additionally, a parallel version of an older, but widely-used depression-filling algorithm required six parallel processors to achieve a run-time on par with what the newer algorithm's improved variation took on a single processor. The Priority-Flood Algorithm is simple to understand and implement: the included pseudocode is only 20 lines and the included C++ reference implementation is under a hundred lines. The algorithm can work on irregular meshes as well as 4-, 6-, 8-, and n-connected grids. It can also be adapted to label watersheds and determine flow directions through either incremental elevation changes or depression carving. In the case of incremental elevation changes, the algorithm includes safety checks not present in prior works.},
+  archiveprefix = {arXiv},
+  keywords      = {Computer Science - Data Structures and Algorithms}
+}
+
+
+@inproceedings{bartelsDTMGenerationLIDAR2006,
+  title      = {{{DTM Generation}} from {{LIDAR Data}} Using {{Skewness Balancing}}},
+  booktitle  = {18th {{International Conference}} on {{Pattern Recognition}} ({{ICPR}}'06)},
+  author     = {Bartels, M. and Wei, Hong and Mason, D.C.},
+  year       = {2006},
+  month      = aug,
+  volume     = {1},
+  pages      = {566--569},
+  issn       = {1051-4651},
+  doi        = {10/cwk4v2},
+  abstract   = {Light detection and ranging (LIDAR) data for terrain and land surveying has contributed to many environmental, engineering and civil applications. However, the analysis of digital surface models (DSMs) from complex LIDAR data is still challenging. Commonly, the first task to investigate LIDAR data point clouds is to separate ground and object points as a preparatory step for further object classification. In this paper, the authors present a novel unsupervised segmentation algorithm - skewness balancing - to separate object and ground points efficiently from high resolution LIDAR point clouds by exploiting statistical moments. The results presented in this paper have shown its robustness and its potential for commercial applications},
+  keywords   = {_tablet,Clouds,Data engineering,Filtering algorithms,Floods,Gaussian distribution,Global Positioning System,Laser radar,Pulse measurements,Surface morphology,Vegetation mapping},
+  annotation = {27 citations (Crossref) [2022-01-19]\\
+                ZSCC: 0000080}
+}
+
+@book{burroughPrinciplesGeographicalInformation2015,
+  title       = {Principles of {{Geographical Information Systems}}},
+  author      = {Burrough, P. A. and McDonnell, Rachael A. and Lloyd, Christopher D.},
+  year        = {2015},
+  publisher   = {OUP Oxford},
+  abstract    = {Geographical data are used in so many aspects of our lives today, ranging from disaster relief operations through to finding directions on our mobile phones. We can all be data collectors, adding locational information as we capture digitally our day-to-day experiences. Geographical Information Systems (GIS) are the software tools that facilitate this, turning the raw data into useful information that can help us understand our worlds better. Principles of Geographical Information Systems presents a thorough overview of the subject, exploring both the theoretical basis of GIS, and their use in practice. It explains how data on the world are converted into digital form and the analytical capabilities used to bring understanding to a range of areas of interest and issues. Spatial data are usually based on two, dichotomous paradigms: exactly defined entities in space, such as land parcels and urban structures, or the continuous variation of single attributes, such as temperature or rainfall. The adoption of one or the other influences how the geographical data are structured in the GIS and the types of analysis possible. A further area of focus in the book concerns the problems of data quality and how statistical errors in spatial data can affect the results of spatial modelling based on the two paradigms of space. Fuzzy logic and continuous classification methods are presented as methods for linking the two spatial paradigms. The book concludes with an overview of current developments and trends in providing spatial data to an ever-expanding global community of users. Online Resource Centre The Online Resource Centre to accompany Principles of Geographical Information Systems features: For students: {$\cdot$} Links to useful software and software providers for GIS {$\cdot$} Datasets with instructions of how to repeat analyses presented in the book using widely-used software For registered adopters of the book: {$\cdot$} Figures from the book, available for download},
+  googlebooks = {kvoJCAAAQBAJ},
+  isbn        = {978-0-19-874284-5},
+  langid      = {english},
+  keywords    = {Business & Economics / Economic History,Science / Earth Sciences / Geography,Technology & Engineering / Cartography,Technology & Engineering / Remote Sensing & Geographic Information Systems,Technology & Engineering / Surveying,Travel / General}
+}
+
+
+@inproceedings{eastman1989pushbroom,
+  title     = {Pushbroom algorithms for calculating distances in raster grids},
+  author    = {Eastman, J Ronald},
+  booktitle = {Proceedings, Autocarto},
+  volume    = {9},
+  pages     = {288--297},
+  year      = {1989}
+}
+
+
+@article{hornHillShadingReflectance1981,
+  title    = {Hill Shading and the Reflectance Map},
+  author   = {Horn, B.K.P.},
+  year     = {1981},
+  month    = jan,
+  journal  = {Proceedings of the IEEE},
+  volume   = {69},
+  number   = {1},
+  pages    = {14--47},
+  issn     = {1558-2256},
+  doi      = {10.1109/PROC.1981.11918},
+  urldate  = {2024-12-17},
+  abstract = {Shaded overlays for maps give the user an immediate appreciation for the surface topography since they appeal to an important visual depth cue. A brief review of the history of manual methods is followed by a discussion of a number of methods that have been proposed for the automatic generation of shaded overlays. These techniques are compared using the reflectance map as a common representation for the dependence of tone or gray level on the orientation of surface elements.},
+  keywords = {Automation,Graphics,History,Photography,Production,Reflectivity,Shadow mapping,Streaming media,Surface topography,Surface treatment}
+}
+
+@article{ilichMultiscaleDTMOpensourcePackage2023,
+  title      = {{{MultiscaleDTM}}: {{An}} Open-Source {{R}} Package for Multiscale Geomorphometric Analysis},
+  shorttitle = {{{MultiscaleDTM}}},
+  author     = {Ilich, Alexander R. and Misiuk, Benjamin and Lecours, Vincent and Murawski, Steven A.},
+  year       = {2023},
+  journal    = {Transactions in GIS},
+  volume     = {27},
+  number     = {4},
+  pages      = {1164--1204},
+  issn       = {1467-9671},
+  doi        = {10.1111/tgis.13067},
+  urldate    = {2025-03-21},
+  abstract   = {Digital terrain models (DTMs) are datasets containing altitude values above or below a reference level, such as a reference ellipsoid or a tidal datum over geographic space, often in the form of a regularly gridded raster. They can be used to calculate terrain attributes that describe the shape and characteristics of topographic surfaces. Calculating these terrain attributes often requires multiple software packages that can be expensive and specialized. We have created a free, open-source R package, MultiscaleDTM, that allows for the calculation of members from each of the five major thematic groups of terrain attributes: slope, aspect, curvature, relative position, and roughness, from a regularly gridded DTM. Furthermore, these attributes can be calculated at multiple spatial scales of analysis, a key feature that is missing from many other packages. Here, we demonstrate the functionality of the package and provide a simulation exploring the relationship between slope and roughness. When roughness measures do not account for slope, these attributes exhibit a strong positive correlation. To minimize this correlation, we propose a new roughness measure called adjusted standard deviation. In most scenarios tested, this measure produced the lowest rank correlation with slope out of all the roughness measures tested. Lastly, the simulation shows that some existing roughness measures from the literature that are supposed to be independent of slope can actually exhibit a strong inverse relationship with the slope in some cases.},
+  copyright  = {{\copyright} 2023 The Authors. Transactions in GIS published by John Wiley \& Sons Ltd.},
+  langid     = {english}
+}
+
+@article{jensonExtractingTopographicStructure1988,
+  title    = {Extracting {{Topographic Structure}} from {{Digital Elevation Data}} for {{Geographic Information System Analysis}}},
+  author   = {Jenson, S K and Domingue, J O},
+  year     = {1988},
+  journal  = {PHOTOGRAMMETRIC ENGINEERING},
+  abstract = {Software tools have been developed at the U.S. Geological Survey's EROS Data Center to extract topographic structure and to delineate watersheds and overland flow paths from digital elevation models. The tools are special purpose FORTRAN programs interfaced with general-purpose raster and vector spatial analysis and relational data base management packages.},
+  langid   = {english}
+}
+@article{keqizhangProgressiveMorphologicalFilter2003,
+  title      = {A Progressive Morphological Filter for Removing Nonground Measurements from Airborne {{LIDAR}} Data},
+  author     = {{Keqi Zhang} and {Shu-Ching Chen} and Whitman, D. and {Mei-Ling Shyu} and {Jianhua Yan} and {Chengcui Zhang}},
+  year       = {2003},
+  month      = apr,
+  journal    = {IEEE Transactions on Geoscience and Remote Sensing},
+  volume     = {41},
+  number     = {4},
+  pages      = {872--882},
+  issn       = {1558-0644},
+  doi        = {10/dv3889},
+  abstract   = {Recent advances in airborne light detection and ranging (LIDAR) technology allow rapid and inexpensive measurements of topography over large areas. This technology is becoming a primary method for generating high-resolution digital terrain models (DTMs) that are essential to numerous applications such as flood modeling and landslide prediction. Airborne LIDAR systems usually return a three-dimensional cloud of point measurements from reflective objects scanned by the laser beneath the flight path. In order to generate a DTM, measurements from nonground features such as buildings, vehicles, and vegetation have to be classified and removed. In this paper, a progressive morphological filter was developed to detect nonground LIDAR measurements. By gradually increasing the window size of the filter and using elevation difference thresholds, the measurements of vehicles, vegetation, and buildings are removed, while ground data are preserved. Datasets from mountainous and flat urbanized areas were selected to test the progressive morphological filter. The results show that the filter can remove most of the nonground points effectively.},
+  keywords   = {airborne lidar,Area measurement,buildings,Clouds,Digital elevation models,Filters,Floods,geodesy,geophysical measurement technique,geophysical signal processing,geophysical techniques,image processing,land surface topography,Laser radar,laser remote sensing,nonground feature removal,optical radar,pmf,Predictive models,progressive morphological filter,remote sensing by laser beam,Surfaces,Terrain factors,terrain mapping,topography (Earth),vegetation,Vegetation mapping,vehicles},
+  annotation = {545 citations (Crossref) [2022-01-19]\\
+                ZSCC: NoCitationData[s0]}
+}
+
+@article{mark1992multidirectional,
+  title   = {A Multidirectional, Oblique-Weighted, Shaded-Relief Image of the Island of Hawaii (No. 92-422); {{US}} Dept. of the Interior},
+  author  = {Mark, Robert},
+  year    = {1992},
+  journal = {US Geological Survey: Reston, VA, USA}
+}
+@article{minarComprehensiveSystemDefinitions2020,
+  title    = {A Comprehensive System of Definitions of Land Surface (Topographic) Curvatures, with Implications for Their Application in Geoscience Modelling and Prediction},
+  author   = {Min{\'a}r, Jozef and Evans, Ian S. and Jen{\v c}o, Mari{\'a}n},
+  year     = {2020},
+  month    = dec,
+  journal  = {Earth-Science Reviews},
+  volume   = {211},
+  pages    = {103414},
+  issn     = {0012-8252},
+  doi      = {10.1016/j.earscirev.2020.103414},
+  urldate  = {2024-01-10},
+  abstract = {Current use of land surface curvatures (LSCs) is in a confused state as a large gap has opened up between applications and theoretical work. LSCs exercise important control on changes of gravity potential energy and the equilibrium of the surface, and they are increasingly used in geosciences but they are not consistently defined. This paper offers a comprehensive theoretical framework for definition, classification and interpretation of LSCs. Systematization of known and newly derived relationships between LSCs is followed by extension of the traditional scheme for interpretation. A new comprehensive system of LSCs starts with the basic trio: profile, plan and twisting curvatures, and includes their slope-dependent sub-forms, combinations and imitations. Analysis of their influence on changes of gravitational potential energy available for mass flows is crucial for their understanding, and leads to a new interpretation of difference curvature. The systematic evaluation of LSCs as expressions of slope disequilibrium offers a further interpretation: zero values of LSCs can be considered as important theoretical attractors of landform development. LSCs are increasingly employed for analyses of landslide, flood, snow avalanche, forest fire, soil erosion, mass balance, ground water, digital soil mapping, individual landform identification and land surface segmentation, modelling of landscape development, classification of LIDAR data and visualization of terrain features. Important improvement of LSC use in all these spheres is possible. They are mostly computed in geographical information systems with limited capabilities: the performance of ArcGIS, SAGA, GRASS, LandSerf, Surfer and MICRODEM is compared here. The important interrelations of DEM resolution, accuracy and generalization are demonstrated in relation to the nested hierarchy of land forms and processes. The best interpretable LSCs, and challenges of future progress, are specified at the close of the paper.},
+  keywords = {Digital terrain analysis,Geomorphometry,Index of slope energy disequilibrium,Land surface curvature,Landscape classification,Natural hazards susceptibility,Natural potential mapping}
+}
+@article{pingelImprovedSimpleMorphological2013a,
+  ids        = {pingelImprovedSimpleMorphological2013},
+  title      = {An Improved Simple Morphological Filter for the Terrain Classification of Airborne {{LIDAR}} Data},
+  author     = {Pingel, Thomas J. and Clarke, Keith C. and McBride, William A.},
+  year       = {2013},
+  month      = mar,
+  journal    = {ISPRS Journal of Photogrammetry and Remote Sensing},
+  volume     = {77},
+  pages      = {21--30},
+  issn       = {0924-2716},
+  doi        = {10/f4rn8t},
+  urldate    = {2021-09-28},
+  abstract   = {Terrain classification of LIDAR point clouds is a fundamental problem in the production of Digital Elevation Models (DEMs). The Simple Morphological Filter (SMRF) addresses this problem by applying image processing techniques to the data. This implementation uses a linearly increasing window and simple slope thresholding, along with a novel application of image inpainting techniques. When tested against the ISPRS LIDAR reference dataset, SMRF achieved a mean 85.4\% Kappa score when using a single parameter set and 90.02\% when optimized. SMRF is intended to serve as a stable base from which more advanced progressive filters can be designed. This approach is particularly effective at minimizing Type I error rates, while maintaining acceptable Type II error rates. As a result, the final surface preserves subtle surface variation in the form of tracks and trails that make this approach ideally suited for the production of DEMs used as ground surfaces in immersive virtual environments.},
+  langid     = {english},
+  keywords   = {Algorithms,Classification,DEM/DTM,LIDAR,Virtual reality},
+  annotation = {138 citations (Crossref) [2022-01-19]\\
+                ZSCC: 0000220}
+}
+@article{pingelPerceptuallyShadedSlope2014a,
+  ids        = {pingelPerceptuallyShadedSlope2014},
+  title      = {Perceptually {{Shaded Slope Maps}} for the {{Visualization}} of {{Digital Surface Models}}},
+  author     = {Pingel, Thomas and Clarke, Keith},
+  year       = {2014},
+  month      = dec,
+  journal    = {Cartographica: The International Journal for Geographic Information and Geovisualization},
+  volume     = {49},
+  number     = {4},
+  pages      = {225--240},
+  publisher  = {University of Toronto Press},
+  issn       = {0317-7173},
+  doi        = {10/ggnthv},
+  urldate    = {2021-10-21},
+  abstract   = {Although shaded relief, or hillshaded, images are a widely used method to represent high-resolution ({\textasciitilde}1-m) digital surfaces derived from airborne laser (or LiDAR) scans, such displays may become difficult to interpret when they include surface features like buildings, roadways, and natural vegetation. One possible alternative as a visualization of such surface models is a representation based on slope shading -- the steeper, the darker -- but attenuated to the perceptual bias of overestimation of slope. The empirical work presented here demonstrates that Perceptually Shaded Slope Maps (PSSMs) perform as well or better than either hillshaded or hypsometric images on map-reading tasks, including profile estimation and mental rotation.},
+  keywords   = {analytique visuelle,LiDAR,reconnaissance de scenes,scene recognition,terrain visualization,visual analytics,visualisation du relief},
+  annotation = {7 citations (Crossref) [2022-01-19]\\
+                ZSCC: 0000014}
+}
+
+@article{quinnPredictionHillslopeFlow1991,
+  title    = {The Prediction of Hillslope Flow Paths for Distributed Hydrological Modelling Using Digital Terrain Models},
+  author   = {Quinn, P. and Beven, K. and Chevallier, P. and Planchon, O.},
+  year     = {1991},
+  month    = jan,
+  journal  = {Hydrological Processes},
+  volume   = {5},
+  number   = {1},
+  pages    = {59--79},
+  issn     = {0885-6087, 1099-1085},
+  doi      = {10.1002/hyp.3360050106},
+  urldate  = {2023-12-16},
+  abstract = {Abstract             The accuracy of the predictions of distributed hydrological models must depend in part on the proper specification of flow pathways. This paper examines some of the problems of deriving flow pathways from raster digital terrain data in the context of hydrological predictions using TOPMODEL. Distributed moisture status is predicted in TOPMODEL on the basis of spatial indices that depend on flow path definition. The sensitivity of this index to flow path algorithm and grid size is examined for the case where the surface topography is a good indicator of local hydraulic gradients. A strategy for the case where downslope subsurface flow pathways may deviate from those indicated by the surface topography is described with an example application.},
+  langid   = {english}
+}
+@article{tarbotonNewMethodDetermination1997,
+  title     = {A New Method for the Determination of Flow Directions and Upslope Areas in Grid Digital Elevation Models},
+  author    = {Tarboton, David G.},
+  year      = {1997},
+  journal   = {Water Resources Research},
+  volume    = {33},
+  number    = {2},
+  pages     = {309--319},
+  issn      = {1944-7973},
+  doi       = {10.1029/96WR03137},
+  urldate   = {2023-12-16},
+  abstract  = {A new procedure for the representation of flow directions and calculation of upslope areas using rectangular grid digital elevation models is presented. The procedure is based on representing flow direction as a single angle taken as the steepest downward slope on the eight triangular facets centered at each grid point. Upslope area is then calculated by proportioning flow between two downslope pixels according to how close this flow direction is to the direct angle to the downslope pixel. This procedure offers improvements over prior procedures that have restricted flow to eight possible directions (introducing grid bia) or proportioned flow according to slope (introducing unrealistic dispersion). The new procedure is more robust than prior procedures based on fitting local planes while retaining a simple grid based structure. Detailed algorithms are presented and results are demonstrated through test examples and application to digital elevation data sets.},
+  copyright = {Copyright 1997 by the American Geophysical Union.},
+  langid    = {english}
+}
+
+@book{tomlin1983digital,
+  title     = {Digital cartographic modeling techniques in environmental planning},
+  author    = {Tomlin, Charles Dana},
+  year      = {1983},
+  publisher = {Yale University}
+}
+@article{zevenbergen1987quantitative,
+  title     = {Quantitative analysis of land surface topography},
+  author    = {Zevenbergen, Lyle W and Thorne, Colin R},
+  journal   = {Earth surface processes and landforms},
+  volume    = {12},
+  number    = {1},
+  pages     = {47--56},
+  year      = {1987},
+  publisher = {Wiley Online Library}
+}
+@article{zhaoFastSweepingMethod2005,
+  title    = {A Fast Sweeping Method for {{Eikonal}} Equations},
+  author   = {Zhao, Hongkai},
+  year     = {2005},
+  month    = apr,
+  journal  = {Mathematics of Computation},
+  volume   = {74},
+  number   = {250},
+  pages    = {603--627},
+  issn     = {0025-5718, 1088-6842},
+  doi      = {10.1090/S0025-5718-04-01678-3},
+  urldate  = {2024-05-23},
+  abstract = {Advancing research. Creating connections.},
+  langid   = {english},
+  keywords = {characteristics,Courant-Friedrichs-Lewy (CFL) condition,Eikonal equation,Gauss-Seidel iteration,Godunov scheme,upwind difference}
+}

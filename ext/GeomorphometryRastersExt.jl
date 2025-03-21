@@ -13,7 +13,7 @@ end
 
 function _cellsize(::Rasters.GI.AbstractProjectedTrait, dem::Raster)
     dim = Rasters.dims(dem, (Rasters.XDim, Rasters.YDim))
-    isintervals(dim) || throw(
+    Rasters.isintervals(dim) || throw(
         ArgumentError("Cannot calculate cell size for a `Raster` with `Points` sampling."),
     )
     (step(dim[1]), step(dim[2]))

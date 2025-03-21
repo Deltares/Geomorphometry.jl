@@ -1,4 +1,3 @@
-using OffsetArrays: centered
 
 function edges(A::AbstractMatrix)
     CI = CartesianIndices(A)
@@ -17,7 +16,7 @@ end
 """
     filldepressions(dem::AbstractMatrix, mask::Matrix{Bool})
 
-Performs the Priority-Flood algorithm on the given digital elevation model (DEM) `dem` with an optional `mask`.
+Performs the Priority-Flood algorithm [barnesPriorityFloodOptimalDepressionFilling2014](@cite) on the given digital elevation model (DEM) `dem` with an optional `mask`.
 
 # Arguments
 - `dem::AbstractMatrix`: A 2D array representing the digital elevation model (DEM).
@@ -31,15 +30,15 @@ const Δ = CartesianIndex(1, 1)
 
 abstract type FlowDirectionMethod end
 
-"""D8 Flow Direction method (Jenson and Domingue, 1988)."""
+"""D8 Flow Direction method by [Jenson (1988)](@cite jensonExtractingTopographicStructure1988)."""
 struct D8 <: FlowDirectionMethod end
 
-"""DInf Flow Direction method (Tarboton, 1997)."""
+"""DInf Flow Direction method by [Tarboton (1997)](@cite tarbotonNewMethodDetermination1997)."""
 struct DInf <: FlowDirectionMethod end
 
-"""FD8 Flow Direction method (Quinn et al., 1991)."""
+"""FD8 Flow Direction method by [Quin (1991)](@cite quinnPredictionHillslopeFlow1991)."""
 Base.@kwdef struct FD8 <: FlowDirectionMethod
-    p::Float32 = 1
+    p::Float32 = 1.1
 end
 
 function filldepressions!(dem::AbstractMatrix, queued = falses(size(dem)))
@@ -132,11 +131,13 @@ const nb =
     ])
 
 function infc(aspect)
+    aspect = (aspect + 360) % 360
     i = round(Int, aspect / 45) + 1
     return nb[i], nb[i + 1]
 end
 
 function infa(aspect)
+    aspect = (aspect + 360) % 360
     a1 = aspect % 45
     a2 = 45 - a1
     return a2 / 45, a1 / 45
@@ -169,7 +170,7 @@ function flowaccumulation!(
     order = ones(Int64, length(closed) - sum(closed))
 
     acc = similar(dem, Float32)
-    acc .= cellsize[1] * cellsize[2]
+    acc .= abs(cellsize[1] * cellsize[2])
     output = similar(dem, eltype(directions))
 
     open = PriorityQueue{CartesianIndex{2}, eltype(dem)}()
@@ -209,7 +210,7 @@ function _accumulate!(::D8, acc, order, dir, R, dem, cellsize)
     end
 end
 function _accumulate!(::DInf, acc, order, dir, R, dem, cellsize)
-    asp = aspect(dem; method = Horn(), cellsize)
+    asp = aspect(dem; method = Horn())
     for i in reverse(order)
         aspect = asp[i]
 
@@ -240,9 +241,16 @@ function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
     # Derive contour lengths, which is used to calculate the weights
     # Uses the algorithm by Quinn et al. (1991), L1=0.5 L2=0.354 for δx=δy=1
     # TODO Check whether just using the angles is enough.
-    δx, δy = cellsize
+    δx, δy = abs.(cellsize)
     δxy = sqrt((δx / 4)^2 + (δy / 4)^2)
     contour_lengths = @SMatrix [
+        δxy δx δxy
+        δy 0 δy
+        δxy δx δxy
+    ]
+
+    δxy = sqrt(δx^2 + δy^2)
+    dists = @SMatrix [
         δxy δx δxy
         δy 0 δy
         δxy δx δxy
@@ -252,7 +260,8 @@ function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
     Σw = 0.0
     for i in reverse(order)
         Σw = 0.0
-        for (ri, dist) in enumerate(neib_8_dist)
+        # TODO Fix this distance with actual distances
+        for (ri, dist) in enumerate(dists)
             ri == 5 && continue
             I = R[i] + nb[ri]
             I in R || continue
@@ -261,6 +270,7 @@ function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
                 weights[ri] = 0.0
                 continue
             end
+            # TODO Check whether this diff/dist is good enough
             weight = (diff / dist * contour_lengths[ri])^fd8.p
             weights[ri] = weight
             Σw += weight

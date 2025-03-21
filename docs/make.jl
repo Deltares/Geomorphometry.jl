@@ -1,28 +1,35 @@
-# push!(LOAD_PATH, "../src/")
+using Revise
 using Geomorphometry
 using Documenter
 using DocumenterVitepress
 using CairoMakie
 using DocumenterCitations
-using Revise
 using Downloads
 
 Revise.revise()
-
-# bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"))
 dir = @__DIR__
-# cp(joinpath(dir, "../CHANGELOG.md"), joinpath(dir, "src/CHANGELOG.md"), force = true)
+
+bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"); style = :authoryear)
+cp(joinpath(dir, "../CHANGELOG.md"), joinpath(dir, "src/CHANGELOG.md"); force = true)
 CairoMakie.activate!(; type = "png")
 
 fn = joinpath(dir, "src", "saba.tif")
-isfile(fn) && Downloads.download("https://github.com/Deltares/Geomorphometry.jl/releases/download/v0.6.0/saba.tif", fn)
+isfile(fn) || Downloads.download(
+    "https://github.com/Deltares/Geomorphometry.jl/releases/download/v0.6.0/saba.tif",
+    fn,
+)
+fn = joinpath(dir, "src", "saba_dsm.tif")
+isfile(fn) || Downloads.download(
+    "https://github.com/Deltares/Geomorphometry.jl/releases/download/v0.6.0/saba_dsm.tif",
+    fn,
+)
 
-# DocMeta.setdocmeta!(
-#     Geomorphometry,
-#     :DocTestSetup,
-#     :(using Geomorphometry);
-#     recursive = true,
-# )
+DocMeta.setdocmeta!(
+    Geomorphometry,
+    :DocTestSetup,
+    :(using Geomorphometry);
+    recursive = true,
+)
 
 makedocs(;
     modules = [Geomorphometry],
@@ -31,35 +38,33 @@ makedocs(;
     sitename = "Geomorphometry.jl",
     format = MarkdownVitepress(;
         repo = "github.com/Deltares/Geomorphometry.jl",
-        md_output_path = ".",
-        build_vitepress = false,
+        # md_output_path = ".",
+        # build_vitepress = true,
+        devbranch = "main",
     ),
     doctest = true,
     checkdocs = :all,
     pages = [
         "Home" => "index.md",
-        "Getting started" => Any[
-            "Installation" => "installation.md",
-            "Usage" => "usage.md",
-        ],
-        "Background" => Any[
-            "Concepts" => "concepts.md",
-            "Future plans" => "todo.md",
-        ],
+        "Getting started" =>
+            Any["Installation" => "installation.md", "Usage" => "usage.md"],
+        "Background" => Any["Concepts" => "concepts.md", "Future plans" => "todo.md"],
         "Reference" => Any[
-            "API" => "reference.md"
-            "Changelog" => "CHANGELOG.md"
+            "Validation" => "validation.md",
+            "API" => "reference.md",
+            "Changelog" => "CHANGELOG.md",
+            "Bibliography" => "bibliography.md",
         ],
     ],
-    clean = false,
-    # plugins = [bib],
+    # clean = false,
+    plugins = [bib],
     warnonly = [:missing_docs, :cross_references],
 )
 
 deploydocs(;
     repo = "github.com/Deltares/Geomorphometry.jl.git",
     target = "build",
-    devbranch = "master",
+    devbranch = "main",
     branch = "gh-pages",
     push_preview = true,
 )

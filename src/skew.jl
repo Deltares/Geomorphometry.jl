@@ -1,15 +1,13 @@
 """
     mask = skb(A; mean=mean(A))
 
-Applies skewness balancing by *Bartels e.a (2006)* [^bartels2006] to `A`.
+Applies skewness balancing by [Bartels e.a (2006)](@cite bartelsDTMGenerationLIDAR2006) to `A`.
 Improved the performance by applying a binary search to find the threshold value.
 
 # Output
 - `mask::BitMatrix` Mask of allowed values
-
-[^bartels2006]: Bartels, M., Hong Wei, and D.C. Mason. 2006. “DTM Generation from LIDAR Data Using Skewness Balancing.” In 18th International Conference on Pattern Recognition (ICPR’06), 1:566–69. https://doi.org/10/cwk4v2.
 """
-function skb(iA::AbstractArray; mean=mean(iA))
+function skb(iA::AbstractArray; mean = mean(iA))
     m = .!isfinite.(iA)
     if sum(m) > 0
         A = copy(iA)
@@ -46,7 +44,7 @@ function skb(iA::AbstractArray; mean=mean(iA))
     return m
 end
 
-function skb2(iA::AbstractArray; mean=mean(iA))
+function skb2(iA::AbstractArray; mean = mean(iA))
     m = .!isfinite.(iA)
     if sum(m) > 0
         A = copy(iA)
@@ -77,21 +75,18 @@ function skb2(iA::AbstractArray; mean=mean(iA))
     return m
 end
 
-
 """
     mask = skbr(A; iterations=10)
 
-Applies recursive skewness balancing by *Bartels e.a (2006)* [^bartels2006] to `A`.
+Applies recursive skewness balancing by [Bartels e.a (2006)](@cite bartelsDTMGenerationLIDAR2006) to `A`.
 Applies `skb` `iterations` times to the object (non-terrain) mask, as to include
 more (sloped) terrain.
 
 # Output
 - `mask::BitMatrix` Mask of allowed values
-
-[^bartels2006]: Bartels, M., Hong Wei, and D.C. Mason. 2006. “DTM Generation from LIDAR Data Using Skewness Balancing.” In 18th International Conference on Pattern Recognition (ICPR’06), 1:566–69. https://doi.org/10/cwk4v2.
 """
-function skbr(A; iterations=10, mean=mean(A))
-    terrain_mask = skb(A; mean=mean)
+function skbr(A; iterations = 10, mean = mean(A))
+    terrain_mask = skb(A; mean = mean)
     object_mask = .!terrain_mask
     while iterations > 1 && sum(object_mask) > 0
         terrain_mask[object_mask] = terrain_mask[object_mask] .| skb(A[object_mask])
