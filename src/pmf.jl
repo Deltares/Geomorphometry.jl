@@ -69,7 +69,7 @@ function _pmf(
 
     # Compute windowsizes and thresholds
     ωₘ = round(Int, ωₘ / cellsize)
-    κ_max = floor(Int, log2(ωₘ - 1))  # determine # iterations based on exp growth
+    κ_max = floor(Int, log2(ωₘ - 1))  # determine iterations based on exp growth
     windowsizes = Int.(exp2.(1:κ_max)) .+ 1
 
     # Compute tresholds
@@ -82,8 +82,8 @@ function _pmf(
     nan_mask = isnan.(Af)
     Af[nan_mask] .= Inf  # Replace NaN with Inf, as to always filter these
 
-    B = copy(A)  # max_elevation raster
-    out = copy(A)  # max_elevation raster
+    B = copy(Af)  # max_elevation raster
+    out = copy(Af)  # max_elevation raster
 
     flags = similar(A, Float64)  # 0 = ground, other values indicate window size
     fill!(flags, 0.0)
@@ -91,8 +91,6 @@ function _pmf(
 
     mask = falses(size(A))
 
-    # @info window_diffs
-    # @info windowsizes
     # Iterate over window sizes and height tresholds
     for (i, ωₖ) in enumerate(windowsizes)
         s = (i > 1) && adjust ? dilate(slope, window_diffs[i]) : slope
@@ -101,10 +99,8 @@ function _pmf(
         dhₜ = min.(dhₘ, s * window_diffs[i] * cellsize .+ dh₀)
         if erode
             if circular
-                # mapwindowcirc_approx!(minimum_mask, copy(A), ωₖ, Af, Inf)
+                # Modifies A and out in place
                 mapwindowcirc_approx2!(min, Af, ωₖ - window_diffs[i], out, Inf)
-                # mapwindowcirc_approx2!(min, copy(A), ωₖ, Af, Inf)
-
                 Af .= out
             else
                 # mapwindow_stack!(minimum, A, ωₖ, Af)
@@ -114,9 +110,11 @@ function _pmf(
             end
         else
             if circular
+                # modifies Af in place
                 opening_circ!(Af, ωₖ, out)
             else
-                LocalFilters.opening!(Af, out, A, ωₖ)
+                # modifies Af in place
+                LocalFilters.opening!(Af, out, Af, ωₖ)
             end
         end
         mask .= (A .- Af) .> dhₜ
@@ -126,7 +124,6 @@ function _pmf(
             end
         end
         B .= min.(B, Af .+ dhₜ)
-        # out .= A
     end
 
     B, flags
