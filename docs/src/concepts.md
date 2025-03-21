@@ -38,7 +38,7 @@ heatmap(multihillshade(r))
 
 :::
 
-## Multiple methods
+## Multiple algorithms
 We have implemented several algorithms for a common operation so that you can choose the one that best fits your needs. For example, the `slope` function has three methods: `Horn`, `ZevenbergenThorne`, and `MaximumDownwardGradient`, as shown in the [Usage](usage.md) section.
 
 Sometimes, as is the case for the `FD8` algorithm, these methods take different parameters that influence the results. `FD8` takes a `p` parameter that is used to weigh the flow direction, with higher powers resulting in less divergent flows (and thus more like D8).

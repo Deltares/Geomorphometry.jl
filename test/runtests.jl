@@ -28,9 +28,6 @@ using Test
     @testset "pssm" begin
         B = pssm(rand(25, 25))
     end
-    @testset "psf" begin
-        B = psf(rand(25, 25))
-    end
     @testset "skb" begin
         B = skb(rand(25, 25))
         B = skb(rand(25, 25); mean = 0.25)
@@ -44,7 +41,8 @@ using Test
         points = [0.0 0 0 0 2; 0 0 0 0 0; 0 0 0 0 0; 0 1 0 0 0; 0 0 0 0 0]
         initial = [8.0 8 8 8 4; 8 8 8 8 8; 8 8 8 8 8; 0 0 8 8 8; 0 0 8 8 8]
         friction = [1.0 200 1 1 1; 200 1 1 4 4; 1 1 4 4 4; 1 1 3 200 200; 1 Inf 3 200 4]
-        @test spread(points, initial, friction) == spread2(points, initial, friction)
+        @test spread(points, initial, friction; method = Tomlin()) ==
+              spread(points, initial, friction; method = Eastman())
     end
     @testset "terrain" begin
         A = rand(25, 25)

@@ -307,16 +307,14 @@ While filters seem unrelated to the previously discussed methods, these are used
 
 == PMF
 ```@example plots
-B, flags = pmf(dsm, ωₘ = 15.0, slope = 0.2, dhₘ = 5.0, dh₀ = 0.3, cellsize = 5.0)
+B, flags = pmf(dsm, ωₘ = 15.0, slope = 0.2, dhₘ = 5.0, dh₀ = 0.3)
 A = copy(dsm)
 A[A .> B] .= NaN
 heatmap(A)
 ```
 == SMF
 ```@example plots
-# B, flags = smf(dsm)
-A = copy(dsm)
-# A[A .> B] .= NaN
+A = smf(dsm; ω=15.0, slope=0.2)
 heatmap(A)
 ```
 == SKB

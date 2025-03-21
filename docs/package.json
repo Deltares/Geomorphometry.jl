@@ -5,6 +5,9 @@
     "docs:preview": "vitepress preview build/.documenter"
   },
   "dependencies": {
+    "@types/d3-format": "^3.0.4",
+    "@types/node": "^22.10.5",
+    "d3-format": "^3.1.0",
     "@shikijs/transformers": "^1.1.7",
     "markdown-it": "^14.1.0",
     "markdown-it-footnote": "^4.0.0",

@@ -3,6 +3,7 @@ import { h } from 'vue'
 import type { Theme } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
 import VersionPicker from "../../components/VersionPicker.vue"
+import StarUs from '../../components/StarUs.vue'
 
 import { enhanceAppWithTabs } from 'vitepress-plugin-tabs/client'
 import './style.css'
@@ -12,6 +13,7 @@ export default {
   Layout() {
     return h(DefaultTheme.Layout, null, {
       // https://vitepress.dev/guide/extending-default-theme#layout-slots
+      'nav-bar-content-after': () => h(StarUs),
     })
   },
   enhanceApp({ app, router, siteData }) {

@@ -17,27 +17,26 @@ function smf(
     A::AbstractMatrix{<:Real};
     ω::Real = 17.0,
     slope::Real = 0.01,
-    cellsize = cellsize(A),
+    cellsize = abs(first(cellsize(A))),
 )
     out = similar(A, Union{Missing, nonmissingtype(eltype(A))})
+    out .= A
     lastsurface = -copy(A)
     is_low = falses(size(A))
-    radii = 3:2:round(Int, ω / first(cellsize))
+    radii = 1:(round(Int, ω / cellsize) >> 1)
 
-    for radius in radii
-        threshold = slope * radius * first(cellsize)
-        thissurface = opening_circ(lastsurface, radius)
-        is_low .|= ((lastsurface - thissurface) .> threshold)
-        lastsurface = thissurface
-    end
+    threshold = slope * cellsize
+    thissurface = opening_circ(lastsurface, 1)
+    is_low .|= ((lastsurface - thissurface) .> threshold)
+    lastsurface .= thissurface
 
     lastsurface = copy(A)
     is_obj = falses(size(A))
     for radius in radii
-        threshold = slope * radius * first(cellsize)
+        threshold = slope * radius * cellsize
         thissurface = opening_circ(lastsurface, radius)
         is_obj .|= ((lastsurface - thissurface) .> threshold)
-        lastsurface = thissurface
+        lastsurface .= thissurface
     end
     out[is_low .| is_obj] .= missing
     return out

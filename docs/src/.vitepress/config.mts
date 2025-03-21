@@ -65,7 +65,7 @@ export default defineConfig({
     sidebar: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
     editLink: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/Deltares/Geomorphometry.jl' },
+      // { icon: 'github', link: 'https://github.com/Deltares/Geomorphometry.jl' },
       { icon: 'linkedin', link: 'https://www.linkedin.com/in/mjpronk/' },
       { icon: 'mastodon', link: 'https://fosstodon.org/@evetion' },
     ],

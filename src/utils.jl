@@ -37,10 +37,10 @@ function circmask(n::Integer)
     return kern.parent
 end
 
-function opening_circ(A::AbstractArray{T, 2}, ω::Integer) where {T <: Real}
-    m = circmask(ω >> 1)
-    A = mapwindow(x -> minimum(x[m]), A, ω)  # erosion
-    A = mapwindow(x -> maximum(x[m]), A, ω)  # dilation
+function opening_circ(A::AbstractMatrix{<:Real}, ω::Integer)
+    window = Stencils.Circle(ω)
+    A = mapstencil(minimum, window, A)
+    A = mapstencil(maximum, window, A)
     A
 end
 
@@ -180,19 +180,6 @@ function opening_circ_approx2!(
     end
     A
 end
-
-# function opening_circ2!(A::Array{T,2}, ω::Integer, out::Array{T,2}) where {T<:Real}
-#     B = circmask(ω >> 1)
-#     localfilter!(out, A, B,
-#         (a) -> typemax(a),
-#         (v, a, b) -> b ? min(v, a) : v,
-#         (d, i, v) -> @inbounds(d[i] = v))
-#     localfilter!(A, out, B,
-#         (a) -> typemin(a),
-#         (v, a, b) -> b ? max(v, a) : v,
-#         (d, i, v) -> @inbounds(d[i] = v))
-#     A
-# end
 
 @inline function maximum_mask(x, m)
     o = -Inf
