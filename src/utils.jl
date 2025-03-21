@@ -1,19 +1,27 @@
-"""Apply the opening operation to `A` with window size `ω`."""
-function opening(A::Array{T,2}, ω::Integer) where {T<:Real}
-    A = mapwindow(minimum, A, (ω, ω))  # erosion
-    A = mapwindow(maximum, A, (ω, ω))  # dilation
-    A
-end
+# """Apply the opening operation to `A` with window size `ω`."""
+# function opening(A::AbstractArray{T, 2}, ω::Integer) where {T <: Real}
+#     A = mapwindow(minimum, A, ω)  # erosion
+#     A = mapwindow(maximum, A, ω)  # dilation
+#     A
+# end
 
 """Apply the opening operation to `A` with window size `ω`."""
-function opening!(A::Array{T,2}, ω::Integer, out::Array{T,2}) where {T<:Real}
+function opening!(
+    A::AbstractArray{T, 2},
+    ω::Integer,
+    out::AbstractArray{T, 2},
+) where {T <: Real}
     mapwindow_sep!(minimum, A, ω, out, Inf)  # erosion
     mapwindow_sep!(maximum, out, ω, A, -Inf)  # dilation
     A
 end
 
 """Apply the opening operation to `A` with window size `ω`."""
-function opening_circ!(A::Array{T,2}, ω::Integer, out::Array{T,2}) where {T<:Real}
+function opening_circ!(
+    A::AbstractArray{T, 2},
+    ω::Integer,
+    out::AbstractArray{T, 2},
+) where {T <: Real}
     mapwindowcirc_approx!(minimum_mask, A, ω, out, Inf)  # erosion
     mapwindowcirc_approx!(maximum_mask, out, ω, A, -Inf)  # dilation
     A
@@ -21,7 +29,7 @@ end
 
 function circmask(n::Integer)
     # TODO This could be precomputed for first N integers
-    kern = falses(-n:n, -n:n)
+    kern = falses((-n):n, (-n):n)
     for I in CartesianIndices(kern)
         i, j = Tuple(I)
         kern[I] = i^2 + j^2 <= n^2
@@ -29,15 +37,19 @@ function circmask(n::Integer)
     return kern.parent
 end
 
-function opening_circ(A::Array{T,2}, ω::Integer) where {T<:Real}
-    m = circmask(ω >> 1)
-    A = mapwindow(x -> minimum(x[m]), A, (ω, ω))  # erosion
-    A = mapwindow(x -> maximum(x[m]), A, (ω, ω))  # dilation
+function opening_circ(A::AbstractMatrix{<:Real}, ω::Integer)
+    window = Stencils.Circle(ω)
+    A = mapstencil(minimum, window, A)
+    A = mapstencil(maximum, window, A)
     A
 end
 
-
 # First discussed here https://github.com/JuliaImages/ImageFiltering.jl/issues/179
+function mapwindow(f, img, window)
+    out = copy(img)
+    mapwindow!(f, img, window, out)
+end
+
 function mapwindow!(f, img, window, out)
     R = CartesianIndices(img)
     I_first, I_last = first(R), last(R)
@@ -65,95 +77,109 @@ function mapwindow_stack!(f, img, window, out)
     out
 end
 
-function mapwindow_sep!(f, img, window, out, fill=Inf)
+function mapwindow_sep!(f, img, window, out, fill = Inf)
     Δ = window ÷ 2
 
     w, h = size(img)
-    A = PaddedView(fill, img, (-Δ+1:w+Δ, -Δ+1:h+Δ))
+    A = PaddedView(fill, img, ((-Δ + 1):(w + Δ), (-Δ + 1):(h + Δ)))
     out2 = copy(out)
 
     # Maximum/minimum is seperable into 1d
     @inbounds for i in 1:h, j in 1:w
-        out2[j, i] = f(@view A[j-Δ:j+Δ, i])
+        out2[j, i] = f(@view A[(j - Δ):(j + Δ), i])
     end
-    A = PaddedView(fill, out2, (-Δ+1:w+Δ, -Δ+1:h+Δ))
+    A = PaddedView(fill, out2, ((-Δ + 1):(w + Δ), (-Δ + 1):(h + Δ)))
     @inbounds for j in 1:w, i in 1:h
-        out[j, i] = f(@view A[j, i-Δ:i+Δ])
+        out[j, i] = f(@view A[j, (i - Δ):(i + Δ)])
     end
     out
 end
 
-
-function mapwindowcirc!(f, img, window, out, fill=Inf)
+function mapwindowcirc!(f, img, window, out, fill = Inf)
     R = CartesianIndices(img)
     Δ = CartesianIndex(ntuple(x -> window ÷ 2, ndims(img)))
 
     w, h = size(img)
-    A = PaddedView(fill, img, (-Δ[1]+1:w+Δ[1], -Δ[2]+1:h+Δ[2]))
+    A = PaddedView(fill, img, ((-Δ[1] + 1):(w + Δ[1]), (-Δ[2] + 1):(h + Δ[2])))
 
-    m = euclidean.(Tuple.(-Δ:Δ), Ref((0, 0))) .<= Δ[1]
+    m = euclidean.(Tuple.((-Δ):Δ), Ref((0, 0))) .<= Δ[1]
     @inbounds for I in R
-        patch = (I-Δ):(I+Δ)
+        patch = (I - Δ):(I + Δ)
         out[I] = f(view(A, patch), m)
     end
     out
 end
 
-
-function mapwindowcirc_approx!(f, img, window, out, fill=Inf)
+function mapwindowcirc_approx!(f, img, window, out = copy(img), fill = Inf)
     R = CartesianIndices(img)
     Δ = CartesianIndex(1, 1)
 
     w, h = size(img)
 
     iterations = window:-2:3
-    A = PaddedView(fill, img, (-Δ[1]+1:w+Δ[1], -Δ[2]+1:h+Δ[2]))
+    A = PaddedView(fill, img, ((-Δ[1] + 1):(w + Δ[1]), (-Δ[2] + 1):(h + Δ[2])))
 
-    m = euclidean.(Tuple.(-Δ:Δ), Ref((0, 0))) .<= Δ[1]
+    m = euclidean.(Tuple.((-Δ):Δ), Ref((0, 0))) .<= Δ[1]
     @inbounds for _ in iterations  # repeat 3x3 window
         for I in R
-            patch = (I-Δ):(I+Δ)
+            patch = (I - Δ):(I + Δ)
             out[I] = f(view(A, patch), m)
         end
         img .= out
     end
     out
 end
+edge(x) = x == 1 || x == 3 || x == 7 || x == 9
+const xx = circmask(1)
+function mapwindowcirc_approx2!(f, A, window, out, fill = Inf)
+    iterations = window:-2:3
+    for _ in iterations
+        localfilter!(
+            out,
+            A,
+            3,
+            (a) -> (fill, 1),
+            (v, a, _) -> ((edge(v[2]) ? f(v[1], a) : v[1]), v[2] + 1),
+            (d, i, v) -> d[i] = v[1],
+        )
+        A .= out
+    end
+    out
+end
 
 # Functions for future changes, based on LocalFiltering
-# function opening_circ_approx2!(A::Array{T,2}, ω::Integer, out::Array{T,2}) where {T<:Real}
-#     iterations = ω:-2:3
+function opening_circ_approx2!(
+    A::Array{T, 2},
+    ω::Integer,
+    out::Array{T, 2},
+) where {T <: Real}
+    iterations = ω:-2:3
 
-#     B = circmask(1)
-#     for _ in iterations
-#         localfilter!(out, A, B,
-#             (a) -> typemax(a),
-#             (v, a, b) -> b ? min(v, a) : v,
-#             (d, i, v) -> @inbounds(d[i] = v))
-#         A, out = out, A
-#     end
-#     for _ in iterations
-#         localfilter!(out, A, B,
-#             (a) -> typemin(a),
-#             (v, a, b) -> b ? max(v, a) : v,
-#             (d, i, v) -> @inbounds(d[i] = v))
-#         A, out = out, A
-#     end
-#     A
-# end
-
-# function opening_circ2!(A::Array{T,2}, ω::Integer, out::Array{T,2}) where {T<:Real}
-#     B = circmask(ω >> 1)
-#     localfilter!(out, A, B,
-#         (a) -> typemax(a),
-#         (v, a, b) -> b ? min(v, a) : v,
-#         (d, i, v) -> @inbounds(d[i] = v))
-#     localfilter!(A, out, B,
-#         (a) -> typemin(a),
-#         (v, a, b) -> b ? max(v, a) : v,
-#         (d, i, v) -> @inbounds(d[i] = v))
-#     A
-# end
+    B = circmask(1)
+    for _ in iterations
+        localfilter!(
+            out,
+            A,
+            B,
+            (a) -> typemax(a),
+            (v, a, b) -> b ? min(v, a) : v,
+            (d, i, v) -> @inbounds(d[i] = v),
+        )
+        A, out = out, A
+    end
+    for _ in iterations
+        localfilter!(
+            out,
+            A,
+            B,
+            (a) -> typemin(a),
+            (v, a, b) -> b ? max(v, a) : v,
+            (d, i, v) -> @inbounds(d[i] = v),
+        )
+        A, out = out, A
+    end
+    A
+end
 
 @inline function maximum_mask(x, m)
     o = -Inf
@@ -169,4 +195,14 @@ end
         o = ifelse(m[I], min(o, x[I]), o)
     end
     o
+end
+
+"""
+    cellsize(dem)
+
+Return an Tuple with the x and y length of each cell of the dem.
+Set them negatively to flip the image.
+"""
+function cellsize(dem)
+    return (1.0, 1.0)
 end

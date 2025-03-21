@@ -1,36 +1,55 @@
 name = "Geomorphometry"
 uuid = "714e3e49-7933-471a-9334-4a6a65a92f36"
 authors = ["Maarten Pronk <git@evetion.nl>", "Deltares"]
-version = "0.6.0"
+version = "0.7.0"
 
 [deps]
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
 FillArrays = "1a297f60-69ca-5386-bcde-b61e274b549b"
-ImageCore = "a09fc81d-aa75-5fe9-8630-4744c3626534"
-ImageFiltering = "6a3955dd-da59-5b1f-98d4-e7296123deb5"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LocalFilters = "085fde7c-5f94-55e4-8448-8bbb5db6dde9"
 OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
 PaddedViews = "5432bcbf-9aad-5242-b902-cca2824c8663"
+QuickHeaps = "30b38841-0f52-47f8-a5f8-18d5d4064379"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+Stencils = "264155e8-78a8-466a-aa59-c9b28c34d21a"
+
+[weakdeps]
+ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
+Eikonal = "a6aab1ba-8f88-4217-b671-4d0788596809"
+GeoArrays = "2fb1d81b-e6a0-5fc5-82e6-8e06903437ab"
+Rasters = "a3a2b9e3-a471-40c9-b274-f788e487c689"
+
+[extensions]
+GeomorphometryEikonalExt = "Eikonal"
+GeomorphometryGeoArraysExt = "GeoArrays"
+GeomorphometryRastersExt = ["Rasters", "ArchGDAL"]
 
 [compat]
+ArchGDAL = "0.10"
 DataStructures = "0.18"
 Distances = "0.10"
+Eikonal = "0.1.1"
 FillArrays = "0.12, 0.13, 1"
-ImageCore = "0.9, 0.10"
-ImageFiltering = "0.6, 0.7"
+GeoArrays = "0.9"
 LocalFilters = "1.2"
 OffsetArrays = "1.10"
 PaddedViews = "0.5"
+Rasters = "0.13"
 StaticArrays = "1"
 StatsBase = "0.33, 0.34"
-julia = "1.6, 1.7, 1.8"
+Stencils = "0.3.4"
+julia = "1.10"
 
 [extras]
+ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
+Eikonal = "a6aab1ba-8f88-4217-b671-4d0788596809"
+GeoArrays = "2fb1d81b-e6a0-5fc5-82e6-8e06903437ab"
+Rasters = "a3a2b9e3-a471-40c9-b274-f788e487c689"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["Test", "GeoArrays", "Rasters", "ArchGDAL", "Eikonal"]
