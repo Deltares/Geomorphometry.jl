@@ -5,7 +5,7 @@ command in the Julia REPL:
 
 ```julia
 julia> using Pkg
-julia> Pkg.add("Geomorphometry.jl")
+julia> Pkg.add("Geomorphometry")
 # or
 julia> ] # ']' should be pressed
 pkg> add Geomorphometry
