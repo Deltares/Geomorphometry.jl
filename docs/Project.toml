@@ -10,3 +10,6 @@ Geomorphometry = "714e3e49-7933-471a-9334-4a6a65a92f36"
 LiveServer = "16fef848-5104-11e9-1b77-fb7a48bbb589"
 Rasters = "a3a2b9e3-a471-40c9-b274-f788e487c689"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
+
+[compat]
+ColorSchemes = "3.29"
