@@ -25,12 +25,13 @@ function Geomorphometry.slope(
     method = Geomorphometry.Horn();
     kwargs...,
 )
+    T = GeoArrays.GI.crstrait(dem)
     options = GeoArrays.ArchGDAL.GDAL.gdaldemprocessingoptionsnew(
         [
             "-alg",
             string(typeof(method)),
-            # "-s",
-            # string(abs(first(cellsize))),
+            "-s",
+            T isa GeoArrays.GI.AbstractGeographicTrait ? "111120" : "1",
             "-of",
             "GTiff",
         ],
@@ -86,8 +87,16 @@ function Geomorphometry.hillshade(
     method = Geomorphometry.Horn();
     kwargs...,
 )
+    T = GeoArrays.GI.crstrait(dem)
     options = GeoArrays.ArchGDAL.GDAL.gdaldemprocessingoptionsnew(
-        ["-alg", string(typeof(method)), "-of", "GTiff"],
+        [
+            "-alg",
+            string(typeof(method)),
+            "-s",
+            T isa GeoArrays.GI.AbstractGeographicTrait ? "111120" : "1",
+            "-of",
+            "GTiff",
+        ],
         C_NULL,
     )
     fn_out = tempname() * ".tif"

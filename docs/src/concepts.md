@@ -17,7 +17,7 @@ dtm = coalesce(r, NaN)
 
 :::tabs
 
-== Rasters
+== Rasters (projected)
 ```@example plots
 r = Raster("saba.tif")
 Geomorphometry.cellsize(r)
@@ -26,9 +26,28 @@ Geomorphometry.cellsize(r)
 heatmap(multihillshade(r))
 ```
 
-== GeoArrays
+== GeoArrays (projected)
 ```@example plots
 r = GeoArrays.read("saba.tif")
+r = coalesce(r, NaN)
+Geomorphometry.cellsize(r)
+```
+```@example plots
+heatmap(multihillshade(r))
+```
+
+== Rasters (geographic)
+```@example plots
+r = Raster("Copernicus_DSM_10_N52_00_E004_00_DEM.tif")
+Geomorphometry.cellsize(r)
+```
+```@example plots
+heatmap(multihillshade(r))
+```
+
+== GeoArrays (geographic)
+```@example plots
+r = GeoArrays.read("Copernicus_DSM_10_N52_00_E004_00_DEM.tif")
 r = coalesce(r, NaN)
 Geomorphometry.cellsize(r)
 ```
