@@ -252,9 +252,9 @@ function laplacian(
         x ->
             -2(
                 _D(ZevenbergenThorne(), x, cellsize[1], cellsize[2]) *
-                (isnothing(direction) ? 1 : cos(_aspect(direction))) +
+                (isnothing(direction) ? 1 : cosd(_aspect(direction))) +
                 _E(ZevenbergenThorne(), x, cellsize[1], cellsize[2]) *
-                (isnothing(direction) ? 1 : sin(_aspect(direction)))
+                (isnothing(direction) ? 1 : sind(_aspect(direction)))
             ) * (gis ? 100 : 1),
         scaled8nb(radius),
         dem,
@@ -315,11 +315,11 @@ function coefficients(::LandSerf, s::Stencil, δx = 1, δy = 1, direction = noth
     else
         direction = _aspect(direction)
         (;
-            a = _A(LandSerf(), s, δx, δy) * cos(direction)^2,
-            b = _B(LandSerf(), s, δx, δy) * sin(direction)^2,
-            c = _C(LandSerf(), s, δx, δy) * sin(direction) * cos(direction),
-            d = _D(LandSerf(), s, δx, δy) * cos(direction),
-            e = _E(LandSerf(), s, δx, δy) * sin(direction),
+            a = _A(LandSerf(), s, δx, δy) * cosd(direction)^2,
+            b = _B(LandSerf(), s, δx, δy) * sind(direction)^2,
+            c = _C(LandSerf(), s, δx, δy) * sind(direction) * cosd(direction),
+            d = _D(LandSerf(), s, δx, δy) * cosd(direction),
+            e = _E(LandSerf(), s, δx, δy) * sind(direction),
             f = _F(LandSerf(), s),
         )
     end
@@ -343,13 +343,9 @@ function profile_curvature(
     dem::AbstractMatrix{<:Real};
     cellsize = cellsize(dem),
     radius = 1,
-    direction = nothing,
+    # direction = nothing,
 )
-    mapstencil(
-        x -> _profile(x, cellsize[1], cellsize[2], direction),
-        scaled8nb(radius),
-        dem,
-    )
+    mapstencil(x -> _profile(x, cellsize[1], cellsize[2], nothing), scaled8nb(radius), dem)
 end
 
 function tangential(a, b, c, d, e)
@@ -370,10 +366,10 @@ function tangential_curvature(
     dem::AbstractMatrix{<:Real};
     cellsize = cellsize(dem),
     radius = 1,
-    direction = nothing,
+    # direction = nothing,
 )
     mapstencil(
-        x -> _tangential(x, cellsize[1], cellsize[2], direction),
+        x -> _tangential(x, cellsize[1], cellsize[2], nothing),
         scaled8nb(radius),
         dem,
     )
@@ -397,7 +393,7 @@ function plan_curvature(
     dem::AbstractMatrix{<:Real};
     cellsize = cellsize(dem),
     radius = 1,
-    direction = nothing,
+    # direction = nothing,
 )
-    mapstencil(x -> _plan(x, cellsize[1], cellsize[2], direction), scaled8nb(radius), dem)
+    mapstencil(x -> _plan(x, cellsize[1], cellsize[2], nothing), scaled8nb(radius), dem)
 end

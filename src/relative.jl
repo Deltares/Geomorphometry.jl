@@ -3,14 +3,15 @@
 
 Roughness is the largest inter-cell difference of a central pixel and its surrounding cell, as defined in Wilson et al (2007, Marine Geodesy 30:3-35).
 """
-function roughness(dem::AbstractMatrix{<:Real})
-    dst = copy(dem)
-
-    initial(a) = (zero(a), a)
-    update(v, a, _) = (max(v[1], abs(a - v[2])), v[2])
-    store!(d, i, v) = @inbounds d[i] = v[1]
-
-    return localfilter!(dst, dem, 3, initial, update, store!)
+function roughness(dem::AbstractMatrix{<:Real}, window::Stencil = Moore(1))
+    mapstencil(_roughness, window, dem)
+end
+function _roughness(x)
+    o = zero(eltype(x))
+    for cell in x
+        o = max(o, abs(cell - center(x)))
+    end
+    o
 end
 
 """
@@ -27,9 +28,7 @@ end
 
 BPI stands for Bathymetric Position Index (Lundblad et al., 2006), which is defined as the difference between a central pixel and the mean of the cells in an annulus around it.
 """
-function BPI(dem::AbstractMatrix{<:Real}, window::Annulus = Annulus(3, 2))
-    mapstencil(x -> center(x) - mean(x), window, dem)
-end
+BPI(dem::AbstractMatrix{<:Real}, window::Annulus = Annulus(3, 2)) = TPI(dem, window)
 
 """
     RIE(dem::AbstractMatrix{<:Real})
@@ -37,7 +36,7 @@ end
 RIE stands for Roughness Index Elevation, which quantifies the standard deviation of residual topography (Cavalli et al., 2008)
 """
 function RIE(dem::AbstractMatrix{<:Real}, window::Stencil = Window(1))
-    meandem = mapstencil(x -> center(x) - mean(x), window, dem)
+    meandem = TPI(dem, window)
     mapstencil(std, window, meandem)
 end
 

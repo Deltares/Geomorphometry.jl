@@ -103,15 +103,14 @@ function _pmf(
                 mapwindowcirc_approx2!(min, Af, ωₖ - window_diffs[i], out, Inf)
                 Af .= out
             else
-                # mapwindow_stack!(minimum, A, ωₖ, Af)
-                LocalFilters.erode!(Af, A, ωₖ)
-                # LocalFilters.erode!(Af, out, ωₖ - window_diffs[i])
-                # out .= Af
+                # modifies Af in place
+                LocalFilters.erode!(Af, out, ωₖ)
             end
         else
             if circular
                 # modifies Af in place
                 opening_circ!(Af, ωₖ, out)
+                out .= Af
             else
                 # modifies Af in place
                 LocalFilters.opening!(Af, out, Af, ωₖ)

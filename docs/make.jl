@@ -23,6 +23,11 @@ isfile(fn) || Downloads.download(
     "https://github.com/Deltares/Geomorphometry.jl/releases/download/v0.6.0/saba_dsm.tif",
     fn,
 )
+fn = joinpath(dir, "src", "Copernicus_DSM_10_N52_00_E004_00_DEM.tif")
+isfile(fn) || Downloads.download(
+    "https://github.com/Deltares/Geomorphometry.jl/releases/download/v0.6.0/Copernicus_DSM_10_N52_00_E004_00_DEM.tif",
+    fn,
+)
 
 DocMeta.setdocmeta!(
     Geomorphometry,
@@ -38,16 +43,19 @@ makedocs(;
     sitename = "Geomorphometry.jl",
     format = MarkdownVitepress(;
         repo = "github.com/Deltares/Geomorphometry.jl",
-        # md_output_path = ".",
-        # build_vitepress = true,
+        md_output_path = ".",
+        build_vitepress = false,
         devbranch = "main",
     ),
     doctest = true,
     checkdocs = :all,
     pages = [
         "Home" => "index.md",
-        "Getting started" =>
-            Any["Installation" => "installation.md", "Usage" => "usage.md"],
+        "Getting started" => Any[
+            "Installation" => "installation.md",
+            "Usage" => "usage.md",
+            "Experimental" => "experimental.md",
+        ],
         "Background" => Any["Concepts" => "concepts.md", "Future plans" => "todo.md"],
         "Reference" => Any[
             "Validation" => "validation.md",
@@ -56,7 +64,7 @@ makedocs(;
             "Bibliography" => "bibliography.md",
         ],
     ],
-    # clean = false,
+    clean = false,
     plugins = [bib],
     warnonly = [:missing_docs, :cross_references],
 )
