@@ -177,40 +177,25 @@ heatmap(plan_curvature(dtm); colorrange=(-1,1), colormap=:tarn)
 heatmap(tangential_curvature(dtm); colorrange=(-1,1), colormap=:tarn)
 ```
 
+== Laplacian
+```@example plots
+heatmap(laplacian(dtm); colorrange=(-1,1), colormap=:tarn)
+```
+
 :::
 
 We can also determine the curvature of the terrain along a specific direction.
 
 :::tabs
 
-== Profile curvature in 90° direction
+== Laplacian in 90° direction
 ```@example plots
-heatmap(profile_curvature(dtm, radius=1, direction=90); colorrange=(-1,1), colormap=:tarn)
+heatmap(laplacian(dtm, radius=1, direction=90); colorrange=(-1,1), colormap=:tarn)
 ```
 
-== Plan curvature in 90° direction
+== Laplacian in 0° direction
 ```@example plots
-heatmap(plan_curvature(dtm, radius=1, direction=90); colorrange=(-1,1), colormap=:tarn)
-```
-
-== Tangential curvature in 90° direction
-```@example plots
-heatmap(tangential_curvature(dtm, radius=1, direction=90); colorrange=(-1,1), colormap=:tarn)
-```
-
-== Profile curvature in 0° direction
-```@example plots
-heatmap(profile_curvature(dtm, radius=1, direction=0); colorrange=(-1,1), colormap=:tarn)
-```
-
-== Plan curvature in 0° direction
-```@example plots
-heatmap(plan_curvature(dtm, radius=1, direction=0); colorrange=(-1,1), colormap=:tarn)
-```
-
-== Tangential curvature in 0° direction
-```@example plots
-heatmap(tangential_curvature(dtm, radius=1, direction=0); colorrange=(-1,1), colormap=:tarn)
+heatmap(laplacian(dtm, radius=1, direction=0); colorrange=(-1,1), colormap=:tarn)
 ```
 
 :::
