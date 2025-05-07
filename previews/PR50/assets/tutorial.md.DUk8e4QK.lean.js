@@ -1,0 +1,1 @@
+import{_ as t,c as e,o as a}from"./chunks/framework.amH_DKMn.js";const _=JSON.parse('{"title":"","description":"","frontmatter":{},"headers":[],"relativePath":"tutorial.md","filePath":"tutorial.md","lastUpdated":null}'),r={name:"tutorial.md"};function o(s,n,c,i,l,d){return a(),e("div")}const m=t(r,[["render",o]]);export{_ as __pageData,m as default};
