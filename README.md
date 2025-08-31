@@ -4,9 +4,10 @@
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://deltares.github.io/Geomorphometry.jl/dev/)
 
 # Geomorphometry
-Geospatial operations, cost and filtering algorithms as used for elevation rasters.
+A Julia package for researchers analysing the shape of the surface of the Earth ([Geomorphometry](https://en.wikipedia.org/wiki/Geomorphometry)) and its applications in hydrology, geomorphology, and environmental science.
 
 ## Functionality
+The package provides efficient implementations of common geomorphometric operations, including:
 - Terrain filters, such as Progressive Morphological Filters (PMF, SMF) and Skewness balancing
 - Geospatial cost (friction) operations that mimic PCRaster. These functions should however be more Julian, extensible and scale better.
 - Visualization, such as Perceptually Shaded Slope Map (PSSM)
