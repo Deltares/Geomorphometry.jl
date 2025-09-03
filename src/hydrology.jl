@@ -357,65 +357,6 @@ function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
     end
 end
 
-
-# NamedStencil{(:E, :S, :N, :W), ((0, -1), (-1, 0), (1, 0), (0, 1)), 1, 2, 4, Nothing}
-
-nbd =
-    CartesianIndex.([
-        (0, -1),  # E
-        (-1, 0),  # S
-        (0, 1),  # W
-        (1, 0),  # N
-        (0, -1),  # E
-        (-1, 0),  # S
-    ])
-
-
-function demonc(aspect)
-    aspect = (aspect + 360) % 360
-    i = round(Int, aspect / 90) + 1
-    return nbd[i], nbd[i + 1]
-end
-
-function demona(aspect)
-    θ = (aspect + 360) % 90
-    iszero(θ) && return 1.0, 0.
-    if θ < 45
-        fraction = tand(θ)*0.5
-        @assert fraction <= 1
-        return fraction, 1 - fraction
-    else
-        fraction = tand(90 - θ)*0.5
-        @assert fraction <= 1
-        return 1 - fraction, fraction
-    end
-end
-
-function _accumulate!(_::DEMON, acc, order, dir, R, dem, cellsize)
-    asp = aspect(dem; method = Horn())
-    for i in reverse(order)
-        aspect = asp[i]
-
-        if !isfinite(aspect)
-            acc[R[i] + dir[i]] += acc[i]
-            continue
-        end
-
-        a, b = demonc(aspect)
-        aw, bw = demona(aspect)
-
-        # Depression
-        if a != dir[i] && b != dir[i]
-            acc[R[i] + dir[i]] += acc[i]
-            continue
-        end
-
-        if R[i] + a in R
-            acc[R[i] + a] += acc[i] * aw
-        end
-        if R[i] + b in R
-            acc[R[i] + b] += acc[i] * bw
-        end
     end
 end
 
