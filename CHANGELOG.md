@@ -60,7 +60,7 @@ All notable changes to this project will be documented in this file.
 - Fixed bug in TPI
 
 ## [0.3.1] - 2022-06-15
-### 
+### Added
 - Added `skewness` filter
 
 ## [0.3.0] - 2022-02-01

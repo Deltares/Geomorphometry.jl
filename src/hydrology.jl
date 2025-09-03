@@ -68,6 +68,17 @@ function filldepressions!(dem::AbstractMatrix, queued = falses(size(dem)))
     return dem
 end
 
+nbs = CartesianIndex.([
+    (-1, -1),
+    (-1, 1),
+    (1, -1),
+    (1, 1),
+    (-1, 0),
+    (0, -1),
+    (0, 1),
+    (1, 0),
+])
+
 function watersheds(dem::AbstractMatrix, queued = falses(size(dem)))
     open = PriorityQueue{CartesianIndex{2}, eltype(dem)}()
     pit = DataStructures.Queue{CartesianIndex{2}}()
@@ -91,7 +102,10 @@ function watersheds(dem::AbstractMatrix, queued = falses(size(dem)))
             labels[cell] = label
             label += 1
         end
-        for ncell in max(I_first, cell - Δ):min(I_last, cell + Δ)
+        # for ncell in max(I_first, cell - Δ):min(I_last, cell + Δ)
+        for nb in nbs
+            ncell = cell + nb
+            ncell in R || continue
             (queued[ncell] || ncell == cell) && continue
             queued[ncell] = true
             if dem[ncell] <= dem[cell]
@@ -116,31 +130,54 @@ function watersheds(dem::AbstractMatrix, queued = falses(size(dem)))
     return dem, labels
 end
 
-const nb =
+# 1  2  3
+# 4  5  6
+# 7  8  9
+
+nbb2 =
     CartesianIndex.([
-        (0, -1),
-        (-1, -1),
-        (-1, 0),
-        (-1, 1),
-        (0, 1),
-        (1, 1),
-        (1, 0),
-        (1, -1),
-        (0, -1),
-        (-1, -1),
+        (-1, 0),  # N  - 270°
+        (-1, 1),  # NE - 315°
+        (0, 1),   # E  - 0° 
+        (1, 1),   # SE - 45°
+        (1, 0),   # S  - 90°
+        (1, -1),  # SW - 135°
+        (0, -1),  # W  - 180°
+        (-1, -1), # NW - 225°
+        (-1, 0),  # N  - 270°
+        (-1, 1),  # NE - 315°
+        (0, 1),   # E  - 0° 
+        (1, 1),   # SE - 45°
     ])
 
 function infc(aspect)
-    aspect = (aspect + 360) % 360
-    i = round(Int, aspect / 45) + 1
-    return nb[i], nb[i + 1]
+    # Normalize aspect to 0-360 range
+    aspect = mod(aspect+90, 360)
+    
+    # Convert aspect to index (0° = North, clockwise)
+    # Each direction covers 45° sector
+    sector = floor(Int, aspect / 45)
+    
+    # Get the two neighboring directions
+    dir1_idx = sector + 1
+    dir2_idx = (sector + 1) % 8 + 1
+    
+    return nbb2[dir1_idx], nbb2[dir2_idx]
 end
 
 function infa(aspect)
-    aspect = (aspect + 360) % 360
-    a1 = aspect % 45
-    a2 = 45 - a1
-    return a2 / 45, a1 / 45
+    # Normalize aspect to 0-360 range
+    aspect = mod(aspect, 360)
+    
+    # Find position within 45° sector
+    sector_angle = mod(aspect, 45)
+    
+    # Calculate weights for the two directions
+    # Weight decreases linearly from 1 to 0 as we move away from the direction
+    weight2 = sector_angle / 45
+    weight1 = 1 - weight2
+    
+    return weight1, weight2
 end
 
 const directions = centered([1 2 3; 4 5 6; 7 8 9])
@@ -157,11 +194,14 @@ function flowaccumulation(
     method = D8(),
     cellsize = cellsize(dem),
 )
-    flowaccumulation!(dem, copy(closed); method, cellsize)
+    acc = similar(dem, Float32)
+    acc .= abs(cellsize[1] * cellsize[2])
+    flowaccumulation!(dem, acc, copy(closed); method, cellsize)
 end
 
 function flowaccumulation!(
     dem::AbstractMatrix,
+    acc::AbstractMatrix{<:Real},
     closed = falses(size(dem));
     method = D8(),
     cellsize = cellsize(dem),
@@ -169,8 +209,6 @@ function flowaccumulation!(
     dir = fill(CartesianIndex{2}(0, 0), size(dem))
     order = ones(Int64, length(closed) - sum(closed))
 
-    acc = similar(dem, Float32)
-    acc .= abs(cellsize[1] * cellsize[2])
     output = similar(dem, eltype(directions))
 
     open = PriorityQueue{CartesianIndex{2}, eltype(dem)}()
@@ -188,7 +226,10 @@ function flowaccumulation!(
         cell = dequeue!(open)
         order[i] = L[cell]
         i += 1
-        for ncell in max(I_first, cell - Δ):min(I_last, cell + Δ)
+        # for ncell in max(I_first, cell - Δ):min(I_last, cell + Δ)
+        for nb in nbs
+            ncell = cell + nb
+            ncell in R || continue
             # skip visited and center cells
             (closed[ncell] || ncell == cell) && continue
 
@@ -210,30 +251,52 @@ function _accumulate!(::D8, acc, order, dir, R, dem, cellsize)
     end
 end
 function _accumulate!(::DInf, acc, order, dir, R, dem, cellsize)
-    asp = aspect(dem; method = Horn())
+    asp = aspect(dem; method = Horn(), cellsize=abs.(cellsize))
+    visited = falses(size(acc))
+
     for i in reverse(order)
         aspect = asp[i]
 
         if !isfinite(aspect)
             acc[R[i] + dir[i]] += acc[i]
+            visited[i] = true
             continue
         end
 
         a, b = infc(aspect)
-        aa, ab = infa(aspect)
+        aa, bb = infa(aspect)
+
+        # a, b = lookup[dir[i] + CartesianIndex(2, 2)]
 
         # Depression
-        if a != dir[i] && b != dir[i]
+        if (a != dir[i] && b != dir[i])
             acc[R[i] + dir[i]] += acc[i]
+            # acc[R[i] + dir[i]] = 5000
+            visited[i] = true
             continue
+        end
+
+        # Scale flows correctly at the edges
+        if !(R[i] + a in R) || visited[R[i] + a]
+            aa = 0
+            bb = 1
+        end
+        if !(R[i] + b in R) || visited[R[i] + b]
+            aa = 1
+            bb = 0
         end
 
         if R[i] + a in R
             acc[R[i] + a] += acc[i] * aa
         end
         if R[i] + b in R
-            acc[R[i] + b] += acc[i] * ab
+            acc[R[i] + b] += acc[i] * bb
         end
+        if visited[R[i] + a] && visited[R[i] + b]
+            error()
+            acc[R[i] + dir[i]] += acc[i]
+        end
+        visited[i] = true
     end
 end
 
@@ -256,6 +319,9 @@ function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
         δxy δx δxy
     ]
 
+    visited = falses(size(acc))
+    nb = vec(collect(CartesianIndices(dists)).-CartesianIndex(2,2))
+
     weights = zeros(size(contour_lengths))
     Σw = 0.0
     for i in reverse(order)
@@ -265,9 +331,9 @@ function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
             ri == 5 && continue
             I = R[i] + nb[ri]
             I in R || continue
+            visited[I] && continue
             diff = dem[R[i]] - dem[I]
             if diff < 0 || isnan(diff) # neighbor is higher
-                weights[ri] = 0.0
                 continue
             end
             # TODO Check whether this diff/dist is good enough
@@ -275,8 +341,9 @@ function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
             weights[ri] = weight
             Σw += weight
         end
-        if iszero(Σw)  # depression
+        if iszero(Σw) || iszero(weights[CartesianIndex(2,2)+dir[i]])
             acc[R[i] + dir[i]] += acc[i]
+            visited[i] = true
             continue
         end
         for (ri, weight) in enumerate(weights)
@@ -285,6 +352,8 @@ function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
             I in R || continue
             acc[I] += acc[i] * (weight / Σw)
         end
+        visited[i] = true
+        fill!(weights, 0)
     end
 end
 
