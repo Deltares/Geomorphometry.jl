@@ -20,6 +20,7 @@ dtm = coalesce(r, NaN)
 == Rasters (projected)
 ```@example plots
 r = Raster("saba.tif")
+r = coalesce.(r, NaN)  # hide
 Geomorphometry.cellsize(r)
 ```
 ```@example plots
@@ -29,7 +30,7 @@ heatmap(multihillshade(r))
 == GeoArrays (projected)
 ```@example plots
 r = GeoArrays.read("saba.tif")
-r = coalesce(r, NaN)
+r = coalesce(r, NaN)  # hide
 Geomorphometry.cellsize(r)
 ```
 ```@example plots
@@ -39,6 +40,7 @@ heatmap(multihillshade(r))
 == Rasters (geographic)
 ```@example plots
 r = Raster("Copernicus_DSM_10_N52_00_E004_00_DEM.tif")
+r = coalesce.(r, NaN)  # hide
 Geomorphometry.cellsize(r)
 ```
 ```@example plots
@@ -48,7 +50,7 @@ heatmap(multihillshade(r))
 == GeoArrays (geographic)
 ```@example plots
 r = GeoArrays.read("Copernicus_DSM_10_N52_00_E004_00_DEM.tif")
-r = coalesce(r, NaN)
+r = coalesce(r, NaN)  # hide
 Geomorphometry.cellsize(r)
 ```
 ```@example plots
