@@ -69,9 +69,9 @@ makedocs(;
     warnonly = [:missing_docs, :cross_references],
 )
 
-deploydocs(;
+DocumenterVitepress.deploydocs(;
     repo = "github.com/Deltares/Geomorphometry.jl.git",
-    target = "build",
+    target = joinpath(@__DIR__, "build"),
     devbranch = "main",
     branch = "gh-pages",
     push_preview = true,
