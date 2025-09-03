@@ -357,9 +357,6 @@ function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
     end
 end
 
-    end
-end
-
 """
     TWI(dem::AbstractMatrix; method=D8(), cellsize=cellsize(dem))
 
