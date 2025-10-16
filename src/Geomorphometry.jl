@@ -32,6 +32,6 @@ export roughness, TRI, TPI, BPI, RIE, rugosity, entropy
 export slope,
     aspect, curvature, laplacian, plan_curvature, profile_curvature, tangential_curvature
 export skb, skbr
-export filldepressions, flowaccumulation, TWI, SPI
+export filldepressions, flowaccumulation, TWI, SPI, HAND
 
 end # module
