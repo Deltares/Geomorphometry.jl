@@ -378,3 +378,70 @@ function SPI(dem::AbstractMatrix; method = D8(), cellsize = cellsize(dem))
     acc, _ = flowaccumulation(dem; method, cellsize)
     return @. log(acc * tand(s))
 end
+
+"""
+    HAND(dem::AbstractMatrix; method=D8(), cellsize=cellsize(dem), threshold=1e10)
+
+Computes the Height Above Nearest Drainage (HAND, [nobreHeightNearestDrainage2011](@cite)) of a digital elevation model (DEM) `dem` 
+with an optional `method` for flow direction, a `cellsize`, and a `threshold` for stream definition.
+"""
+function HAND(dem::AbstractMatrix; method = D8(), cellsize = cellsize(dem), threshold = 100)
+    dir = fill(CartesianIndex{2}(0, 0), size(dem))
+    closed = falses(size(dem))
+    order = ones(Int64, length(closed) - sum(closed))
+
+    output = zero(dem)
+    acc = similar(dem, Float32)
+    acc .= abs(cellsize[1] * cellsize[2])
+
+    open = PriorityQueue{CartesianIndex{2}, eltype(dem)}()
+
+    R = CartesianIndices(dem)
+    L = LinearIndices(dem)
+    I_first, I_last = first(R), last(R)
+
+    @inbounds for cell in edges(R)
+        enqueue!(open, cell, dem[cell])
+        closed[cell] = true
+    end
+    i = 1
+    @inbounds while !isempty(open)
+        cell = dequeue!(open)
+        order[i] = L[cell]
+        i += 1
+        # for ncell in max(I_first, cell - Δ):min(I_last, cell + Δ)
+        for nb in nbs
+            ncell = cell + nb
+            ncell in R || continue
+            # skip visited and center cells
+            (closed[ncell] || ncell == cell) && continue
+
+            closed[ncell] = true
+            dir[ncell] = cell - ncell
+
+            enqueue!(open, ncell, dem[ncell])
+        end
+    end
+
+    _accumulate!(method, acc, order, dir, R, dem, cellsize)
+    stream_mask = acc .>= threshold
+    _hand!(output, order, dir, R, dem, stream_mask)
+    return output
+end
+
+function _hand!(output, order, dir, R, dem, stream_mask)
+    for i in order
+        if stream_mask[i]
+            # Relative height for stream is 0
+            output[i] = 0.0
+        elseif isfinite(dem[i]) && isfinite(dem[R[i] + dir[i]])
+            # Otherwise, add the height difference with the downstream cell
+            # to the downstream cell's HAND value. Use max to avoid negative values
+            # in case of depressions. TODO Handle depressions better?
+            output[i] = output[R[i] + dir[i]] + max(0, (dem[i] - dem[R[i] + dir[i]]))
+        else
+            output[i] = NaN
+        end
+    end
+    return output
+end

@@ -283,6 +283,31 @@ heatmap(twi; colormap=:tempo)
 
 :::
 
+We can also calculate the Height Above Nearest Drainage (HAND) using the [`HAND`](@ref) function. This function requires a flow accumulation map to determine the stream network. Here we use a threshold based on the flow accumulation to define streams.
+
+:::tabs
+
+== HAND threshold 1e3
+```@example plots
+hand = HAND(dtm; threshold=1e3)
+hand[mask] .= NaN  # hide
+heatmap(hand; colormap=:turbo)
+```
+== HAND threshold 1e5
+```@example plots
+hand = HAND(dtm; threshold=1e5)
+hand[mask] .= NaN  # hide
+heatmap(hand; colormap=:turbo)
+```
+== HAND threshold 1e5 with DInf method
+```@example plots
+hand = HAND(dtm; method=FD8(), threshold=1e5)
+hand[mask] .= NaN  # hide
+heatmap(hand; colormap=:turbo)
+```
+
+:::
+
 
 ## Terrain filters
 While filters seem unrelated to the previously discussed methods, these are used to filter (rasterized) pointclouds i.e. surface models (DSM) to arrive at a terrain model (DTM). We provide [`pmf`](@ref), [`smf`](@ref), and [`skb`](@ref) filters. Here we use the `pmf` filter to remove elevations that do not pass the slope filter (normally vegetation and buildings).
