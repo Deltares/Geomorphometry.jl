@@ -10,6 +10,8 @@ Revise.revise()
 dir = @__DIR__
 
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"); style = :authoryear)
+
+# TODO, Use skip_files=["src/CHANGELOG.md"] when LiveServer is used!
 cp(joinpath(dir, "../CHANGELOG.md"), joinpath(dir, "src/CHANGELOG.md"); force = true)
 CairoMakie.activate!(; type = "png")
 
