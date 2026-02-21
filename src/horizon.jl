@@ -1,5 +1,5 @@
 """
-    horizon_angle(dem; method=GridSweep(), cellsize=cellsize(dem), maxdist=Inf)
+    horizon_angle(dem; method=GridSweep(), cellsize=cellsize(dem))
 
 Compute horizon angles for each cell in a DEM.
 
@@ -13,26 +13,20 @@ the horizontal (sheltered), negative angles indicate terrain falling below (expo
 # Keywords
 - `directions`: 16 by default, can be 4, 8, 16, 32, ...
 - `cellsize`: Cell size as `(row_size, col_size)` tuple
-- `maxdist`: Maximum search distance in coordinate units
 
 # Returns
 3D array of size `(rows, cols, directions)` with horizon angles in degrees.
-Direction order: N, NE, E, SE, S, SW, W, NW (for 8 dirs) or N, E, S, W (for 4 dirs).
-
-Angles are in degrees, consistent with `slope` and `aspect`.
 """
-function horizon_angle(
-    dem::AbstractMatrix{<:Real};
+function horizon_angle(dem::AbstractMatrix{<:Real};
     directions::Int = 16,
     cellsize = cellsize(dem),
-    maxdist = Inf,
 )
     if directions == 4
-        _horizon_angle_cardinal(dem, cellsize, maxdist)
+        _horizon_angle_cardinal(dem, cellsize)
     elseif directions == 8
-        _horizon_angle_8(dem, cellsize, maxdist)
+        _horizon_angle_8(dem, cellsize)
     elseif directions % 8 == 0 && directions > 8
-        _horizon_angle_rotated(dem, directions, cellsize, maxdist)
+        _horizon_angle_rotated(dem, directions, cellsize)
     else
         throw(ArgumentError("directions must be 4, 8, 16, 32, ..., got $directions"))
     end
@@ -76,7 +70,7 @@ function _sweep_line_ka!(out, dem, start_r, start_c, step_r, step_c, dist, nrows
     end
 end
 
-function _horizon_angle_cardinal(dem, cellsize, maxdist)
+function _horizon_angle_cardinal(dem, cellsize)
     # Returns 3D array with 4 directions: N, E, S, W
     T = Float32
     nrows, ncols = size(dem)
@@ -108,7 +102,7 @@ function _horizon_angle_cardinal(dem, cellsize, maxdist)
     return result
 end
 
-function _horizon_angle_8(dem, cellsize, maxdist)
+function _horizon_angle_8(dem, cellsize)
     # Returns 3D array with 8 directions: N, NE, E, SE, S, SW, W, NW
     T = Float32
     nrows, ncols = size(dem)
@@ -170,7 +164,7 @@ function _bilinear_kernel(dem, r, c, nrows, ncols)
            fr * fc * dem[r1, c1]
 end
 
-function _horizon_angle_rotated(dem, ndirs::Int, cellsize, maxdist)
+function _horizon_angle_rotated(dem, ndirs::Int, cellsize)
     nrows, ncols = size(dem)
     cs1, cs2 = Float64(cellsize[1]), Float64(cellsize[2])
     n_rotations = ndirs ÷ 8
@@ -179,7 +173,7 @@ function _horizon_angle_rotated(dem, ndirs::Int, cellsize, maxdist)
     fill!(result, 0f0)
 
     # No rotation needed for first 8
-    h = _horizon_angle_8(dem, cellsize, maxdist)
+    h = _horizon_angle_8(dem, cellsize)
     for i in 1:8
         di = (i - 1) * n_rotations + 1
         copyto!(view(result, :, :, di), view(h, :, :, i))
@@ -190,7 +184,7 @@ function _horizon_angle_rotated(dem, ndirs::Int, cellsize, maxdist)
         angle = rot * (π / 4 / n_rotations)  # Rotation angle in radians
 
         rotated = _rotate_dem(dem, angle, cs1, cs2)
-        h = _horizon_angle_8(rotated, cellsize, maxdist)
+        h = _horizon_angle_8(rotated, cellsize)
 
         # Map results back to original grid positions
         for i in 1:8
@@ -288,7 +282,7 @@ end
 end
 
 """
-    sky_view_factor(dem; directions=16, cellsize=cellsize(dem), maxdist=Inf)
+    sky_view_factor(dem; directions=16, cellsize=cellsize(dem))
 
 Compute the Sky View Factor (SVF) for each cell in a DEM.
 
@@ -302,18 +296,15 @@ across all directions.
 # Keywords
 - `directions`: Number of directions (default: 16)
 - `cellsize`: Cell size as `(row_size, col_size)` tuple
-- `maxdist`: Maximum search distance in coordinate units
 
 # Returns
 A matrix of SVF values in the range [0, 1].
 """
-function sky_view_factor(
-    dem::AbstractMatrix{<:Real};
+function sky_view_factor(dem::AbstractMatrix{<:Real};
     directions::Int = 16,
     cellsize = cellsize(dem),
-    maxdist = Inf,
 )
-    horizons = horizon_angle(dem; directions, cellsize, maxdist)
+    horizons = horizon_angle(dem; directions, cellsize)
     ndirs = size(horizons, 3)
     backend = get_backend(horizons)
     result = KernelAbstractions.allocate(backend, Float32, size(dem))
