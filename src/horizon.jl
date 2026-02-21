@@ -1,21 +1,3 @@
-abstract type HorizonMethod end
-
-"""
-    GridSweep(directions=8)
-
-Fast sweep method for computing horizon angles.
-
-# Arguments
-- `directions::Int`: Number of directions. Must be 4, 8, 16, 32, etc.
-  - 4: cardinal (N, E, S, W)
-  - 8: cardinal + diagonal
-  - 16+: uses rotated grid resampling for intermediate angles
-"""
-Base.@kwdef struct GridSweep <: HorizonMethod
-    directions::Int = 8
-end
-
-
 """
     horizon_angle(dem; method=GridSweep(), cellsize=cellsize(dem), maxdist=Inf)
 
@@ -27,7 +9,9 @@ the horizontal (sheltered), negative angles indicate terrain falling below (expo
 
 # Arguments
 - `dem`: Digital elevation model matrix
-- `method`: `GridSweep(directions=8)` - directions can be 4, 8, 16, 32, ...
+
+# Keywords
+- `directions`: 16 by default, can be 4, 8, 16, 32, ...
 - `cellsize`: Cell size as `(row_size, col_size)` tuple
 - `maxdist`: Maximum search distance in coordinate units
 
@@ -39,47 +23,56 @@ Angles are in degrees, consistent with `slope` and `aspect`.
 """
 function horizon_angle(
     dem::AbstractMatrix{<:Real};
-    method::HorizonMethod = GridSweep(),
+    directions::Int = 16,
     cellsize = cellsize(dem),
     maxdist = Inf,
 )
-    _horizon_angle(method, dem, cellsize, maxdist)
-end
-
-function _horizon_angle(method::GridSweep, dem, cellsize, maxdist)
-    ndirs = method.directions
-    if ndirs == 4
+    if directions == 4
         _horizon_angle_cardinal(dem, cellsize, maxdist)
-    elseif ndirs == 8
+    elseif directions == 8
         _horizon_angle_8(dem, cellsize, maxdist)
-    elseif ndirs % 8 == 0 && ndirs > 8
-        _horizon_angle_rotated(dem, ndirs, cellsize, maxdist)
+    elseif directions % 8 == 0 && directions > 8
+        _horizon_angle_rotated(dem, directions, cellsize, maxdist)
     else
-        throw(ArgumentError("GridSweep directions must be 4, 8, 16, 32, ..., got $ndirs"))
+        throw(ArgumentError("directions must be 4, 8, 16, 32, ..., got $directions"))
     end
 end
 
-# Single sweep along a line: start at `start`, step by `step`, look back at `-step`
-function _sweep_line!(out::AbstractMatrix{Float32}, dem, start::CartesianIndex{2}, step::CartesianIndex{2}, dist::Float64, grid::CartesianIndices{2})
+# KernelAbstractions kernels for line sweeps
+
+# Sweep from row edge (top or bottom) - index gives column
+@kernel function _sweep_row_edge_kernel!(out, @Const(dem), start_row::Int, step_r::Int, step_c::Int, dist::Float64, nrows::Int, ncols::Int)
+    col = @index(Global)
+    _sweep_line_ka!(out, dem, start_row, col, step_r, step_c, dist, nrows, ncols)
+end
+
+# Sweep from col edge (left or right) - index gives row
+@kernel function _sweep_col_edge_kernel!(out, @Const(dem), row_offset::Int, start_col::Int, step_r::Int, step_c::Int, dist::Float64, nrows::Int, ncols::Int)
+    idx = @index(Global)
+    _sweep_line_ka!(out, dem, idx + row_offset, start_col, step_r, step_c, dist, nrows, ncols)
+end
+
+# Shared sweep implementation for any direction
+function _sweep_line_ka!(out, dem, start_r, start_c, step_r, step_c, dist, nrows, ncols)
     max_tan = -Inf
-    pos = start
-    while pos in grid
-        elev_pos = Float64(dem[pos])
+    r, c = start_r, start_c
+    @inbounds while r >= 1 && r <= nrows && c >= 1 && c <= ncols
+        elev_pos = Float64(dem[r, c])
         if isnan(elev_pos)
-            # Reset when crossing NaN - next valid cell is a new edge
             max_tan = -Inf
-            pos += step
-            continue
+        else
+            pr, pc = r - step_r, c - step_c
+            if pr >= 1 && pr <= nrows && pc >= 1 && pc <= ncols
+                prev_elev = Float64(dem[pr, pc])
+                if !isnan(prev_elev)
+                    tan_angle = (prev_elev - elev_pos) / dist
+                    max_tan = max(max_tan, tan_angle)
+                end
+            end
+            out[r, c] = Float32(atand(max_tan == -Inf ? 0.0 : max_tan))
         end
-        prev = pos - step
-        prev_valid = prev in grid && !isnan(Float64(dem[prev]))
-        if prev_valid
-            tan_angle = (Float64(dem[prev]) - elev_pos) / dist
-            max_tan = max(max_tan, tan_angle)
-        end
-        # If at edge (no valid terrain behind), assume flat horizon (0°)
-        out[pos] = Float32(atand(max_tan == -Inf ? 0.0 : max_tan))
-        pos += step
+        r += step_r
+        c += step_c
     end
 end
 
@@ -87,8 +80,9 @@ function _horizon_angle_cardinal(dem, cellsize, maxdist)
     # Returns 3D array with 4 directions: N, E, S, W
     T = Float32
     nrows, ncols = size(dem)
-    grid = CartesianIndices(dem)
-    result = fill(T(NaN), nrows, ncols, 4)
+    backend = get_backend(dem)
+    result = KernelAbstractions.allocate(backend, T, nrows, ncols, 4)
+    fill!(result, T(NaN))
 
     cs1, cs2 = Float64(cellsize[1]), Float64(cellsize[2])
     dist_ns = abs(cs1)
@@ -99,15 +93,18 @@ function _horizon_angle_cardinal(dem, cellsize, maxdist)
     S = view(result, :, :, 3)
     W = view(result, :, :, 4)
 
-    for col in 1:ncols
-        _sweep_line!(S, dem, CartesianIndex(nrows, col), CartesianIndex(-1, 0), dist_ns, grid)
-        _sweep_line!(N, dem, CartesianIndex(1, col), CartesianIndex(1, 0), dist_ns, grid)
-    end
-    for row in 1:nrows
-        _sweep_line!(E, dem, CartesianIndex(row, ncols), CartesianIndex(0, -1), dist_ew, grid)
-        _sweep_line!(W, dem, CartesianIndex(row, 1), CartesianIndex(0, 1), dist_ew, grid)
-    end
+    workgroup = backend isa KernelAbstractions.CPU ? 1 : 256
+    sweep_row_edge! = _sweep_row_edge_kernel!(backend, workgroup)
+    sweep_col_edge! = _sweep_col_edge_kernel!(backend, workgroup)
 
+    # N/S from top/bottom edges (step_c=0 for cardinal)
+    sweep_row_edge!(S, dem, nrows, -1, 0, dist_ns, nrows, ncols, ndrange=ncols)
+    sweep_row_edge!(N, dem, 1, 1, 0, dist_ns, nrows, ncols, ndrange=ncols)
+    # E/W from left/right edges (step_r=0 for cardinal)
+    sweep_col_edge!(E, dem, 0, ncols, 0, -1, dist_ew, nrows, ncols, ndrange=nrows)
+    sweep_col_edge!(W, dem, 0, 1, 0, 1, dist_ew, nrows, ncols, ndrange=nrows)
+
+    KernelAbstractions.synchronize(backend)
     return result
 end
 
@@ -115,8 +112,9 @@ function _horizon_angle_8(dem, cellsize, maxdist)
     # Returns 3D array with 8 directions: N, NE, E, SE, S, SW, W, NW
     T = Float32
     nrows, ncols = size(dem)
-    grid = CartesianIndices(dem)
-    result = fill(T(NaN), nrows, ncols, 8)
+    backend = get_backend(dem)
+    result = KernelAbstractions.allocate(backend, T, nrows, ncols, 8)
+    fill!(result, T(NaN))
 
     cs1, cs2 = Float64(cellsize[1]), Float64(cellsize[2])
     dist_ns = abs(cs1)
@@ -132,28 +130,29 @@ function _horizon_angle_8(dem, cellsize, maxdist)
     W = view(result, :, :, 7)
     NW = view(result, :, :, 8)
 
-    # Sweeps starting from top/bottom edges
-    for col in 1:ncols
-        _sweep_line!(S, dem, CartesianIndex(nrows, col), CartesianIndex(-1, 0), dist_ns, grid)
-        _sweep_line!(N, dem, CartesianIndex(1, col), CartesianIndex(1, 0), dist_ns, grid)
-        _sweep_line!(SW, dem, CartesianIndex(nrows, col), CartesianIndex(-1, 1), dist_diag, grid)
-        _sweep_line!(NE, dem, CartesianIndex(1, col), CartesianIndex(1, -1), dist_diag, grid)
-        _sweep_line!(SE, dem, CartesianIndex(nrows, col), CartesianIndex(-1, -1), dist_diag, grid)
-        _sweep_line!(NW, dem, CartesianIndex(1, col), CartesianIndex(1, 1), dist_diag, grid)
-    end
+    workgroup = backend isa KernelAbstractions.CPU ? 1 : 256
+    sweep_row_edge! = _sweep_row_edge_kernel!(backend, workgroup)
+    sweep_col_edge! = _sweep_col_edge_kernel!(backend, workgroup)
 
-    # Sweeps starting from left/right edges
-    for row in 1:nrows
-        _sweep_line!(E, dem, CartesianIndex(row, ncols), CartesianIndex(0, -1), dist_ew, grid)
-        _sweep_line!(W, dem, CartesianIndex(row, 1), CartesianIndex(0, 1), dist_ew, grid)
-    end
-    for row in 1:nrows-1
-        _sweep_line!(SW, dem, CartesianIndex(row, 1), CartesianIndex(-1, 1), dist_diag, grid)
-        _sweep_line!(SE, dem, CartesianIndex(row, ncols), CartesianIndex(-1, -1), dist_diag, grid)
-        _sweep_line!(NE, dem, CartesianIndex(row + 1, ncols), CartesianIndex(1, -1), dist_diag, grid)
-        _sweep_line!(NW, dem, CartesianIndex(row + 1, 1), CartesianIndex(1, 1), dist_diag, grid)
-    end
+    # Sweeps from top/bottom edges (ndrange=ncols)
+    sweep_row_edge!(S, dem, nrows, -1, 0, dist_ns, nrows, ncols, ndrange=ncols)
+    sweep_row_edge!(N, dem, 1, 1, 0, dist_ns, nrows, ncols, ndrange=ncols)
+    sweep_row_edge!(SW, dem, nrows, -1, 1, dist_diag, nrows, ncols, ndrange=ncols)
+    sweep_row_edge!(NE, dem, 1, 1, -1, dist_diag, nrows, ncols, ndrange=ncols)
+    sweep_row_edge!(SE, dem, nrows, -1, -1, dist_diag, nrows, ncols, ndrange=ncols)
+    sweep_row_edge!(NW, dem, 1, 1, 1, dist_diag, nrows, ncols, ndrange=ncols)
 
+    # Sweeps from left/right edges (ndrange=nrows for E/W)
+    sweep_col_edge!(E, dem, 0, ncols, 0, -1, dist_ew, nrows, ncols, ndrange=nrows)
+    sweep_col_edge!(W, dem, 0, 1, 0, 1, dist_ew, nrows, ncols, ndrange=nrows)
+
+    # Diagonal sweeps from left/right edges (ndrange=nrows-1)
+    sweep_col_edge!(SW, dem, 0, 1, -1, 1, dist_diag, nrows, ncols, ndrange=nrows-1)
+    sweep_col_edge!(SE, dem, 0, ncols, -1, -1, dist_diag, nrows, ncols, ndrange=nrows-1)
+    sweep_col_edge!(NE, dem, 1, ncols, 1, -1, dist_diag, nrows, ncols, ndrange=nrows-1)
+    sweep_col_edge!(NW, dem, 1, 1, 1, 1, dist_diag, nrows, ncols, ndrange=nrows-1)
+
+    KernelAbstractions.synchronize(backend)
     return result
 end
 
@@ -175,30 +174,31 @@ function _horizon_angle_rotated(dem, ndirs::Int, cellsize, maxdist)
     nrows, ncols = size(dem)
     cs1, cs2 = Float64(cellsize[1]), Float64(cellsize[2])
     n_rotations = ndirs ÷ 8
-    result = zeros(Float32, nrows, ncols, ndirs)
+    backend = get_backend(dem)
+    result = KernelAbstractions.allocate(backend, Float32, nrows, ncols, ndirs)
+    fill!(result, 0f0)
 
-    for rot in 0:n_rotations-1
+    # No rotation needed for first 8
+    h = _horizon_angle_8(dem, cellsize, maxdist)
+    for i in 1:8
+        di = (i - 1) * n_rotations + 1
+        copyto!(view(result, :, :, di), view(h, :, :, i))
+    end
+
+    # For the rest we rotate DEM, run, map back
+    for rot in 1:n_rotations-1
         angle = rot * (π / 4 / n_rotations)  # Rotation angle in radians
 
-        if rot == 0
-            # No rotation needed - use original GridSweep
-            h = _horizon_angle_8(dem, cellsize, maxdist)
-            for i in 1:8
-                di = (i - 1) * n_rotations + 1
-                result[:, :, di] .= view(h, :, :, i)
-            end
-        else
-            # Rotate DEM, run GridSweep, map back
-            rotated = _rotate_dem(dem, angle, cs1, cs2)
-            h = _horizon_angle_8(rotated, cellsize, maxdist)
+        rotated = _rotate_dem(dem, angle, cs1, cs2)
+        h = _horizon_angle_8(rotated, cellsize, maxdist)
 
-            # Map results back to original grid positions
-            for i in 1:8
-                di = (i - 1) * n_rotations + 1 + rot
-                _unrotate_result!(view(result, :, :, di), view(h, :, :, i), angle, nrows, ncols)
-            end
+        # Map results back to original grid positions
+        for i in 1:8
+            di = (i - 1) * n_rotations + 1 + rot
+            _unrotate_result!(view(result, :, :, di), view(h, :, :, i), angle, nrows, ncols)
         end
     end
+
     return result
 end
 
@@ -278,43 +278,17 @@ function _bilinear(dem, r::Float64, c::Float64)
            fr * fc * dem[r1, c1]
 end
 
-function _build_max_pyramid(dem)
-    nrows, ncols = size(dem)
-    nlevels = floor(Int, log2(min(nrows, ncols)))
-    levels = Vector{Matrix{Float32}}(undef, nlevels + 1)
-
-    levels[1] = Matrix{Float32}(undef, nrows, ncols)
-    for i in eachindex(dem)
-        levels[1][i] = Float32(dem[i])
+@kernel function _sky_view_factor_kernel!(result, @Const(horizons), ndirs::Int)
+    i, j = @index(Global, NTuple)
+    res = 0.0f0
+    @inbounds for di in 1:ndirs
+        res += cosd(horizons[i, j, di])^2
     end
-
-    for lv in 2:nlevels+1
-        prev = levels[lv-1]
-        nr, nc = size(prev, 1) ÷ 2, size(prev, 2) ÷ 2
-        level = Matrix{Float32}(undef, nr, nc)
-        for r in 1:nr
-            for c in 1:nc
-                level[r, c] = max(
-                    prev[2r-1, 2c-1], prev[2r-1, 2c],
-                    prev[2r, 2c-1], prev[2r, 2c]
-                )
-            end
-        end
-        levels[lv] = level
-    end
-    return levels
-end
-
-function _sample_pyramid(pyramid, r::Float64, c::Float64, level::Int)
-    lvl = pyramid[level + 1]
-    scale = 1 << level
-    pr = clamp(ceil(Int, r / scale), 1, size(lvl, 1))
-    pc = clamp(ceil(Int, c / scale), 1, size(lvl, 2))
-    return lvl[pr, pc]
+    result[i, j] = res / ndirs
 end
 
 """
-    sky_view_factor(dem; method=GridSweep(), cellsize=cellsize(dem), maxdist=Inf)
+    sky_view_factor(dem; directions=16, cellsize=cellsize(dem), maxdist=Inf)
 
 Compute the Sky View Factor (SVF) for each cell in a DEM.
 
@@ -324,7 +298,9 @@ across all directions.
 
 # Arguments
 - `dem`: Digital elevation model matrix
-- `method`: Horizon computation method (default: `GridSweep()`)
+
+# Keywords
+- `directions`: Number of directions (default: 16)
 - `cellsize`: Cell size as `(row_size, col_size)` tuple
 - `maxdist`: Maximum search distance in coordinate units
 
@@ -333,18 +309,19 @@ A matrix of SVF values in the range [0, 1].
 """
 function sky_view_factor(
     dem::AbstractMatrix{<:Real};
-    method::HorizonMethod = GridSweep(),
+    directions::Int = 16,
     cellsize = cellsize(dem),
     maxdist = Inf,
 )
-    horizons = horizon_angle(dem; method, cellsize, maxdist)
+    horizons = horizon_angle(dem; directions, cellsize, maxdist)
     ndirs = size(horizons, 3)
-    result = zeros(Float32, size(dem))
-    for di in 1:ndirs
-        for i in CartesianIndices(result)
-            result[i] += cosd(horizons[i, di])^2
-        end
-    end
-    result ./= ndirs
+    backend = get_backend(horizons)
+    result = KernelAbstractions.allocate(backend, Float32, size(dem))
+
+    workgroup = backend isa KernelAbstractions.CPU ? 1 : (16, 16)
+    kernel! = _sky_view_factor_kernel!(backend, workgroup)
+    kernel!(result, horizons, ndirs, ndrange=size(dem))
+    KernelAbstractions.synchronize(backend)
+
     return result
 end
