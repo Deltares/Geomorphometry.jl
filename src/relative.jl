@@ -226,3 +226,47 @@ function pitremoval(dem::AbstractMatrix{<:Real}; limit = 0.0)
 
     return localfilter!(dst, dem, 3, initial, update, store!)
 end
+
+"""
+    percentile_elevation(dem::AbstractMatrix{<:Real}; radius=10)
+
+Computes the percentile rank of each cell's elevation relative to its neighborhood.
+
+Returns a value between 0 and 1 for each cell, where:
+- 0 means the cell is lower than all neighbors (local minimum / valley bottom)
+- 1 means the cell is higher than all neighbors (local maximum / ridge top)
+- 0.5 means the cell is at the median elevation of its neighborhood
+
+This metric is useful for identifying cold air pooling zones, which tend to occur
+in areas with low percentile elevation (valleys and depressions).
+
+Based on Lundquist et al. (2008) "Automated algorithm for mapping regions of
+cold-air pooling in complex terrain", Journal of Geophysical Research.
+
+# Arguments
+- `dem::AbstractMatrix{<:Real}`: Digital elevation model
+- `radius::Int=10`: Radius of the circular neighborhood in cells
+
+# Example
+```julia
+dem = rand(100, 100) .* 1000  # Random terrain
+pct = percentile_elevation(dem; radius=20)
+valleys = pct .< 0.3  # Low-lying areas prone to cold air pooling
+```
+"""
+function percentile_elevation(dem::AbstractMatrix{<:Real}; radius::Int, stencil::Stencil = Moore(radius))
+    mapstencil(_percentile_elevation, stencil, dem)
+end
+
+function _percentile_elevation(hood)
+    c = center(hood)
+    n_lower = 0
+    n_total = 0
+    for cell in hood
+        n_total += 1
+        if cell < c
+            n_lower += 1
+        end
+    end
+    return n_lower / n_total
+end
