@@ -26,7 +26,7 @@ export ZevenbergenThorne, Horn, MDG
 export D8, DInf, FD8
 export pmf, smf, psf
 export pssm, hillshade, multihillshade
-export basin_depth, basin_volume, drainage_potential
+export depression_depth, depression_volume, drainage_potential
 export pitremoval, percentile_elevation
 export spread, Eastman, FastSweeping, Tomlin
 export roughness, TRI, TPI, BPI, RIE, rugosity, entropy

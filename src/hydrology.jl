@@ -380,30 +380,30 @@ function SPI(dem::AbstractMatrix; method = D8(), cellsize = cellsize(dem))
 end
 
 """
-    basin_depth(dem::AbstractMatrix; filled=filldepressions(dem))
+    depression_depth(dem::AbstractMatrix; filled=filldepressions(dem))
 
 Computes the depth of each cell below the filled surface.
 
 Returns the difference between the depression-filled DEM and the original DEM,
-representing how deep each cell sits within a depression/basin. Cells not in
+representing how deep each cell sits within a depression/depression. Cells not in
 depressions will have a depth of zero.
 
 This is useful for identifying potential cold air pooling zones and water
 retention areas.
 """
-function basin_depth(dem::AbstractMatrix; filled = filldepressions(dem))
+function depression_depth(dem::AbstractMatrix; filled = filldepressions(dem))
     filled .- dem
 end
 
 """
-    basin_volume(dem::AbstractMatrix; filled=filldepressions(dem), cellsize=cellsize(dem))
+    depression_volume(dem::AbstractMatrix; filled=filldepressions(dem), cellsize=cellsize(dem))
 
 Computes the total volume of all depressions/basins in the DEM.
 
-Returns the sum of basin depths multiplied by cell area.
+Returns the sum of depression depths multiplied by cell area.
 """
-function basin_volume(dem::AbstractMatrix; filled = filldepressions(dem), cellsize = cellsize(dem))
-    sum(basin_depth(dem; filled)) * prod(abs.(cellsize))
+function depression_volume(dem::AbstractMatrix; filled = filldepressions(dem), cellsize = cellsize(dem))
+    sum(depression_depth(dem; filled)) * prod(abs.(cellsize))
 end
 
 """
