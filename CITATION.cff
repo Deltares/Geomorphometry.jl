@@ -12,6 +12,9 @@ authors:
     family-names: Pronk
     affiliation: Deltares
     orcid: 'https://orcid.org/0000-0001-8758-3939'
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.18851928
 repository-code: 'https://github.com/Deltares/Geomorphometry.jl'
 url: 'https://deltares.github.io/Geomorphometry.jl/dev/'
 abstract: >-
