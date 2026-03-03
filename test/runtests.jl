@@ -67,8 +67,8 @@ using Test
             10 10 10 10 10
         ]
 
-        @testset "basin_depth" begin
-            bd = basin_depth(dem)
+        @testset "depression_depth" begin
+            bd = depression_depth(dem)
             # Center should be deepest (10 - 5 = 5)
             @test bd[3, 3] ≈ 5.0
             # Edges should be zero (not in depression)
@@ -76,11 +76,11 @@ using Test
             @test all(bd .>= 0)
         end
 
-        @testset "basin_volume" begin
-            vol = basin_volume(dem; cellsize=(1.0, 1.0))
+        @testset "depression_volume" begin
+            vol = depression_volume(dem; cellsize=(1.0, 1.0))
             @test vol > 0
             # Volume should equal sum of depths for unit cells
-            @test vol ≈ sum(basin_depth(dem))
+            @test vol ≈ sum(depression_depth(dem))
         end
 
         @testset "drainage_potential" begin
