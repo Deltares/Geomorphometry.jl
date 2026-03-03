@@ -1,6 +1,8 @@
 using Geomorphometry
 using Test
 
+include("horizon.jl")
+
 @testset "Geomorphometry" begin
     @testset "pmf" begin
         # Write your own tests here.
