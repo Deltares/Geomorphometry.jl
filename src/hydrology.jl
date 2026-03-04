@@ -180,7 +180,7 @@ function infa(aspect)
     return weight1, weight2
 end
 
-const directions = centered([1 2 3; 4 5 6; 7 8 9])
+const directions = centered(UInt8[1 2 3; 4 5 6; 7 8 9])
 
 """
     flowaccumulation(dem::AbstractMatrix, closed::Matrix{Bool}, method::FlowDirectionMethod)
@@ -380,12 +380,17 @@ function SPI(dem::AbstractMatrix; method = D8(), cellsize = cellsize(dem))
 end
 
 """
-    HAND(dem::AbstractMatrix; method=D8(), cellsize=cellsize(dem), threshold=1e10)
+    height_above_nearest_drainage(dem::AbstractMatrix; method=D8(), cellsize=cellsize(dem), threshold=1e10)
 
-Computes the Height Above Nearest Drainage (HAND, [nobreHeightNearestDrainage2011](@cite)) of a digital elevation model (DEM) `dem` 
-with an optional `method` for flow direction, a `cellsize`, and a `threshold` for stream definition.
+Compute Height Above Nearest Drainage (HAND, [nobreHeightNearestDrainage2011](@cite)) of a digital elevation model (DEM) `dem` 
+with an optional `method` for flow direction, a `cellsize`, and an flowaccumulation `threshold` for stream definition.
 """
-function HAND(dem::AbstractMatrix; method = D8(), cellsize = cellsize(dem), threshold = 100)
+function height_above_nearest_drainage(
+    dem::AbstractMatrix;
+    method = D8(),
+    cellsize = cellsize(dem),
+    threshold = 100,
+)
     dir = fill(CartesianIndex{2}(0, 0), size(dem))
     closed = falses(size(dem))
     order = ones(Int64, length(closed) - sum(closed))
@@ -430,12 +435,15 @@ function HAND(dem::AbstractMatrix; method = D8(), cellsize = cellsize(dem), thre
 end
 
 """
-    HAND(dem::AbstractMatrix, stream_mask::AbstractMatrix{Bool})
+    height_above_nearest_drainage(dem::AbstractMatrix, stream_mask::AbstractMatrix{Bool})
 
 Computes the Height Above Nearest Drainage (HAND, [nobreHeightNearestDrainage2011](@cite)) of a digital elevation model (DEM) `dem` 
 given a stream definition as a boolean `stream_mask`.
 """
-function HAND(dem::AbstractMatrix, stream_mask::AbstractMatrix{Bool})
+function height_above_nearest_drainage(
+    dem::AbstractMatrix,
+    stream_mask::AbstractMatrix{Bool},
+)
     dir = fill(CartesianIndex{2}(0, 0), size(dem))
     closed = falses(size(dem))
     order = ones(Int64, length(closed) - sum(closed))

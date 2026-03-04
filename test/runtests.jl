@@ -1,6 +1,8 @@
 using Geomorphometry
 using Test
 
+include("horizon.jl")
+
 @testset "Geomorphometry" begin
     @testset "pmf" begin
         # Write your own tests here.
@@ -56,5 +58,18 @@ using Test
         aspect(A; method = MDG())
         curvature(A)
         hillshade(A)
+    end
+    @testset "hand" begin
+        dem = Float32[
+            10 10 10 10 10
+            10 8 7 8 10
+            10 7 5 7 10
+            10 8 7 8 10
+            10 10 10 10 10
+        ]
+        rdem = height_above_nearest_drainage(dem)
+        @test rdem[1, 1] == 0  # all descending
+        @test rdem[4, 4] == 3  # highest asecnding point
+        @test maximum(rdem) == 3
     end
 end

@@ -1,0 +1,28 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: Geomorphometry.jl
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Maarten
+    family-names: Pronk
+    affiliation: Deltares
+    orcid: 'https://orcid.org/0000-0001-8758-3939'
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.18851928
+repository-code: 'https://github.com/Deltares/Geomorphometry.jl'
+url: 'https://deltares.github.io/Geomorphometry.jl/dev/'
+abstract: >-
+  Geomorphometry related algorithms written in the Julia
+  language.
+keywords:
+  - julia
+  - geomorphometry
+  - gis
+  - hydrology
+license: MIT
