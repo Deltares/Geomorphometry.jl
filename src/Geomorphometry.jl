@@ -30,11 +30,17 @@ export pmf, smf, psf
 export pssm, hillshade, multihillshade
 export pitremoval
 export spread, Eastman, FastSweeping, Tomlin
-export roughness, TRI, TPI, BPI, RIE, rugosity, entropy
+export roughness,
+    terrain_ruggedness_index,
+    topographic_position_index,
+    bathymetric_position_index,
+    roughness_index_elevation,
+    rugosity,
+    entropy
 export slope,
     aspect, curvature, laplacian, plan_curvature, profile_curvature, tangential_curvature
 export skb, skbr
-export filldepressions, flowaccumulation, TWI, SPI
+export filldepressions, flowaccumulation, topographic_wetness_index, stream_power_index
 export horizon_angle, sky_view_factor, GridSweep
 
 end # module

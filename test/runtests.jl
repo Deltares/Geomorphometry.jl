@@ -50,6 +50,8 @@ include("horizon.jl")
         A = rand(25, 25)
         TRI(A)
         TPI(A)
+        BPI(A)
+        RIE(A)
         roughness(A)
         slope(A; method = Horn())
         slope(A; cellsize = (5, 5), method = ZevenbergenThorne())
@@ -58,5 +60,33 @@ include("horizon.jl")
         aspect(A; method = MDG())
         curvature(A)
         hillshade(A)
+    end
+    @testset "hydrology" begin
+        # Large depression with flow towards cell (1,1)
+        dem = Float32[
+            10 10 10 10 10
+            10 8 7 8 10
+            10 7 5 7 10
+            10 8 7 8 10
+            10 10 10 10 10
+        ]
+        acc, dir = flowaccumulation(dem; method = D8())
+        @test maximum(acc) == 10
+        @test acc[2, 2] == 9
+        @test acc[5, 5] == 1
+        acc, dir = flowaccumulation(dem; method = DInf())
+        @test maximum(acc) == 10
+        @test acc[2, 2] == 9
+        @test acc[5, 5] == 1
+        acc, dir = flowaccumulation(dem; method = FD8(2))
+        @test maximum(acc) == 10
+        @test acc[2, 2] == 9
+        @test acc[5, 5] == 1
+
+        fdem = filldepressions(dem)
+        @test all(==(10), fdem)
+
+        TWI(dem)
+        SPI(dem)
     end
 end
