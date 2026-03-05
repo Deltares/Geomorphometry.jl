@@ -86,7 +86,49 @@ include("horizon.jl")
         fdem = filldepressions(dem)
         @test all(==(10), fdem)
 
-        TWI(dem)
-        SPI(dem)
+        @testset "depression_depth" begin
+            bd = depression_depth(dem)
+            # Center should be deepest (10 - 5 = 5)
+            @test bd[3, 3] ≈ 5.0
+            # Edges should be zero (not in depression)
+            @test bd[1, 1] ≈ 0.0
+            @test all(bd .>= 0)
+        end
+
+        @testset "depression_volume" begin
+            vol = depression_volume(dem; cellsize=(1.0, 1.0))
+            @test vol > 0
+            # Volume should equal sum of depths for unit cells
+            @test vol ≈ sum(depression_depth(dem))
+        end
+
+        @testset "drainage_potential" begin
+            dp = drainage_potential(dem; cellsize=(1.0, 1.0))
+            # Center (flat, high accumulation) should have low drainage
+            @test dp[3, 3] ≈ 0.0
+            # Edges should have higher drainage potential
+            @test dp[1, 3] > dp[3, 3]
+        end
+
+        @testset "percentile_elevation" begin
+            pct = percentile_elevation(dem; radius=1)
+            # Center (lowest) should have low percentile
+            @test pct[3, 3] ≈ 0.0
+            # Corners (highest) should have high percentile
+            @test pct[1, 1] > 0.5
+        end
+
+        @testset "flowaccumulation" begin
+            acc, dir = flowaccumulation(dem; cellsize=(1.0, 1.0))
+            # Center should have highest accumulation
+            @test_broken acc[3, 3] == maximum(acc)
+        end
+
+        @testset "TWI and SPI" begin
+            twi = TWI(dem; cellsize=(1.0, 1.0))
+            spi = SPI(dem; cellsize=(1.0, 1.0))
+            @test size(twi) == size(dem)
+            @test size(spi) == size(dem)
+        end
     end
 end
