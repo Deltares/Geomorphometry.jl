@@ -41,7 +41,7 @@ export roughness,
 export slope,
     aspect, curvature, laplacian, plan_curvature, profile_curvature, tangential_curvature
 export skb, skbr
-export filldepressions, flowaccumulation, topographic_wetness_index, stream_power_index
+export filldepressions, flowaccumulation, topographic_wetness_index, stream_power_index, height_above_nearest_drainage
 export horizon_angle, sky_view_factor, GridSweep
 
 end # module
