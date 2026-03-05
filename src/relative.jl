@@ -15,39 +15,47 @@ function _roughness(x)
 end
 
 """
-    TPI(dem::AbstractMatrix{<:Real})
+    topographic_position_index(dem::AbstractMatrix{<:Real})
 
-TPI stands for Topographic Position Index, which is defined as the difference between a central pixel and the mean of its surrounding cells (see Wilson et al 2007, Marine Geodesy 30:3-35).
+Topographic Position Index (TPI), which is defined as the difference between a central pixel and the mean of its surrounding cells (see Wilson et al 2007, Marine Geodesy 30:3-35).
 """
-function TPI(dem::AbstractMatrix{<:Real}, window::Stencil = Moore(1))
+function topographic_position_index(dem::AbstractMatrix{<:Real}, window::Stencil = Moore(1))
     mapstencil(x -> center(x) - mean(x), window, dem)
 end
+@deprecate TPI topographic_position_index
 
 """
-    BPI(dem::AbstractMatrix{<:Real})
+    bathymetric_position_index(dem::AbstractMatrix{<:Real})
 
-BPI stands for Bathymetric Position Index (Lundblad et al., 2006), which is defined as the difference between a central pixel and the mean of the cells in an annulus around it.
+Bathymetric Position Index (BPI)(Lundblad et al., 2006), which is defined as the difference between a central pixel and the mean of the cells in an annulus around it.
 """
-BPI(dem::AbstractMatrix{<:Real}, window::Annulus = Annulus(3, 2)) = TPI(dem, window)
+bathymetric_position_index(dem::AbstractMatrix{<:Real}, window::Annulus = Annulus(3, 2)) =
+    topographic_position_index(dem, window)
+@deprecate BPI bathymetric_position_index
 
 """
-    RIE(dem::AbstractMatrix{<:Real})
+    roughness_index_elevation(dem::AbstractMatrix{<:Real})
 
-RIE stands for Roughness Index Elevation, which quantifies the standard deviation of residual topography (Cavalli et al., 2008)
+Roughness Index Elevation (RIE), which quantifies the standard deviation of residual topography (Cavalli et al., 2008)
 """
-function RIE(dem::AbstractMatrix{<:Real}, window::Stencil = Window(1))
-    meandem = TPI(dem, window)
+function roughness_index_elevation(dem::AbstractMatrix{<:Real}, window::Stencil = Window(1))
+    meandem = topographic_position_index(dem, window)
     mapstencil(std, window, meandem)
 end
+@deprecate RIE roughness_index_elevation
 
 """
-    TRI(dem::AbstractMatrix{<:Real})
+    terrain_ruggedness_index(dem::AbstractMatrix{<:Real})
 
-TRI stands for Terrain Ruggedness Index, which measures the difference between a central pixel and its surrounding cells.
+Terrain Ruggedness Index (TRI), which measures the difference between a central pixel and its surrounding cells.
 This algorithm uses the square root of the sum of the square of the absolute difference between a central pixel and its surrounding cells.
 This is recommended for terrestrial use cases.
 """
-function TRI(dem::AbstractMatrix{<:Real}; normalize = false, squared = true)
+function terrain_ruggedness_index(
+    dem::AbstractMatrix{<:Real};
+    normalize = false,
+    squared = true,
+)
     dst = copy(dem)
 
     @inline initial(a) = (zero(a), a)
@@ -71,6 +79,7 @@ function TRI(dem::AbstractMatrix{<:Real}; normalize = false, squared = true)
 
     return localfilter!(dst, dem, 3, initial, update, store!)
 end
+@deprecate TRI terrain_ruggedness_index
 
 """
     prominence(dem::AbstractMatrix{<:Real})

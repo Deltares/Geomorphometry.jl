@@ -68,16 +68,8 @@ function filldepressions!(dem::AbstractMatrix, queued = falses(size(dem)))
     return dem
 end
 
-nbs = CartesianIndex.([
-    (-1, -1),
-    (-1, 1),
-    (1, -1),
-    (1, 1),
-    (-1, 0),
-    (0, -1),
-    (0, 1),
-    (1, 0),
-])
+nbs =
+    CartesianIndex.([(-1, -1), (-1, 1), (1, -1), (1, 1), (-1, 0), (0, -1), (0, 1), (1, 0)])
 
 function watersheds(dem::AbstractMatrix, queued = falses(size(dem)))
     open = PriorityQueue{CartesianIndex{2}, eltype(dem)}()
@@ -152,31 +144,31 @@ nbb2 =
 
 function infc(aspect)
     # Normalize aspect to 0-360 range
-    aspect = mod(aspect+90, 360)
-    
+    aspect = mod(aspect + 90, 360)
+
     # Convert aspect to index (0° = North, clockwise)
     # Each direction covers 45° sector
     sector = floor(Int, aspect / 45)
-    
+
     # Get the two neighboring directions
     dir1_idx = sector + 1
     dir2_idx = (sector + 1) % 8 + 1
-    
+
     return nbb2[dir1_idx], nbb2[dir2_idx]
 end
 
 function infa(aspect)
     # Normalize aspect to 0-360 range
     aspect = mod(aspect, 360)
-    
+
     # Find position within 45° sector
     sector_angle = mod(aspect, 45)
-    
+
     # Calculate weights for the two directions
     # Weight decreases linearly from 1 to 0 as we move away from the direction
     weight2 = sector_angle / 45
     weight1 = 1 - weight2
-    
+
     return weight1, weight2
 end
 
@@ -247,14 +239,16 @@ end
 
 function _accumulate!(::D8, acc, order, dir, R, dem, cellsize)
     for i in reverse(order)
+        dir[i] == CartesianIndex(0, 0) && continue
         acc[R[i] + dir[i]] += acc[i]
     end
 end
 function _accumulate!(::DInf, acc, order, dir, R, dem, cellsize)
-    asp = aspect(dem; method = Horn(), cellsize=abs.(cellsize))
+    asp = aspect(dem; method = Horn(), cellsize = abs.(cellsize))
     visited = falses(size(acc))
 
     for i in reverse(order)
+        dir[i] == CartesianIndex(0, 0) && continue
         aspect = asp[i]
 
         if !isfinite(aspect)
@@ -320,11 +314,12 @@ function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
     ]
 
     visited = falses(size(acc))
-    nb = vec(collect(CartesianIndices(dists)).-CartesianIndex(2,2))
+    nb = vec(collect(CartesianIndices(dists)) .- CartesianIndex(2, 2))
 
     weights = zeros(size(contour_lengths))
     Σw = 0.0
     for i in reverse(order)
+        dir[i] == CartesianIndex(0, 0) && continue
         Σw = 0.0
         # TODO Fix this distance with actual distances
         for (ri, dist) in enumerate(dists)
@@ -341,7 +336,7 @@ function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
             weights[ri] = weight
             Σw += weight
         end
-        if iszero(Σw) || iszero(weights[CartesianIndex(2,2)+dir[i]])
+        if iszero(Σw) || iszero(weights[CartesianIndex(2, 2) + dir[i]])
             acc[R[i] + dir[i]] += acc[i]
             visited[i] = true
             continue
@@ -358,26 +353,32 @@ function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
 end
 
 """
-    TWI(dem::AbstractMatrix; method=D8(), cellsize=cellsize(dem))
+    topographic_wetness_index(dem::AbstractMatrix; method=D8(), cellsize=cellsize(dem))
 
 Computes the Topographic Wetness Index (TWI) of a digital elevation model (DEM) `dem` with an optional `method` for flow direction and a `cellsize`.
 """
-function TWI(dem::AbstractMatrix; method = D8(), cellsize = cellsize(dem))
+function topographic_wetness_index(
+    dem::AbstractMatrix;
+    method = D8(),
+    cellsize = cellsize(dem),
+)
     s = slope(dem; cellsize)
     acc, _ = flowaccumulation(dem; method, cellsize)
     return @. log(acc / tand(s))
 end
+@deprecate TWI topographic_wetness_index
 
 """
-    SPI(dem::AbstractMatrix; method=D8(), cellsize=cellsize(dem))
+    stream_power_index(dem::AbstractMatrix; method=D8(), cellsize=cellsize(dem))
 
 Computes the Stream Power Index (SPI) of a digital elevation model (DEM) `dem` with an optional `method` for flow direction and a `cellsize`.
 """
-function SPI(dem::AbstractMatrix; method = D8(), cellsize = cellsize(dem))
+function stream_power_index(dem::AbstractMatrix; method = D8(), cellsize = cellsize(dem))
     s = slope(dem; cellsize)
     acc, _ = flowaccumulation(dem; method, cellsize)
     return @. log(acc * tand(s))
 end
+@deprecate SPI stream_power_index
 
 """
     depression_depth(dem::AbstractMatrix; filled=filldepressions(dem))
