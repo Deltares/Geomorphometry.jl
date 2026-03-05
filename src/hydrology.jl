@@ -378,3 +378,50 @@ function SPI(dem::AbstractMatrix; method = D8(), cellsize = cellsize(dem))
     acc, _ = flowaccumulation(dem; method, cellsize)
     return @. log(acc * tand(s))
 end
+
+"""
+    depression_depth(dem::AbstractMatrix; filled=filldepressions(dem))
+
+Computes the depth of each cell below the filled surface.
+
+Returns the difference between the depression-filled DEM and the original DEM,
+representing how deep each cell sits within a depression/depression. Cells not in
+depressions will have a depth of zero.
+
+This is useful for identifying potential cold air pooling zones and water
+retention areas.
+"""
+function depression_depth(dem::AbstractMatrix; filled = filldepressions(dem))
+    filled .- dem
+end
+
+"""
+    depression_volume(dem::AbstractMatrix; filled=filldepressions(dem), cellsize=cellsize(dem))
+
+Computes the total volume of all depressions/basins in the DEM.
+
+Returns the sum of depression depths multiplied by cell area.
+"""
+function depression_volume(dem::AbstractMatrix; filled = filldepressions(dem), cellsize = cellsize(dem))
+    sum(depression_depth(dem; filled)) * prod(abs.(cellsize))
+end
+
+"""
+    drainage_potential(dem::AbstractMatrix; method=D8(), cellsize=cellsize(dem))
+
+Computes a drainage potential index indicating how well each cell drains.
+
+High values indicate good drainage (steep slopes with low upstream accumulation).
+Low values indicate poor drainage (flat areas that accumulate flow from upslope).
+
+This is useful as a proxy for cold air drainage - cells with high drainage potential
+will shed cold air downslope rather than pooling it.
+
+Based on the relationship between slope and flow accumulation:
+`drainage = sin(slope) / log(1 + accumulation)`
+"""
+function drainage_potential(dem::AbstractMatrix; method = D8(), cellsize = cellsize(dem))
+    s = slope(dem; cellsize)
+    acc, _ = flowaccumulation(dem; method, cellsize)
+    return @. sind(s) / log1p(acc)
+end
