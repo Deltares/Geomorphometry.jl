@@ -236,6 +236,30 @@ heatmap(percentile_elevation(dtm; radius=5); colormap=:delta, colorrange=(0,1))
 
 :::
 
+## Horizon
+Related to the relative position is the category related to the view (to a horizon) from any cell in a DEM. We have `horizon_angle` to compute the maximum horizon angle for a given number of directions, and `sky_view_factor` to compute fraction of the sky (hemisphere) visible from a cell.
+
+:::tabs
+
+== Horizon Angle (to the west)
+```@example plots
+hor = horizon_angle(dtm)
+heatmap(hor[:,:,1]; colormap=:curl, colorrange=(-90, 90))
+```
+== Sky View Factor (SVF) in 16 directions
+```@example plots
+skf = sky_view_factor(dtm)
+heatmap(skf; colormap=Reverse(:deep))
+```
+== Sky View Factor (SVF) in 64 directions
+```@example plots
+skf = sky_view_factor(dtm;directions=64)
+heatmap(skf; colormap=Reverse(:deep))
+```
+
+:::
+
+
 ## Hydrology
 Hydrological operations are used to analyze the flow of water on the terrain. We provide [`filldepressions`](@ref) to fill depressions, `depression_depth` to calculate the depth of each depression (difference between filled dem and dem) and `depression_volume` that sums all depression depths. The major depression in the example is the caldera of the dormant volcano ([Mount Scenery](https://en.wikipedia.org/wiki/Mount_Scenery)).
 
@@ -289,7 +313,7 @@ heatmap(log10.(acc); colormap=:rain)
 The ldd is a Matrix of FlowDirections that visualizes the integer encodings.
 ```@example plots
 acc, ldd = flowaccumulation(dtm; method=D8())
-ldd[300:900, 200:800]  # overland flow directions
+ldd[400:800, 300:700]  # overland flow directions
 ```
 == Underlying method
 

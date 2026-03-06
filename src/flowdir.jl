@@ -7,7 +7,7 @@ direction integers map to neighbor offsets. See [`LDD`](@ref).
 abstract type FlowDirectionConvention end
 
 """
-    FlowDirection{C<:FlowDirectionConvention, T<:Integer} <: FlowDirection{C, T}
+    FlowDirection{C<:FlowDirectionConvention, T<:Integer} <: Integer
 
 A flow direction value in convention `C`, stored as type `T`.
 
@@ -33,6 +33,8 @@ Base.show(io::IO, d::FlowDirection{C}) where {C} = print(io, _arrow(C, d.value))
 Base.CartesianIndex(d::FlowDirection{C}) where {C} = _dir_to_ci(C, d.value)
 Base.Int(d::FlowDirection) = Int(d.value)
 Base.:(==)(a::FlowDirection{C}, b::FlowDirection{C}) where {C} = a.value == b.value
+Base.:(==)(a::FlowDirection{C}, b::Integer) where {C} = a.value == b
+Base.:(==)(a::Integer, b::FlowDirection{C}) where {C} = a == b.value
 
 Base.convert(::Type{CartesianIndex{2}}, d::FlowDirection{C}) where {C} =
     _dir_to_ci(C, d.value)
@@ -48,9 +50,6 @@ Base.convert(::Type{FlowDirection{C}}, d::T) where {C, T <: FlowDirection} =
 convention(::Type{FlowDirection{C}}) where {C} = C
 convention(::Type{FlowDirection{C, T}}) where {C, T} = C
 convention(d::FlowDirection) = convention(typeof(d))
-
-"""Return the storage type of a direction."""
-Base.eltype(::Type{FlowDirection{C, T}}) where {C, T} = T
 
 """Whether a convention supports encoding multiple directions in a single value."""
 ismulti(::Type{<:FlowDirectionConvention}) = false
@@ -198,59 +197,4 @@ function decompose(::Type{D8D}, d::Integer)
         d ⊻= bit
     end
     return Tuple(dirs)
-end
-
-### Matrix wrapper
-
-"""
-    FlowDirectionMap{C<:FlowDirectionConvention} <: AbstractMatrix{FlowDirection{C,T}}
-
-Matrix wrapper for local drainage directions, storing direction values as integers
-for I/O efficiency while providing arrow-based visualization and CartesianIndex conversion.
-
-The convention `C` determines the encoding. The default is [`LDD`](@ref), which uses 1-9:
-```
-1(↖) 4(↑) 7(↗)
-2(←) 5(·) 8(→)
-3(↙) 6(↓) 9(↘)
-```
-
-# Constructors
-- `FlowDirectionMap{C}(data::AbstractMatrix{<:Integer})`: Wrap with specific convention.
-- `FlowDirectionMap(data::AbstractMatrix{<:Integer})`: Wrap with [`LDD`](@ref) convention (default).
-"""
-struct FlowDirectionMap{
-    C <: FlowDirectionConvention,
-    T <: Integer,
-    M <: AbstractMatrix{T},
-} <: AbstractMatrix{T}
-    data::M
-end
-
-FlowDirectionMap{C}(data::AbstractMatrix{T}) where {C, T <: Integer} =
-    FlowDirectionMap{C, T, typeof(data)}(data)
-
-Base.size(m::FlowDirectionMap) = size(parent(m))
-Base.getindex(m::FlowDirectionMap{C, T}, i::Int) where {C, T} =
-    FlowDirection{C, T}(getindex(parent(m), i))
-Base.setindex!(m::FlowDirectionMap, v, i) = setindex!(parent(m), v, i)
-Base.parent(m::FlowDirectionMap) = m.data
-Base.IndexStyle(::Type{<:FlowDirectionMap}) = IndexLinear()
-Base.similar(m::FlowDirectionMap{C, T}) where {C, T} =
-    FlowDirectionMap{C}(similar(parent(m)))
-Base.similar(m::FlowDirectionMap{C}, ::Type{S}, dims::Dims{2}) where {C, S <: Integer} =
-    FlowDirectionMap{C}(similar(parent(m), S, dims))
-
-"""
-    convert(::Type{FlowDirectionMap{To}}, m::FlowDirectionMap{From})
-
-Convert a `FlowDirectionMap` from one convention to another, using CartesianIndex offsets
-as intermediate representation. Only works for single-direction values.
-"""
-function Base.convert(
-    ::Type{FlowDirectionMap{To}},
-    m::FlowDirectionMap{From},
-) where {To <: FlowDirectionConvention, From <: FlowDirectionConvention}
-    new_data = _ci_to_dir.(Ref(To), _dir_to_ci.(Ref(From), m.data))
-    FlowDirectionMap{To}(new_data)
 end

@@ -47,7 +47,7 @@ export filldepressions,
     topographic_wetness_index,
     stream_power_index,
     height_above_nearest_drainage
-export FlowDirection, FlowDirectionMap, LDD, D8D
+export FlowDirection, LDD, D8D
 export horizon_angle, sky_view_factor, GridSweep
 
 end # module

@@ -171,7 +171,7 @@ include("horizon.jl")
 
             # The lowest corner (10,10) should have the highest accumulation
             inner = CartesianIndices((2:9, 2:9))
-            @test all(ldd.data[ci] != 5 for ci in inner)  # no pits inside
+            @test all(ldd[ci] != 5 for ci in inner)  # no pits inside
         end
     end
 end

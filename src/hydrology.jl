@@ -246,14 +246,15 @@ function _accumulate!(::D8, acc, order, dir, R, dem, cellsize)
         dir[i] == CartesianIndex(0, 0) && continue
         acc[R[i] + dir[i]] += acc[i]
     end
-    output = similar(acc, UInt8)
+    output = similar(dem, FlowDirection{LDD, UInt8})
     output .= getindex.(Ref(_ldd_ci2dir), _orient.(dir, Ref(cellsize)))
-    return FlowDirectionMap{LDD}(output)
+    return output
 end
 function _accumulate!(::DInf, acc, order, dir, R, dem, cellsize)
     asp = aspect(dem; method = Horn(), cellsize = abs.(cellsize))
     visited = falses(size(acc))
-    output = zeros(UInt8, size(acc))
+    output = similar(dem, FlowDirection{D8D, UInt8})
+    fill!(output, 0)
 
     for i in reverse(order)
         dir[i] == CartesianIndex(0, 0) && continue
@@ -303,7 +304,7 @@ function _accumulate!(::DInf, acc, order, dir, R, dem, cellsize)
         end
         visited[i] = true
     end
-    return FlowDirectionMap{D8D}(output)
+    return output
 end
 
 function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
@@ -327,7 +328,8 @@ function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
 
     visited = falses(size(acc))
     nb = vec(collect(CartesianIndices(dists)) .- CartesianIndex(2, 2))
-    output = zeros(UInt8, size(acc))
+    output = similar(dem, FlowDirection{D8D, UInt8})
+    fill!(output, 0)
 
     weights = zeros(size(contour_lengths))
     Σw = 0.0
@@ -367,7 +369,7 @@ function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
         visited[i] = true
         fill!(weights, 0)
     end
-    return FlowDirectionMap{D8D}(output)
+    return output
 end
 
 """

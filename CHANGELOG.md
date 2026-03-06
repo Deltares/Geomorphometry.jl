@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 ## Changed
 - The second returned argument `ldd` of `flowaccumulation` now returns a `FlowDirectionMap{LDD, UInt8}` instead of a `Matrix{UInt8}`.
 - The second returned argument `ldd` of `flowaccumulation` now return multiple flow direction encodings when `DInf()` and `FD8` are used for the `method` kwarg.
+- Changed default `method` for all flow related methods from `D8()` to `DInf()`.
 
 ## Deprecated
 - *All* shorthand names (e.g. `TPI`, `HAND`) are now deprecated in favour of their written out names (e.g. `topographic_position_index`).
