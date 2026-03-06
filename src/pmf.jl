@@ -1,5 +1,5 @@
 """
-    B, flags = pmf(A; ωₘ, slope, dhₘ, dh₀, cellsize, adjust, erode)
+    B, flags = progressive_morphological_filter(A; ωₘ, slope, dhₘ, dh₀, cellsize, adjust, erode)
 
 Applies the progressive morphological filter by [Zhang (2003)](@cite keqizhangProgressiveMorphologicalFilter2003) to `A`.
 
@@ -17,7 +17,7 @@ Afterwards, one can retrieve the resulting mask for `A` by `A .<= B` or `flags .
 - `dh₀::Real=0.2` Initial elevation threshold [m]
 - `cellsize::Real=1.` Cellsize in [m]
 """
-function pmf(
+function progressive_morphological_filter(
     A::AbstractMatrix{<:Real};
     ωₘ = 20.0,
     slope = 0.01,
@@ -30,6 +30,7 @@ function pmf(
 )
     _pmf(A, ωₘ, slope, dhₘ, dh₀, cellsize, circular, adjust, erode)
 end
+@deprecate pmf progressive_morphological_filter
 
 function _pmf(
     A::AbstractMatrix{<:Real},

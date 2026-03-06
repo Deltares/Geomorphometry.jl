@@ -237,7 +237,7 @@ function pitremoval(dem::AbstractMatrix{<:Real}; limit = 0.0)
 end
 
 """
-    percentile_elevation(dem::AbstractMatrix{<:Real}; radius=10)
+    percentile_elevation(dem::AbstractMatrix{<:Real}; radius=1)
 
 Computes the percentile rank of each cell's elevation relative to its neighborhood.
 
@@ -254,7 +254,7 @@ cold-air pooling in complex terrain", Journal of Geophysical Research.
 
 # Arguments
 - `dem::AbstractMatrix{<:Real}`: Digital elevation model
-- `radius::Int=10`: Radius of the circular neighborhood in cells
+- `radius::Int=1`: Radius of the circular neighborhood in cells
 
 # Example
 ```julia
@@ -263,7 +263,11 @@ pct = percentile_elevation(dem; radius=20)
 valleys = pct .< 0.3  # Low-lying areas prone to cold air pooling
 ```
 """
-function percentile_elevation(dem::AbstractMatrix{<:Real}; radius::Int, stencil::Stencil = Moore(radius))
+function percentile_elevation(
+    dem::AbstractMatrix{<:Real};
+    radius::Int = 1,
+    stencil::Stencil = Moore(radius),
+)
     mapstencil(_percentile_elevation, stencil, dem)
 end
 

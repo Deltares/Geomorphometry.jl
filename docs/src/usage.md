@@ -201,25 +201,25 @@ heatmap(laplacian(dtm, radius=1, direction=0); colorrange=(-1,1), colormap=:tarn
 :::
 
 ## Relative position
-There are several terrain descriptors that can be used to analyze the relative position of a point with respect to its neighbors. These include [`TPI`](@ref), [`TRI`](@ref), [`RIE`](@ref), [`BPI`](@ref), [`rugosity`](@ref) and [`roughness`](@ref). Here we use `BPI`, but with a custom sized `Window` (from Stencils.jl). All these functions can be used with a custom window size.
+There are several terrain descriptors that can be used to analyze the relative position of a point with respect to its neighbors. These include [`topographic_position_index`](@ref), [`terrain_ruggedness_index`](@ref), [`roughness_index_elevation`](@ref), [`bathymetric_position_index`](@ref), [`rugosity`](@ref), [`roughness`](@ref) and [`percentile_elevation`](@ref). Here we use `bathymetric_position_index`, but with a custom sized `Window` (from Stencils.jl). All these functions can be used with a custom window size.
 
 :::tabs
 
-== BPI
+== Bathymetric Position Index (BPI)
 ```@example plots
-heatmap(BPI(dtm, Geomorphometry.Annulus(5, 3)); colormap=:delta, colorrange=(-10,10))
+heatmap(bathymetric_position_index(dtm, Geomorphometry.Annulus(5, 3)); colormap=:delta, colorrange=(-10,10))
 ```
-== TPI
+== Topographic Position Index (TPI)
 ```@example plots
-heatmap(TPI(dtm); colormap=:delta, colorrange=(-10,10))
+heatmap(topographic_position_index(dtm); colormap=:delta, colorrange=(-10,10))
 ```
-== TRI
+== Terrain Ruggedness Index (TRI)
 ```@example plots
-heatmap(TRI(dtm); colormap=:speed)
+heatmap(terrain_ruggedness_index(dtm); colormap=:speed)
 ```
-== RIE
+== Roughness Index Elevation (RIE)
 ```@example plots
-heatmap(RIE(dtm); colormap=:speed)
+heatmap(roughness_index_elevation(dtm); colormap=:speed)
 ```
 == rugosity
 ```@example plots
@@ -229,11 +229,40 @@ heatmap(rugosity(dtm); colormap=:speed)
 ```@example plots
 heatmap(roughness(dtm); colormap=:speed)
 ```
+== Percentile Elevation
+```@example plots
+heatmap(percentile_elevation(dtm; radius=5); colormap=:delta, colorrange=(0,1))
+```
 
 :::
 
 ## Hydrology
-Hydrological operations are used to analyze the flow of water on the terrain. We provide [`filldepressions`](@ref) to fill depressions, and [`flowaccumulation`](@ref) to calculate the flow accumulation. Here we use `flowaccumulation` to calculate the flow accumulation. Note that the local drainage direction is also returned. By default the FD8 algorithm is used, but you can also use the D∞ or D8 algorithm by setting the `method` keyword argument to `DInf()` or `D8()`.
+Hydrological operations are used to analyze the flow of water on the terrain. We provide [`filldepressions`](@ref) to fill depressions, `depression_depth` to calculate the depth of each depression (difference between filled dem and dem) and `depression_volume` that sums all depression depths. The major depression in the example is the caldera of the dormant volcano ([Mount Scenery](https://en.wikipedia.org/wiki/Mount_Scenery)).
+
+
+:::tabs
+
+== Fill depressions
+```@example plots
+dtm[mask] .= -Inf  # hide
+fdtm = filldepressions(dtm)
+dtm[mask] .= NaN  # hide
+heatmap(fdtm)
+```
+== Depression depth
+```@example plots
+depth = depression_depth(dtm; filled=fdtm)
+depth[mask] .= NaN  # hide
+heatmap(depth; colormap=:tempo)
+```
+== Depression volume
+```@example plots
+depression_volume(dtm; filled=fdtm)
+```
+
+:::
+
+Filling the depressions in a DEM is not necessary to calculate the flow accumulation. Here we use `flowaccumulation` to do so, and it automatically carves out depressions. Note that the local drainage direction is also returned. By default the FD8 algorithm is used, but you can also use the D∞ or D8 algorithm by setting the `method` keyword argument to `DInf()` or `D8()`.
 
 :::tabs
 
@@ -255,6 +284,13 @@ acc, ldd = flowaccumulation(dtm; method=D8())
 acc[mask] .= NaN  # hide
 heatmap(log10.(acc); colormap=:rain)
 ```
+== Drainage direction
+
+The ldd is a Matrix of FlowDirections that visualizes the integer encodings.
+```@example plots
+acc, ldd = flowaccumulation(dtm; method=D8())
+ldd[300:900, 200:800]  # overland flow directions
+```
 == Underlying method
 
 We use the Priority Flood method by [barnesPriorityFloodOptimalDepressionFilling2014](@citet).
@@ -265,43 +301,48 @@ We use the Priority Flood method by [barnesPriorityFloodOptimalDepressionFilling
 
 :::
 
-Combined with the previous analysis, we can calculate [`TWI`](@ref) and [`SPI`](@ref) indices. These indices are used to analyze the terrain's ability to accumulate water and the terrain's ability to store water respectively.
-
+Combined with the previous analysis, we can calculate [`topographic_wetness_index`](@ref), [`stream_power_index`](@ref) and 
+[`drainage_potential`](@ref) indices. These indices are used to analyze the terrain's ability to accumulate water, the terrain's ability to store water respectively, and the ability to drain water respectively.
 
 :::tabs
 
-== TWI
+== Topographic Wetness Index (TWI)
 ```@example plots
-twi = TWI(dtm; method=FD8())
+twi = topographic_wetness_index(dtm; method=FD8())
 heatmap(twi; colormap=:tempo)
 ```
-== SPI
+== Stream Power Index (SPI)
 ```@example plots
-twi = SPI(dtm; method=FD8())
+twi = stream_power_index(dtm; method=FD8())
 heatmap(twi; colormap=:tempo)
+```
+== Drainage Potential
+```@example plots
+dp = drainage_potential(dtm; method=FD8())
+heatmap(dp; colormap=:tempo)
 ```
 
 :::
 
-We can also calculate the Height Above Nearest Drainage (HAND) using the [`HAND`](@ref) function. This function requires a flow accumulation map to determine the stream network. Here we use a threshold based on the flow accumulation to define streams.
+We can also calculate the Height Above Nearest Drainage (HAND) using the [`height_above_nearest_drainage`](@ref) function. This function requires a flow accumulation map to determine the stream network. Here we use a threshold based on the flow accumulation to define streams.
 
 :::tabs
 
 == HAND threshold 1e3
 ```@example plots
-hand = HAND(dtm; threshold=1e3)
+hand = height_above_nearest_drainage(dtm; threshold=1e3)
 hand[mask] .= NaN  # hide
 heatmap(hand; colormap=:turbo)
 ```
 == HAND threshold 1e5
 ```@example plots
-hand = HAND(dtm; threshold=1e5)
+hand = height_above_nearest_drainage(dtm; threshold=1e5)
 hand[mask] .= NaN  # hide
 heatmap(hand; colormap=:turbo)
 ```
-== HAND threshold 1e5 with DInf method
+== HAND threshold 1e5 with FD8 method
 ```@example plots
-hand = HAND(dtm; method=FD8(), threshold=1e5)
+hand = height_above_nearest_drainage(dtm; method=FD8(), threshold=1e5)
 hand[mask] .= NaN  # hide
 heatmap(hand; colormap=:turbo)
 ```
@@ -310,28 +351,28 @@ heatmap(hand; colormap=:turbo)
 
 
 ## Terrain filters
-While filters seem unrelated to the previously discussed methods, these are used to filter (rasterized) pointclouds i.e. surface models (DSM) to arrive at a terrain model (DTM). We provide [`pmf`](@ref), [`smf`](@ref), and [`skb`](@ref) filters. Here we use the `pmf` filter to remove elevations that do not pass the slope filter (normally vegetation and buildings).
+While filters seem unrelated to the previously discussed methods, these are used to filter (rasterized) pointclouds i.e. surface models (DSM) to arrive at a terrain model (DTM). We provide [`progressive_morphological_filter`](@ref), [`simple_morphological_filter`](@ref), and [`skewness_balancing`](@ref) filters. Here we use the `progressive_morphological_filter` filter to remove elevations that do not pass the slope filter (normally vegetation and buildings).
 
 
 :::tabs
 
-== PMF
+== Progressive Morphological Filter (PMF)
 ```@example plots
-B, flags = pmf(dsm, ωₘ = 15.0, slope = 0.2, dhₘ = 5.0, dh₀ = 0.3)
+B, flags = progressive_morphological_filter(dsm, ωₘ = 15.0, slope = 0.2, dhₘ = 5.0, dh₀ = 0.3)
 A = copy(dsm)
 A[A .> B] .= NaN
 heatmap(A)
 ```
-== SMF
+== Simple Morphological Filter (SMF)
 ```@example plots
-A = smf(dsm; ω=15.0, slope=0.2)
+A = simple_morphological_filter(dsm; ω=15.0, slope=0.2)
 heatmap(A)
 ```
-== SKB
+== Skewness Balancing (SKB)
 ```@example plots
-B, flags = skb(dsm)
+smask = skewness_balancing(dsm)
 A = copy(dsm)
-A[A .> B] .= NaN
+A[.!smask] .= NaN
 heatmap(A)
 ```
 :::
