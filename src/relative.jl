@@ -1,7 +1,7 @@
 """
     roughness(dem::AbstractMatrix{<:Real})
 
-Roughness is the largest inter-cell difference of a central pixel and its surrounding cell, as defined in Wilson et al (2007, Marine Geodesy 30:3-35).
+Roughness is the largest inter-cell difference of a central pixel and its surrounding cell, as defined in [Wilson et al. (2007)](@cite wilsonMultiscaleTerrainAnalysis2007).
 """
 function roughness(dem::AbstractMatrix{<:Real}, window::Stencil = Moore(1))
     mapstencil(_roughness, window, dem)
@@ -17,7 +17,7 @@ end
 """
     topographic_position_index(dem::AbstractMatrix{<:Real})
 
-Topographic Position Index (TPI), which is defined as the difference between a central pixel and the mean of its surrounding cells (see Wilson et al 2007, Marine Geodesy 30:3-35).
+Topographic Position Index (TPI), which is defined as the difference between a central pixel and the mean of its surrounding cells, as defined in [Wilson et al. (2007)](@cite wilsonMultiscaleTerrainAnalysis2007).
 """
 function topographic_position_index(dem::AbstractMatrix{<:Real}, window::Stencil = Moore(1))
     mapstencil(x -> center(x) - mean(x), window, dem)
@@ -27,7 +27,7 @@ end
 """
     bathymetric_position_index(dem::AbstractMatrix{<:Real})
 
-Bathymetric Position Index (BPI)(Lundblad et al., 2006), which is defined as the difference between a central pixel and the mean of the cells in an annulus around it.
+Bathymetric Position Index (BPI) [lundbladBenthicTerrainClassification2006](@cite), which is defined as the difference between a central pixel and the mean of the cells in an annulus around it.
 """
 bathymetric_position_index(dem::AbstractMatrix{<:Real}, window::Annulus = Annulus(3, 2)) =
     topographic_position_index(dem, window)
@@ -216,7 +216,7 @@ end
 """
     pitremoval(dem::AbstractMatrix{<:Real})
 
-Remove pits from a DEM Array if the center cell of a 3x3 patch is `limit` lower or than the surrounding cells.
+Remove pits from a DEM Array if the center cell of a 3x3 patch is `limit` lower than the surrounding cells.
 """
 function pitremoval(dem::AbstractMatrix{<:Real}; limit = 0.0)
     dst = copy(dem)
@@ -249,8 +249,7 @@ Returns a value between 0 and 1 for each cell, where:
 This metric is useful for identifying cold air pooling zones, which tend to occur
 in areas with low percentile elevation (valleys and depressions).
 
-Based on Lundquist et al. (2008) "Automated algorithm for mapping regions of
-cold-air pooling in complex terrain", Journal of Geophysical Research.
+Based on [Lundquist et al. (2008)](@cite lundquistAutomatedAlgorithmMapping2008).
 
 # Arguments
 - `dem::AbstractMatrix{<:Real}`: Digital elevation model

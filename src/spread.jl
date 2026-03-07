@@ -11,7 +11,7 @@ Base.@kwdef struct Tomlin <: SpreadMethod end
 """
     spread(::Tomlin, points::Matrix{<:Real}, initial::Matrix{<:Real}, friction::Matrix{<:Real}; res=1, limit=Inf, method=Tomlin())
 
-Total friction distance spread from `points` as by [Tomlin (1983)](@cite tomlin1983digital).
+Total friction distance spread from `points` as described by [Tomlin (1983)](@cite tomlin1983digital).
 This is also the method implemented by [PCRaster](https://pcraster.geo.uu.nl/pcraster/4.0.2/doc/manual/op_spread.html).
 
 # Output

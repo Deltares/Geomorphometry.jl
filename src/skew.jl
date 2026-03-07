@@ -1,7 +1,7 @@
 """
     mask = skewness_balancing(A; mean=mean(A))
 
-Applies skewness balancing by [Bartels e.a (2006)](@cite bartelsDTMGenerationLIDAR2006) to `A`.
+Applies skewness balancing by [Bartels et al. (2006)](@cite bartelsDTMGenerationLIDAR2006) to `A`.
 Improved the performance by applying a binary search to find the threshold value.
 
 # Output
@@ -85,7 +85,7 @@ _mean(A::AbstractArray) = mean(filter(isfinite, vec(A)))
 """
     mask = skbr(A; iterations=10)
 
-Applies recursive skewness balancing by [Bartels e.a (2010)](@cite bartelsThresholdfreeObjectGround2010) to `A`.
+Applies recursive skewness balancing by [Bartels et al. (2010)](@cite bartelsThresholdfreeObjectGround2010) to `A`.
 Applies `skewness_balancing` `iterations` times to the object (non-terrain) mask, as to include
 more (sloped) terrain.
 

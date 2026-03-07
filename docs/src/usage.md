@@ -94,7 +94,7 @@ f
 ```
 
 ## Derivatives
-Common derivatives are implemented in Geomorphometry.jl. These include [`slope`](@ref), [`aspect`](@ref), and `curvature`. The latter is ill-defined, here we provide [`plan_curvature`](@ref) (also called *projected contour curvature*), [`profile_curvature`](@ref) (also called *normal slope line curvature*), and [`tangential_curvature`](@ref) (also called *normal contour curvature*). Note that functions here allow for a custom radius (but fixed positions, see X), as demonstrated for `profile_curvature`.
+Common derivatives are implemented in Geomorphometry.jl. These include [`slope`](@ref), [`aspect`](@ref), and `curvature`. The latter is ill-defined, here we provide [`plan_curvature`](@ref) (also called *projected contour curvature*), [`profile_curvature`](@ref) (also called *normal slope line curvature*), and [`tangential_curvature`](@ref) (also called *normal contour curvature*). Note that functions here allow for a custom radius, as demonstrated for `profile_curvature`.
 
 
 ### Slope
@@ -132,7 +132,7 @@ heatmap(slope(dtm; method=ZevenbergenThorne(), direction=0); colormap=:matter, c
 ```@example plots
 heatmap(slope(dtm; method=Horn(), direction=90); colormap=:matter, colorrange=(-45, 45))
 ```
-== ZevenbergenThorne (90°))
+== ZevenbergenThorne (90°)
 ```@example plots
 heatmap(slope(dtm; method=ZevenbergenThorne(), direction=90); colormap=:matter, colorrange=(-45, 45))
 ```
@@ -313,7 +313,7 @@ heatmap(log10.(acc); colormap=:rain)
 The ldd is a Matrix of FlowDirections that visualizes the integer encodings.
 ```@example plots
 acc, ldd = flowaccumulation(dtm; method=D8())
-ldd[400:800, 300:700]  # overland flow directions
+parent(ldd[400:800, 300:700])  # overland flow directions
 ```
 == Underlying method
 

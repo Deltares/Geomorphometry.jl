@@ -73,10 +73,10 @@ function _pmf(
     κ_max = floor(Int, log2(ωₘ - 1))  # determine iterations based on exp growth
     windowsizes = Int.(exp2.(1:κ_max)) .+ 1
 
-    # Compute tresholds
+    # Compute thresholds
     dwindows = vcat(windowsizes[1], windowsizes)  # prepend first element so we get 0 as diff
     window_diffs = [dwindows[i] - dwindows[i - 1] for i in 2:length(dwindows)]
-    # height_tresholds = [min(dhₘ, slope * window_diff * cellsize + dh₀) for window_diff in window_diffs]
+    # height_thresholds = [min(dhₘ, slope * window_diff * cellsize + dh₀) for window_diff in window_diffs]
 
     # Set up arrays
     Af = copy(A)  # array to be morphed
@@ -92,7 +92,7 @@ function _pmf(
 
     mask = falses(size(A))
 
-    # Iterate over window sizes and height tresholds
+    # Iterate over window sizes and height thresholds
     for (i, ωₖ) in enumerate(windowsizes)
         s = (i > 1) && adjust ? dilate(slope, window_diffs[i]) : slope
         nωₖ = (i > 1) ? window_diffs[i] : ωₖ
@@ -207,10 +207,10 @@ function _pmf2(
     # windowsizes = Int.(exp2.(1:κ_max)) .+ 1
     windowsizes = halve_range(ωₘ)
 
-    # Compute tresholds
+    # Compute thresholds
     dwindows = vcat(windowsizes[1], windowsizes)  # prepend first element so we get 0 as diff
     window_diffs = [dwindows[i] - dwindows[i - 1] for i in 2:length(dwindows)]
-    # height_tresholds = [min(dhₘ, slope * window_diff * cellsize + dh₀) for window_diff in window_diffs]
+    # height_thresholds = [min(dhₘ, slope * window_diff * cellsize + dh₀) for window_diff in window_diffs]
 
     # Set up arrays
     Af = copy(A)  # array to be morphed
@@ -226,7 +226,7 @@ function _pmf2(
 
     mask = falses(size(A))
 
-    # Iterate over window sizes and height tresholds
+    # Iterate over window sizes and height thresholds
     for (i, ωₖ) in enumerate(windowsizes)
         s = (i > 1) && adjust ? dilate(slope, window_diffs[i]) : slope
         @debug "Window $(ωₖ), $(window_diffs[i]) slope sum: $(sum(s))"
