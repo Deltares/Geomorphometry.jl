@@ -122,39 +122,48 @@ function watersheds(dem::AbstractMatrix, queued = falses(size(dem)))
     return dem, labels
 end
 
-# 1  2  3
-# 4  5  6
-# 7  8  9
+"""
+    _orient(ci::CartesianIndex{2}, cellsize)
 
+Convert a pixel CartesianIndex offset to the table convention (dim1=East+, dim2=North+).
+Accounts for the sign of `cellsize`: a GeoTIFF typically has negative `cellsize[2]`
+(+dim2 = South), so the second component is flipped. This function is its own inverse.
+"""
+@inline function _orient(ci::CartesianIndex{2}, cellsize)
+    i, j = Tuple(ci)
+    CartesianIndex(i * Int(sign(cellsize[1])), j * Int(sign(cellsize[2])))
+end
+
+# Neighbor offsets in table convention (dim1=East+, dim2=North+), ordered by compass bearing
 nbb2 =
     CartesianIndex.([
-        (-1, 0),  # N  - 270°
-        (-1, 1),  # NE - 315°
-        (0, 1),   # E  - 0° 
-        (1, 1),   # SE - 45°
-        (1, 0),   # S  - 90°
-        (1, -1),  # SW - 135°
-        (0, -1),  # W  - 180°
-        (-1, -1), # NW - 225°
-        (-1, 0),  # N  - 270°
-        (-1, 1),  # NE - 315°
-        (0, 1),   # E  - 0° 
-        (1, 1),   # SE - 45°
+        (0, 1),    # N  - 0°
+        (1, 1),    # NE - 45°
+        (1, 0),    # E  - 90°
+        (1, -1),   # SE - 135°
+        (0, -1),   # S  - 180°
+        (-1, -1),  # SW - 225°
+        (-1, 0),   # W  - 270°
+        (-1, 1),   # NW - 315°
+        (0, 1),    # N  - 0°   (wrap)
+        (1, 1),    # NE - 45°  (wrap)
+        (1, 0),    # E  - 90°  (wrap)
+        (1, -1),   # SE - 135° (wrap)
     ])
 
-function infc(aspect)
-    # Normalize aspect to 0-360 range
-    aspect = mod(aspect + 90, 360)
+function infc(aspect, cellsize)
+    # Normalize compass bearing to 0-360 range (0° = North, clockwise)
+    aspect = mod(aspect, 360)
 
-    # Convert aspect to index (0° = North, clockwise)
-    # Each direction covers 45° sector
+    # Each direction covers a 45° sector
     sector = floor(Int, aspect / 45)
 
-    # Get the two neighboring directions
+    # Get the two neighboring directions (in table convention)
     dir1_idx = sector + 1
     dir2_idx = (sector + 1) % 8 + 1
 
-    return nbb2[dir1_idx], nbb2[dir2_idx]
+    # Convert from table to pixel convention
+    return _orient(nbb2[dir1_idx], cellsize), _orient(nbb2[dir2_idx], cellsize)
 end
 
 function infa(aspect)
@@ -172,8 +181,6 @@ function infa(aspect)
     return weight1, weight2
 end
 
-const directions = centered(UInt8[1 2 3; 4 5 6; 7 8 9])
-
 """
     flowaccumulation(dem::AbstractMatrix, closed::Matrix{Bool}, method::FlowDirectionMethod)
 
@@ -183,7 +190,7 @@ Returns the flow accumulation and the flow direction (local drainage direction o
 function flowaccumulation(
     dem::AbstractMatrix,
     closed = falses(size(dem));
-    method = D8(),
+    method = DInf(),
     cellsize = cellsize(dem),
 )
     acc = similar(dem, Float32)
@@ -195,13 +202,11 @@ function flowaccumulation!(
     dem::AbstractMatrix,
     acc::AbstractMatrix{<:Real},
     closed = falses(size(dem));
-    method = D8(),
+    method = DInf(),
     cellsize = cellsize(dem),
 )
     dir = fill(CartesianIndex{2}(0, 0), size(dem))
     order = ones(Int64, length(closed) - sum(closed))
-
-    output = similar(dem, eltype(directions))
 
     open = PriorityQueue{CartesianIndex{2}, eltype(dem)}()
 
@@ -232,9 +237,8 @@ function flowaccumulation!(
         end
     end
 
-    _accumulate!(method, acc, order, dir, R, dem, cellsize)
-    output .= getindex.(Ref(directions), dir)
-    return acc, output
+    dirs = _accumulate!(method, acc, order, dir, R, dem, cellsize)
+    return acc, dirs
 end
 
 function _accumulate!(::D8, acc, order, dir, R, dem, cellsize)
@@ -242,10 +246,15 @@ function _accumulate!(::D8, acc, order, dir, R, dem, cellsize)
         dir[i] == CartesianIndex(0, 0) && continue
         acc[R[i] + dir[i]] += acc[i]
     end
+    output = similar(dem, FlowDirection{LDD, UInt8})
+    output .= getindex.(Ref(_ldd_ci2dir), _orient.(dir, Ref(cellsize)))
+    return output
 end
 function _accumulate!(::DInf, acc, order, dir, R, dem, cellsize)
     asp = aspect(dem; method = Horn(), cellsize = abs.(cellsize))
     visited = falses(size(acc))
+    output = similar(dem, FlowDirection{D8D, UInt8})
+    fill!(output, 0)
 
     for i in reverse(order)
         dir[i] == CartesianIndex(0, 0) && continue
@@ -253,19 +262,18 @@ function _accumulate!(::DInf, acc, order, dir, R, dem, cellsize)
 
         if !isfinite(aspect)
             acc[R[i] + dir[i]] += acc[i]
+            output[i] = _d8_ci2dir[_orient(dir[i], cellsize)]
             visited[i] = true
             continue
         end
 
-        a, b = infc(aspect)
+        a, b = infc(aspect, cellsize)
         aa, bb = infa(aspect)
-
-        # a, b = lookup[dir[i] + CartesianIndex(2, 2)]
 
         # Depression
         if (a != dir[i] && b != dir[i])
             acc[R[i] + dir[i]] += acc[i]
-            # acc[R[i] + dir[i]] = 5000
+            output[i] = _d8_ci2dir[_orient(dir[i], cellsize)]
             visited[i] = true
             continue
         end
@@ -280,18 +288,23 @@ function _accumulate!(::DInf, acc, order, dir, R, dem, cellsize)
             bb = 0
         end
 
-        if R[i] + a in R
+        dirs = zero(UInt8)
+        if R[i] + a in R && aa > 0
             acc[R[i] + a] += acc[i] * aa
+            dirs |= _d8_ci2dir[_orient(a, cellsize)]
         end
-        if R[i] + b in R
+        if R[i] + b in R && bb > 0
             acc[R[i] + b] += acc[i] * bb
+            dirs |= _d8_ci2dir[_orient(b, cellsize)]
         end
+        output[i] = dirs
         if visited[R[i] + a] && visited[R[i] + b]
             error()
             acc[R[i] + dir[i]] += acc[i]
         end
         visited[i] = true
     end
+    return output
 end
 
 function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
@@ -315,6 +328,8 @@ function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
 
     visited = falses(size(acc))
     nb = vec(collect(CartesianIndices(dists)) .- CartesianIndex(2, 2))
+    output = similar(dem, FlowDirection{D8D, UInt8})
+    fill!(output, 0)
 
     weights = zeros(size(contour_lengths))
     Σw = 0.0
@@ -338,28 +353,33 @@ function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
         end
         if iszero(Σw) || iszero(weights[CartesianIndex(2, 2) + dir[i]])
             acc[R[i] + dir[i]] += acc[i]
+            output[i] = _d8_ci2dir[_orient(dir[i], cellsize)]
             visited[i] = true
             continue
         end
+        dirs = zero(UInt8)
         for (ri, weight) in enumerate(weights)
             iszero(weight) && continue
             I = R[i] + nb[ri]
             I in R || continue
             acc[I] += acc[i] * (weight / Σw)
+            dirs |= _d8_ci2dir[_orient(nb[ri], cellsize)]
         end
+        output[i] = dirs
         visited[i] = true
         fill!(weights, 0)
     end
+    return output
 end
 
 """
-    topographic_wetness_index(dem::AbstractMatrix; method=D8(), cellsize=cellsize(dem))
+    topographic_wetness_index(dem::AbstractMatrix; method=DInf(), cellsize=cellsize(dem))
 
 Computes the Topographic Wetness Index (TWI) of a digital elevation model (DEM) `dem` with an optional `method` for flow direction and a `cellsize`.
 """
 function topographic_wetness_index(
     dem::AbstractMatrix;
-    method = D8(),
+    method = DInf(),
     cellsize = cellsize(dem),
 )
     s = slope(dem; cellsize)
@@ -369,25 +389,26 @@ end
 @deprecate TWI topographic_wetness_index
 
 """
-    stream_power_index(dem::AbstractMatrix; method=D8(), cellsize=cellsize(dem))
+    stream_power_index(dem::AbstractMatrix; method=DInf(), cellsize=cellsize(dem))
 
 Computes the Stream Power Index (SPI) of a digital elevation model (DEM) `dem` with an optional `method` for flow direction and a `cellsize`.
 """
-function stream_power_index(dem::AbstractMatrix; method = D8(), cellsize = cellsize(dem))
+function stream_power_index(dem::AbstractMatrix; method = DInf(), cellsize = cellsize(dem))
     s = slope(dem; cellsize)
     acc, _ = flowaccumulation(dem; method, cellsize)
     return @. log(acc * tand(s))
 end
+@deprecate SPI stream_power_index
 
 """
-    height_above_nearest_drainage(dem::AbstractMatrix; method=D8(), cellsize=cellsize(dem), threshold=1e10)
+    height_above_nearest_drainage(dem::AbstractMatrix; method=DInf(), cellsize=cellsize(dem), threshold=1e10)
 
 Compute Height Above Nearest Drainage (HAND, [nobreHeightNearestDrainage2011](@cite)) of a digital elevation model (DEM) `dem` 
 with an optional `method` for flow direction, a `cellsize`, and an flowaccumulation `threshold` for stream definition.
 """
 function height_above_nearest_drainage(
     dem::AbstractMatrix;
-    method = D8(),
+    method = DInf(),
     cellsize = cellsize(dem),
     threshold = 100,
 )
@@ -498,7 +519,7 @@ function _hand!(output, order, dir, R, dem, stream_mask)
         end
     end
     return output
-@deprecate SPI stream_power_index
+end
 
 """
     depression_depth(dem::AbstractMatrix; filled=filldepressions(dem))
@@ -523,12 +544,16 @@ Computes the total volume of all depressions/basins in the DEM.
 
 Returns the sum of depression depths multiplied by cell area.
 """
-function depression_volume(dem::AbstractMatrix; filled = filldepressions(dem), cellsize = cellsize(dem))
-    sum(depression_depth(dem; filled)) * prod(abs.(cellsize))
+function depression_volume(
+    dem::AbstractMatrix;
+    filled = filldepressions(dem),
+    cellsize = cellsize(dem),
+)
+    sum(filter(isfinite, depression_depth(dem; filled))) * prod(abs.(cellsize))
 end
 
 """
-    drainage_potential(dem::AbstractMatrix; method=D8(), cellsize=cellsize(dem))
+    drainage_potential(dem::AbstractMatrix; method=DInf(), cellsize=cellsize(dem))
 
 Computes a drainage potential index indicating how well each cell drains.
 
@@ -541,7 +566,7 @@ will shed cold air downslope rather than pooling it.
 Based on the relationship between slope and flow accumulation:
 `drainage = sin(slope) / log(1 + accumulation)`
 """
-function drainage_potential(dem::AbstractMatrix; method = D8(), cellsize = cellsize(dem))
+function drainage_potential(dem::AbstractMatrix; method = DInf(), cellsize = cellsize(dem))
     s = slope(dem; cellsize)
     acc, _ = flowaccumulation(dem; method, cellsize)
     return @. sind(s) / log1p(acc)

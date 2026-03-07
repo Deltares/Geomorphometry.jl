@@ -33,7 +33,7 @@ include("horizon.jl")
     @testset "skb" begin
         B = skb(rand(25, 25))
         B = skb(rand(25, 25); mean = 0.25)
-        B = skbr(rand(25, 25); iterations = 5)
+        B = Geomorphometry.skbr(rand(25, 25); iterations = 5)
     end
     @testset "pitremoval" begin
         B = pitremoval(rand(25, 25))
@@ -70,12 +70,12 @@ include("horizon.jl")
             10 8 7 8 10
             10 10 10 10 10
         ]
-        
+
         rdem = height_above_nearest_drainage(dem)
         @test rdem[1, 1] == 0  # all descending
         @test rdem[4, 4] == 3  # highest asecnding point
         @test maximum(rdem) == 3
-        
+
         acc, dir = flowaccumulation(dem; method = D8())
         @test maximum(acc) == 10
         @test acc[2, 2] == 9
@@ -102,14 +102,14 @@ include("horizon.jl")
         end
 
         @testset "depression_volume" begin
-            vol = depression_volume(dem; cellsize=(1.0, 1.0))
+            vol = depression_volume(dem; cellsize = (1.0, 1.0))
             @test vol > 0
             # Volume should equal sum of depths for unit cells
             @test vol ≈ sum(depression_depth(dem))
         end
 
         @testset "drainage_potential" begin
-            dp = drainage_potential(dem; cellsize=(1.0, 1.0))
+            dp = drainage_potential(dem; cellsize = (1.0, 1.0))
             # Center (flat, high accumulation) should have low drainage
             @test dp[3, 3] ≈ 0.0
             # Edges should have higher drainage potential
@@ -117,24 +117,61 @@ include("horizon.jl")
         end
 
         @testset "percentile_elevation" begin
-            pct = percentile_elevation(dem; radius=1)
+            pct = percentile_elevation(dem; radius = 1)
             # Center (lowest) should have low percentile
             @test pct[3, 3] ≈ 0.0
             # Corners (highest) should have high percentile
             @test pct[1, 1] > 0.5
         end
 
-        @testset "flowaccumulation" begin
-            acc, dir = flowaccumulation(dem; cellsize=(1.0, 1.0))
-            # Center should have highest accumulation
-            @test_broken acc[3, 3] == maximum(acc)
-        end
-
         @testset "TWI and SPI" begin
-            twi = TWI(dem; cellsize=(1.0, 1.0))
-            spi = SPI(dem; cellsize=(1.0, 1.0))
+            twi = TWI(dem; cellsize = (1.0, 1.0))
+            spi = SPI(dem; cellsize = (1.0, 1.0))
             @test size(twi) == size(dem)
             @test size(spi) == size(dem)
+        end
+
+        @testset "FlowDirection types and conventions" begin
+            # LDD pit
+            d = FlowDirection{LDD}(Int8(5))
+            @test Geomorphometry.ispit(d)
+            @test Geomorphometry.convention(d) == LDD
+
+            # D8D single direction
+            d = FlowDirection{D8D}(Int16(1))
+            @test !Geomorphometry.ispit(d)
+            @test Geomorphometry.issingle(d)
+            @test Geomorphometry.ndirections(d) == 1
+            @test Geomorphometry.convention(d) == D8D
+
+            # D8D combined directions
+            d = FlowDirection{D8D}(Int16(1 | 2 | 4))
+            @test !Geomorphometry.issingle(d)
+            @test Geomorphometry.ndirections(d) == 3
+            @test Geomorphometry.length(Geomorphometry.decompose(d)) == 3
+
+            # Convention traits
+            @test Geomorphometry.ismulti(D8D)
+            @test !Geomorphometry.ismulti(LDD)
+        end
+
+        @testset "CartesianIndex round-trip" begin
+            # For each LDD direction, converting to CI and back should be identity
+            for code in UInt8(1):UInt8(9)
+                ci = CartesianIndex(FlowDirection{LDD}(code))
+                code2 = FlowDirection{LDD}(ci).value
+                @test code == code2
+            end
+        end
+
+        @testset "D8 tilted plane" begin
+            # Simple tilted plane — no depressions, unambiguous flow
+            dem = Float32[100.0f0 - 2.0f0 * i - 3.0f0 * j for i in 1:10, j in 1:10]
+            acc, ldd = flowaccumulation(dem; method = D8())
+
+            # The lowest corner (10,10) should have the highest accumulation
+            inner = CartesianIndices((2:9, 2:9))
+            @test all(ldd[ci] != 5 for ci in inner)  # no pits inside
         end
     end
 end

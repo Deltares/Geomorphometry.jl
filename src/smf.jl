@@ -1,6 +1,6 @@
 """
 ```
-B = smf(A; ω, slope, dhₘ, dh₀, cellsize)
+B = simple_morphological_filter(A; ω, slope, dhₘ, dh₀, cellsize)
 ```
 Applies the simple morphological filter by [Pingel et al. (2013)](@cite pingelImprovedSimpleMorphological2013a) to `A`.
 
@@ -13,7 +13,7 @@ Applies the simple morphological filter by [Pingel et al. (2013)](@cite pingelIm
 - `slope::Float64=0.01` Terrain slope [m/m]
 - `cellsize::Float64=1.` Cellsize in [m]
 """
-function smf(
+function simple_morphological_filter(
     A::AbstractMatrix{<:Real};
     ω::Real = 17.0,
     slope::Real = 0.01,
@@ -41,3 +41,4 @@ function smf(
     out[is_low .| is_obj] .= missing
     return out
 end
+@deprecate smf simple_morphological_filter

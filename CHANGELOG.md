@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.3] - 2026-03-06
+
+## Added
+- Added methods `depression_depth`, `depression_volume`, `drainage_potential` and `percentile_elevation`.
+- Added `FlowDirection` and `FlowDirectionMap` helpers that wrap integer encodings for flow direction.
+
+## Fixed
+- Double flow accumulation on edges (with no flow direction)
+
+## Changed
+- The second returned argument `ldd` of `flowaccumulation` now returns a `FlowDirectionMap{LDD, UInt8}` instead of a `Matrix{UInt8}`.
+- The second returned argument `ldd` of `flowaccumulation` now return multiple flow direction encodings when `DInf()` and `FD8` are used for the `method` kwarg.
+- Changed default `method` for all flow related methods from `D8()` to `DInf()`.
+
+## Deprecated
+- *All* shorthand names (e.g. `TPI`, `HAND`) are now deprecated in favour of their written out names (e.g. `topographic_position_index`).
+
+## [0.7.2] - 2026-03-03
+
+## Added
+- Added `horizon_angle` and `sky_view_factor` methods.
+
+## [0.7.1] - 2025-09-03
+
+## Fixed
+- Fixed incorrect flows of DInf and FD8 methods
+
+
 ## [0.7.0] - 2025-03-21
 
 ### Added
