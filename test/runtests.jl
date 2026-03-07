@@ -73,7 +73,7 @@ include("horizon.jl")
 
         rdem = height_above_nearest_drainage(dem)
         @test rdem[1, 1] == 0  # all descending
-        @test rdem[4, 4] == 3  # highest asecnding point
+        @test rdem[4, 4] == 3  # highest ascending point
         @test maximum(rdem) == 3
 
         acc, dir = flowaccumulation(dem; method = D8())

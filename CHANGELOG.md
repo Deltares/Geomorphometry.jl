@@ -2,18 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.7.3] - 2026-03-06
+## [0.7.3] - 2026-03-07
 
 ## Added
 - Added methods `depression_depth`, `depression_volume`, `drainage_potential` and `percentile_elevation`.
-- Added `FlowDirection` and `FlowDirectionMap` helpers that wrap integer encodings for flow direction.
+- Added `FlowDirection` that wraps integer encodings for flow direction. 
 
 ## Fixed
-- Double flow accumulation on edges (with no flow direction)
+- No more double flow accumulation on edges (cells without flow direction)
 
 ## Changed
-- The second returned argument `ldd` of `flowaccumulation` now returns a `FlowDirectionMap{LDD, UInt8}` instead of a `Matrix{UInt8}`.
-- The second returned argument `ldd` of `flowaccumulation` now return multiple flow direction encodings when `DInf()` and `FD8` are used for the `method` kwarg.
+- The second returned argument `ldd` of `flowaccumulation` now returns a `Matrix{Direction{C, UInt8}}` instead of a `Matrix{UInt8}`.
+- The second returned argument `ldd` of `flowaccumulation` now return multiple flow direction encodings (LDD) when `DInf()` and `FD8` are used for the `method` kwarg. These range from 0 to 128, not just 1-9.
 - Changed default `method` for all flow related methods from `D8()` to `DInf()`.
 
 ## Deprecated

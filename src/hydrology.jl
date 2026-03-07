@@ -36,7 +36,7 @@ struct D8 <: FlowDirectionMethod end
 """DInf Flow Direction method by [Tarboton (1997)](@cite tarbotonNewMethodDetermination1997)."""
 struct DInf <: FlowDirectionMethod end
 
-"""FD8 Flow Direction method by [Quin (1991)](@cite quinnPredictionHillslopeFlow1991)."""
+"""FD8 Flow Direction method by [Quinn (1991)](@cite quinnPredictionHillslopeFlow1991)."""
 Base.@kwdef struct FD8 <: FlowDirectionMethod
     p::Float32 = 1.1
 end
@@ -404,7 +404,7 @@ end
     height_above_nearest_drainage(dem::AbstractMatrix; method=DInf(), cellsize=cellsize(dem), threshold=1e10)
 
 Compute Height Above Nearest Drainage (HAND, [nobreHeightNearestDrainage2011](@cite)) of a digital elevation model (DEM) `dem` 
-with an optional `method` for flow direction, a `cellsize`, and an flowaccumulation `threshold` for stream definition.
+with an optional `method` for flow direction, a `cellsize`, and a flow accumulation `threshold` for stream definition.
 """
 function height_above_nearest_drainage(
     dem::AbstractMatrix;
@@ -527,7 +527,7 @@ end
 Computes the depth of each cell below the filled surface.
 
 Returns the difference between the depression-filled DEM and the original DEM,
-representing how deep each cell sits within a depression/depression. Cells not in
+representing how deep each cell sits within a depression. Cells not in
 depressions will have a depth of zero.
 
 This is useful for identifying potential cold air pooling zones and water

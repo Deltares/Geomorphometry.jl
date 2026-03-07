@@ -2,7 +2,7 @@
 """
     image = pssm(dem; exaggeration=2.3, resolution=1.0)
 
-Perceptually Shaded Slope Map by [Pingel, Clarke., (2014)](@cite pingelPerceptuallyShadedSlope2014a).
+Perceptually Shaded Slope Map by [Pingel and Clarke (2014)](@cite pingelPerceptuallyShadedSlope2014a).
 
 # Output
 - `image::Gray{T,2}` Grayscale image

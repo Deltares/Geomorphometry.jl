@@ -16,4 +16,5 @@ _extensions
 scripts
 .documenter
 docs/src/CHANGELOG.md
+docs/src/CONTRIBUTING.md
 *.png

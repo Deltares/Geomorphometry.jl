@@ -84,7 +84,7 @@ function mapwindow_sep!(f, img, window, out, fill = Inf)
     A = PaddedView(fill, img, ((-Δ + 1):(w + Δ), (-Δ + 1):(h + Δ)))
     out2 = copy(out)
 
-    # Maximum/minimum is seperable into 1d
+    # Maximum/minimum is separable into 1d
     @inbounds for i in 1:h, j in 1:w
         out2[j, i] = f(@view A[(j - Δ):(j + Δ), i])
     end

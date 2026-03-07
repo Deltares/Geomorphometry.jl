@@ -20,5 +20,12 @@ From the Julia REPL, type `]` to enter the Pkg REPL mode and run:
 pkg> add Geomorphometry
 ```
 
+## Contributing
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to:
+
+- Report bugs and issues
+- Request new features
+- Submit pull requests
+
 ## Alternative Packages
 If you are working in Python the [xDEM](https://xdem.readthedocs.io/en/stable/) package provides a comprehensive suite of tools for DEM analysis

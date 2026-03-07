@@ -13,6 +13,7 @@ bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"); style = :autho
 
 # TODO, Use skip_files=["src/CHANGELOG.md"] when LiveServer is used!
 cp(joinpath(dir, "../CHANGELOG.md"), joinpath(dir, "src/CHANGELOG.md"); force = true)
+cp(joinpath(dir, "../CONTRIBUTING.md"), joinpath(dir, "src/CONTRIBUTING.md"); force = true)
 CairoMakie.activate!(; type = "png")
 
 fn = joinpath(dir, "src", "saba.tif")
@@ -58,12 +59,17 @@ makedocs(;
             "Usage" => "usage.md",
             "Experimental" => "experimental.md",
         ],
-        "Background" => Any["Concepts" => "concepts.md", "Future plans" => "todo.md"],
+        "Background" => Any[
+            "Concepts" => "concepts.md",
+            "Research" => "research.md",
+            "Future plans" => "todo.md",
+        ],
         "Reference" => Any[
             "Validation" => "validation.md",
             "API" => "reference.md",
             "Changelog" => "CHANGELOG.md",
             "Bibliography" => "bibliography.md",
+            "Contributing" => "CONTRIBUTING.md",
         ],
     ],
     # clean = false,
