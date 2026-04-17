@@ -12,7 +12,7 @@ hero:
   actions:
     - theme: brand
       text: Get Started
-      link: /tutorials/installation.md
+      link: /installation
     - theme: alt
       text: View on Github
       link: https://github.com/Deltares/Geomorphometry.jl
