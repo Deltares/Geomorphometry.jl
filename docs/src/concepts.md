@@ -98,6 +98,7 @@ heatmap(log10.(acc); colormap=:rain)
 Inspired by the excellent [MultiScaleDTM](https://github.com/ailich/MultiscaleDTM) package in R by [ilichMultiscaleDTMOpensourcePackage2023](@citet), we have added multiscale options to some filters.
 
 Relative terrain filters have a `window` keyword argument for a Stencil from [Stencils.jl](https://github.com/rafaqz/Stencils.jl) package.
+The use of this package also enables the operations to run on the GPU, although performance benefits might only show at larger arrays and/or windows.
 
 :::tabs
 
@@ -123,6 +124,21 @@ Geomorphometry.Moore(5)
 ```
 ```@example plots
 heatmap(TPI(dtm, Geomorphometry.Moore(5)); colorrange=(0,25), colormap=:speed)
+```
+
+== GPU example
+```julia
+using Metal  # or CUDA
+A = MtlMatrix(rand(Float32,1_000,1_000))  # or CuArray
+out = TPI(A)  # just works
+```
+
+```julia
+julia> Metal.@time TPI(A, Geomorphometry.Moore(10));
+  0.022437 seconds (600 CPU allocations: 20.094 KiB) (5 GPU allocations: 3.815 MiB, 0.39% memmgmt time)
+julia> B = Array(A). # cpu copy
+julia> @time TPI(B, Geomorphometry.Moore(10));
+  0.118110 seconds (556 allocations: 3.864 MiB, 0.00% compilation time: 100% of which was recompilation)
 ```
 
 :::
