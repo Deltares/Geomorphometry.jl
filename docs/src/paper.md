@@ -23,7 +23,7 @@ affiliations:
  - name: University of Melbourne, Melbourne, Australia
    index: 2
    ror: 01ej9dk98
-date: 7 March 2026
+date: 5 May 2026
 bibliography: refs.bib
 
 ---
@@ -41,9 +41,9 @@ Of the three widely used dynamic languages---Julia, Python, and R---Julia was th
 
 The package implements over 30 functions spanning several domains (non-exhaustive):
 
-- **Terrain derivatives**: slope, aspect, and curvatures via [@hornHillShadingReflectance1981], [@zevenbergen1987quantitative], and [@minarComprehensiveSystemDefinitions2020].
+- **Terrain derivatives**: slope, aspect, and curvatures via @hornHillShadingReflectance1981, @zevenbergen1987quantitative, and @minarComprehensiveSystemDefinitions2020.
 - **Relative terrain indices**: roughness, Topographic Position Index [@wilsonMultiscaleTerrainAnalysis2007], Bathymetric Position Index [@lundbladBenthicTerrainClassification2006], rugosity, entropy, percentile elevation [@lundquistAutomatedAlgorithmMapping2008], horizon angles, and Sky View Factor; at multiple scales.
-- **Terrain classification**: Morphological Filters [@keqizhangProgressiveMorphologicalFilter2003, @pingelImprovedSimpleMorphological2013a], and skewness balancing [@bartelsDTMGenerationLIDAR2006; @bartelsThresholdfreeObjectGround2010].
+- **Terrain classification**: Several Morphological Filters [@keqizhangProgressiveMorphologicalFilter2003; @pingelImprovedSimpleMorphological2013a], and skewness balancing [@bartelsDTMGenerationLIDAR2006; @bartelsThresholdfreeObjectGround2010].
 - **Hydrological analysis**: depression filling [@barnesPriorityFloodOptimalDepressionFilling2014], flow accumulation (using D8 [@jensonExtractingTopographicStructure1988], D-infinity [@tarbotonNewMethodDetermination1997] or FD8 [@quinnPredictionHillslopeFlow1991] methods), and relative height models [@nobreHeightNearestDrainage2011].
 - **Visualisation**: hillshading [@burroughPrinciplesGeographicalInformation2015], multi-directional hillshading [@mark1992multidirectional], and Perceptually Shaded Slope Maps [@pingelPerceptuallyShadedSlope2014a].
 - **Cost-distance analysis**: friction-based spreading via Tomlin [@tomlin1983digital], Eastman [@eastman1989pushbroom], and fast sweeping [@zhaoFastSweepingMethod2005].
@@ -87,6 +87,6 @@ No AI tools were used for critical components, such as the overall design, archi
 
 # Acknowledgements
 
-We thank the authors of the packages in Julia(Geo) ecosystem, particularly `GeoInterface`, `Stencils.jl`, and `DataStructures.jl`, on which Geomorphometry.jl is built.
+We thank the authors of the packages in [Julia(Geo)](https://juliageo.org/) ecosystem, particularly [`GeoInterface.jl`](https://github.com/JuliaGeo/GeoInterface.jl/), [`Stencils.jl`](https://github.com/rafaqz/Stencils.jl), and [`DataStructures.jl`](https://github.com/JuliaCollections/DataStructures.jl), on which Geomorphometry.jl is built.
 
 # References
