@@ -61,7 +61,13 @@ end
 In Geomorphometry.jl we provide a set of tools to analyze and visualize the shape of the Earth. The package is designed to be fast, flexible, and easy to use.
 Moreover, we have implemented several algorithms for a common operation so that you can choose the one that best fits your needs.
 
-In these pages we will use the elevation model of [Saba](https://en.wikipedia.org/wiki/Saba_(island)) to showcase the different categories of operations that are available in Geomorphometry.jl.
+In these pages we will use the elevation model of [Saba](https://en.wikipedia.org/wiki/Saba_(island)) to showcase the different categories of operations that are available in Geomorphometry.jl. However, any DEM should work, most algorithms accept an `AbstractMatrix{<:Real}`. Note that you thus need to remove missing values from your DEM, which is ideally done by interpolation, but a quick `coalesce.(dem, NaN)` will work too (but will cause NaN gaps in your output).
+
+::: details
+
+You can download the data yourself from https://www.beeldmateriaal.nl/dataroom-caribisch-nederland, specifically the [DTM](https://basisdata.nl/hwh-ortho/Caribisch_NL/LiDAR/caribisch/Saba/02a_DTM_50cm/M_SABA2023.TIF) and [DSM](https://basisdata.nl/hwh-ortho/Caribisch_NL/LiDAR/caribisch/Saba/03a_DSM_50cm/R_SABA2023.TIF). I've resampled them to a coarser resolution (from 0.5 m to 5 m), interpolated some nodata areas, and attached them to a Github release https://github.com/Deltares/Geomorphometry.jl/releases/tag/v0.6.0.
+
+:::
 
 ## Visualization
 Visualization is done using the [`hillshade`](@ref), [`multihillshade`](@ref), and [`pssm`](@ref) functions. The first two shade the terrain by using a single or multiple light source(s) respectively, while `pssm` is a slope map exaggerated for human perception.
@@ -237,7 +243,7 @@ heatmap(percentile_elevation(dtm; radius=5); colormap=:delta, colorrange=(0,1))
 :::
 
 ## Horizon
-Related to the relative position is the category related to the view (to a horizon) from any cell in a DEM. We have `horizon_angle` to compute the maximum horizon angle for a given number of directions, and `sky_view_factor` to compute fraction of the sky (hemisphere) visible from a cell.
+Related to the relative position is the category related to the view (to a horizon) from any cell in a DEM. We have [`horizon_angle`](@ref) to compute the maximum horizon angle for a given number of directions, and [`sky_view_factor`](@ref) to compute fraction of the sky (hemisphere) visible from a cell.
 
 :::tabs
 
@@ -261,7 +267,7 @@ heatmap(skf; colormap=Reverse(:deep))
 
 
 ## Hydrology
-Hydrological operations are used to analyze the flow of water on the terrain. We provide [`filldepressions`](@ref) to fill depressions, `depression_depth` to calculate the depth of each depression (difference between filled dem and dem) and `depression_volume` that sums all depression depths. The major depression in the example is the caldera of the dormant volcano ([Mount Scenery](https://en.wikipedia.org/wiki/Mount_Scenery)).
+Hydrological operations are used to analyze the flow of water on the terrain. We provide [`filldepressions`](@ref) to fill depressions, [`depression_depth`](@ref) to calculate the depth of each depression (difference between filled dem and dem) and [`depression_volume`](@ref) that sums all depression depths. The major depression in the example is the caldera of the dormant volcano ([Mount Scenery](https://en.wikipedia.org/wiki/Mount_Scenery)).
 
 
 :::tabs
@@ -286,7 +292,7 @@ depression_volume(dtm; filled=fdtm)
 
 :::
 
-Filling the depressions in a DEM is not necessary to calculate the flow accumulation. Here we use `flowaccumulation` to do so, and it automatically carves out depressions. Note that the local drainage direction is also returned. By default the FD8 algorithm is used, but you can also use the D∞ or D8 algorithm by setting the `method` keyword argument to `DInf()` or `D8()`.
+Filling the depressions in a DEM is not necessary to calculate the flow accumulation. Here we use [`flowaccumulation`](@ref) to do so, and it automatically carves out depressions. Note that the local drainage direction is also returned. By default the FD8 algorithm is used, but you can also use the D∞ or D8 algorithm by setting the `method` keyword argument to `DInf()` or `D8()`.
 
 :::tabs
 
