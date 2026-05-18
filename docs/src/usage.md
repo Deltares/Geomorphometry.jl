@@ -12,9 +12,9 @@ CairoMakie.activate!(type = "png")
 A = GeoArrays.read("saba.tif") # hide
 B = GeoArrays.read("saba_dsm.tif") # hide
 mask = ismissing.(A) # hide
-# dem = coalesce(A, NaN).A # hide
-dtm = coalesce(A, NaN) # hide
-dsm = coalesce(B, NaN) # hide
+# dem = coalesce(A, NaN32).A # hide
+dtm = coalesce(A, NaN32) # hide
+dsm = coalesce(B, NaN32) # hide
 # ndem = GeoArrays.flipud!(deepcopy(dtm))
 
 fdtm = deepcopy(dtm)
@@ -61,7 +61,7 @@ end
 In Geomorphometry.jl we provide a set of tools to analyze and visualize the shape of the Earth. The package is designed to be fast, flexible, and easy to use.
 Moreover, we have implemented several algorithms for a common operation so that you can choose the one that best fits your needs.
 
-In these pages we will use the elevation model of [Saba](https://en.wikipedia.org/wiki/Saba_(island)) to showcase the different categories of operations that are available in Geomorphometry.jl. However, any DEM should work, most algorithms accept an `AbstractMatrix{<:Real}`. Note that you thus need to remove missing values from your DEM, which is ideally done by interpolation, but a quick `coalesce.(dem, NaN)` will work too (but will cause NaN gaps in your output). Below are the steps to reproduce the example plots.
+In these pages we will use the elevation model of [Saba](https://en.wikipedia.org/wiki/Saba_(island)) to showcase the different categories of operations that are available in Geomorphometry.jl. However, any DEM should work, most algorithms accept an `AbstractMatrix{<:Real}`. Note that you thus need to remove missing values from your DEM, which is ideally done by interpolation, but a quick `coalesce.(dem, NaN32)` will work too (but will cause NaN gaps in your output). Below are the steps to reproduce the example plots.
 
 ::: tabs
 
@@ -89,8 +89,8 @@ import ArchGDAL
 dtm = Raster(dtm_fn)
 dsm = Raster(dsm_fn)
 mask = ismissing.(dtm)  # used for hiding nodata areas in plots
-dtm = replace_missing(dtm, NaN)
-dsm = replace_missing(dsm, NaN)
+dtm = replace_missing(dtm, NaN32)
+dsm = replace_missing(dsm, NaN32)
 ```
 
 == Reading (using GeoArrays.jl)
@@ -100,8 +100,8 @@ using GeoArrays
 dtm = GeoArrays.read(dtm_fn)
 dsm = GeoArrays.read(dsm_fn)
 mask = ismissing.(dtm)  # used for hiding nodata areas in plots
-dtm = coalesce(dtm, NaN)
-dsm = coalesce(dsm, NaN)
+dtm = coalesce(dtm, NaN32)
+dsm = coalesce(dsm, NaN32)
 ```
 
 == Plotting
@@ -331,7 +331,7 @@ heatmap(fdtm)
 == Depression depth
 ```@example plots
 depth = depression_depth(dtm; filled=fdtm)
-depth[mask] .= NaN  # ignore nodata areas for plotting
+depth[mask] .= NaN32  # ignore nodata areas for plotting
 heatmap(depth; colormap=:tempo)
 ```
 == Depression volume
@@ -343,24 +343,32 @@ depression_volume(dtm; filled=fdtm)
 
 Filling the depressions in a DEM is not necessary to calculate the flow accumulation. Here we use [`flowaccumulation`](@ref) to do so, and it automatically carves out depressions. Note that the local drainage direction is also returned. By default the FD8 algorithm is used, but you can also use the D∞ or D8 algorithm by setting the `method` keyword argument to `DInf()` or `D8()`.
 
+::: warning
+
+Most hydrology related methods iterate through all DEM cells, thus producing output for all DEM cells, including cells containing nodata values (e.g. `NaN32`, `Inf`).
+Here we manually hide these nodata areas for plotting.
+
+:::
+
+
 :::tabs
 
 == Flow accumulation with FD8
 ```@example plots
 acc, ldd = flowaccumulation(dtm; method=FD8(2))
-acc[mask] .= NaN  # hide
+acc[mask] .= NaN32  # ignore nodata areas for plotting
 heatmap(log10.(acc); colormap=:rain)
 ```
 == Flow accumulation with D∞
 ```@example plots
 acc, ldd = flowaccumulation(dtm; method=DInf())
-acc[mask] .= NaN  # hide
+acc[mask] .= NaN32  # ignore nodata areas for plotting
 heatmap(log10.(acc); colormap=:rain)
 ```
 == Flow accumulation with D8
 ```@example plots
 acc, ldd = flowaccumulation(dtm; method=D8())
-acc[mask] .= NaN  # hide
+acc[mask] .= NaN32  # ignore nodata areas for plotting
 heatmap(log10.(acc); colormap=:rain)
 ```
 == Drainage direction
@@ -410,19 +418,19 @@ We can also calculate the Height Above Nearest Drainage (HAND) using the [`heigh
 == HAND threshold 1e3
 ```@example plots
 hand = height_above_nearest_drainage(dtm; threshold=1e3)
-hand[mask] .= NaN  # ignore nodata areas for plotting
+hand[mask] .= NaN32  # ignore nodata areas for plotting
 heatmap(hand; colormap=:turbo)
 ```
 == HAND threshold 1e5
 ```@example plots
 hand = height_above_nearest_drainage(dtm; threshold=1e5)
-hand[mask] .= NaN  # ignore nodata areas for plotting
+hand[mask] .= NaN32  # ignore nodata areas for plotting
 heatmap(hand; colormap=:turbo)
 ```
 == HAND threshold 1e5 with FD8 method
 ```@example plots
 hand = height_above_nearest_drainage(dtm; method=FD8(), threshold=1e5)
-hand[mask] .= NaN  # ignore nodata areas for plotting
+hand[mask] .= NaN32  # ignore nodata areas for plotting
 heatmap(hand; colormap=:turbo)
 ```
 
@@ -439,7 +447,7 @@ While filters seem unrelated to the previously discussed methods, these are used
 ```@example plots
 B, flags = progressive_morphological_filter(dsm, ωₘ = 15.0, slope = 0.2, dhₘ = 5.0, dh₀ = 0.3)
 A = copy(dsm)
-A[A .> B] .= NaN
+A[A .> B] .= NaN32
 heatmap(A)
 ```
 == Simple Morphological Filter (SMF)
@@ -451,7 +459,7 @@ heatmap(A)
 ```@example plots
 smask = skewness_balancing(dsm)
 A = copy(dsm)
-A[.!smask] .= NaN
+A[.!smask] .= NaN32
 heatmap(A)
 ```
 :::
@@ -467,21 +475,21 @@ Here we use the top of the volcano as the starting point, and the squared slope 
 == Tomlin
 ```@example plots
 tspread = spread(dtm .> 850, 0, slope(dtm).^2)
-tspread[mask] .= NaN  # ignore nodata areas for plotting
+tspread[mask] .= NaN32  # ignore nodata areas for plotting
 heatmap(tspread, colormap=:dense)
 ```
 
 == Eikonal
 ```@example plots
 fspread = spread(dtm .> 850, 0, slope(dtm).^2, method=FastSweeping())
-fspread[mask] .= NaN  # ignore nodata areas for plotting
+fspread[mask] .= NaN32  # ignore nodata areas for plotting
 heatmap(fspread, colormap=:dense)
 ```
 
 == Eastman
 ```@example plots
 espread = spread(dtm .> 850, 0, slope(dtm).^2, method=Eastman(iterations=25))
-espread[mask] .= NaN  # ignore nodata areas for plotting
+espread[mask] .= NaN32  # ignore nodata areas for plotting
 heatmap(espread, colormap=:dense)
 ```
 
