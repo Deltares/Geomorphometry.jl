@@ -61,7 +61,56 @@ end
 In Geomorphometry.jl we provide a set of tools to analyze and visualize the shape of the Earth. The package is designed to be fast, flexible, and easy to use.
 Moreover, we have implemented several algorithms for a common operation so that you can choose the one that best fits your needs.
 
-In these pages we will use the elevation model of [Saba](https://en.wikipedia.org/wiki/Saba_(island)) to showcase the different categories of operations that are available in Geomorphometry.jl. However, any DEM should work, most algorithms accept an `AbstractMatrix{<:Real}`. Note that you thus need to remove missing values from your DEM, which is ideally done by interpolation, but a quick `coalesce.(dem, NaN)` will work too (but will cause NaN gaps in your output).
+In these pages we will use the elevation model of [Saba](https://en.wikipedia.org/wiki/Saba_(island)) to showcase the different categories of operations that are available in Geomorphometry.jl. However, any DEM should work, most algorithms accept an `AbstractMatrix{<:Real}`. Note that you thus need to remove missing values from your DEM, which is ideally done by interpolation, but a quick `coalesce.(dem, NaN)` will work too (but will cause NaN gaps in your output). Below are the steps to reproduce the example plots.
+
+::: tabs
+
+== Downloading
+```julia
+using Downloads
+
+dtm_fn = abspath("saba.tif")
+isfile(dtm_fn) || Downloads.download(
+    "https://github.com/Deltares/Geomorphometry.jl/releases/download/v0.6.0/saba.tif",
+    dtm_fn,
+)
+dsm_fn = abspath("saba_dsm.tif")
+isfile(dsm_fn) || Downloads.download(
+    "https://github.com/Deltares/Geomorphometry.jl/releases/download/v0.6.0/saba_dsm.tif",
+    dsm_fn,
+)
+```
+
+== Reading (using Rasters.jl)
+```julia
+using Rasters
+import ArchGDAL
+
+dtm = Raster(dtm_fn)
+dsm = Raster(dsm_fn)
+mask = ismissing.(dtm)  # used for hiding nodata areas in plots
+dtm = replace_missing(dtm, NaN)
+dsm = replace_missing(dsm, NaN)
+```
+
+== Reading (using GeoArrays.jl)
+```julia
+using GeoArrays
+
+dtm = GeoArrays.read(dtm_fn)
+dsm = GeoArrays.read(dsm_fn)
+mask = ismissing.(dtm)  # used for hiding nodata areas in plots
+dtm = coalesce(dtm, NaN)
+dsm = coalesce(dsm, NaN)
+```
+
+== Plotting
+```julia
+using CairoMakie  # or GLMakie, Plots
+
+heatmap(dtm)
+```
+:::
 
 ::: details
 
@@ -249,8 +298,8 @@ Related to the relative position is the category related to the view (to a horiz
 
 == Horizon Angle (to the west)
 ```@example plots
-hor = horizon_angle(dtm)
-heatmap(hor[:,:,1]; colormap=:curl, colorrange=(-90, 90))
+hor = horizon_angle(dtm)  # this produces a width,height,directions sized raster
+heatmap(hor[:,:,1]; colormap=:curl, colorrange=(-90, 90))  # first direction (east) out of 16
 ```
 == Sky View Factor (SVF) in 16 directions
 ```@example plots
@@ -274,15 +323,15 @@ Hydrological operations are used to analyze the flow of water on the terrain. We
 
 == Fill depressions
 ```@example plots
-dtm[mask] .= -Inf  # hide
-fdtm = filldepressions(dtm)
-dtm[mask] .= NaN  # hide
+cdtm = copy(dtm)
+cdtm[mask] .= -Inf  # Sea should be lower than terrain
+fdtm = filldepressions(cdtm)
 heatmap(fdtm)
 ```
 == Depression depth
 ```@example plots
 depth = depression_depth(dtm; filled=fdtm)
-depth[mask] .= NaN  # hide
+depth[mask] .= NaN  # ignore nodata areas for plotting
 heatmap(depth; colormap=:tempo)
 ```
 == Depression volume
@@ -361,19 +410,19 @@ We can also calculate the Height Above Nearest Drainage (HAND) using the [`heigh
 == HAND threshold 1e3
 ```@example plots
 hand = height_above_nearest_drainage(dtm; threshold=1e3)
-hand[mask] .= NaN  # hide
+hand[mask] .= NaN  # ignore nodata areas for plotting
 heatmap(hand; colormap=:turbo)
 ```
 == HAND threshold 1e5
 ```@example plots
 hand = height_above_nearest_drainage(dtm; threshold=1e5)
-hand[mask] .= NaN  # hide
+hand[mask] .= NaN  # ignore nodata areas for plotting
 heatmap(hand; colormap=:turbo)
 ```
 == HAND threshold 1e5 with FD8 method
 ```@example plots
 hand = height_above_nearest_drainage(dtm; method=FD8(), threshold=1e5)
-hand[mask] .= NaN  # hide
+hand[mask] .= NaN  # ignore nodata areas for plotting
 heatmap(hand; colormap=:turbo)
 ```
 
@@ -417,14 +466,23 @@ Here we use the top of the volcano as the starting point, and the squared slope 
 
 == Tomlin
 ```@example plots
-heatmap(spread(dtm .> 850, 0, slope(dtm).^2), colormap=:dense)
+tspread = spread(dtm .> 850, 0, slope(dtm).^2)
+tspread[mask] .= NaN  # ignore nodata areas for plotting
+heatmap(tspread, colormap=:dense)
 ```
+
 == Eikonal
 ```@example plots
-heatmap(spread(dtm .> 850, 0, slope(dtm).^2, method=FastSweeping()), colormap=:dense)
+fspread = spread(dtm .> 850, 0, slope(dtm).^2, method=FastSweeping())
+fspread[mask] .= NaN  # ignore nodata areas for plotting
+heatmap(fspread, colormap=:dense)
 ```
+
 == Eastman
 ```@example plots
-heatmap(spread(dtm .> 850, 0, slope(dtm).^2, method=Eastman(iterations=25)), colormap=:dense)
+espread = spread(dtm .> 850, 0, slope(dtm).^2, method=Eastman(iterations=25))
+espread[mask] .= NaN  # ignore nodata areas for plotting
+heatmap(espread, colormap=:dense)
 ```
+
 :::
