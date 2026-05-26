@@ -68,9 +68,9 @@ Julia's design---expressive like Python, yet compiled to efficient native code--
 Geospatial awareness is added through package extensions for `GeoArrays.jl` and `Rasters.jl` rather than hard dependencies, keeping the core lightweight.
 The package is designed to be customizable and extendable, as shown in its core concepts:
 
-- **Multiple algorithms.** Where several methods exist for the same task (e.g., slope, flow direction, cost-distance), users can select the most appropriate one. Algorithm selection uses Julia's multiple dispatch, making it straightforward to add new methods without modifying existing code---useful for both research and teaching.
-- **Geospatial aware.** Package extensions automatically extract cell sizes and handle coordinate reference systems---including geographic (lat/lon) DEMs---preventing common user errors.
-- **Multiscale analysis.** Relative terrain indices accept configurable stencil windows from `Stencils.jl`, enabling analysis at multiple spatial scales, on both CPU and GPU, extending the approach of @ilichMultiscaleDTMOpensourcePackage2023.
+- **Multiple algorithms:** Where several methods exist for the same task (e.g., slope, flow direction, cost-distance), users can select the most appropriate one. Algorithm selection uses Julia's multiple dispatch, making it straightforward to add new methods without modifying existing code---useful for both research and teaching.
+- **Geospatially aware:** Package extensions automatically extract cell sizes and handle coordinate reference systems---including geographic (lat/lon) DEMs---preventing common user errors.
+- **Multiscale analysis:** Relative terrain indices accept configurable stencil windows from `Stencils.jl`, enabling analysis at multiple spatial scales, on both CPU and GPU, extending the approach of @ilichMultiscaleDTMOpensourcePackage2023.
 
 Terrain derivative implementations are validated against GDAL's `gdaldem`, and flow direction against `pyflwdir`, ensuring consistency with established tools.
 
