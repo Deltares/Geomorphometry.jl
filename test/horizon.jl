@@ -40,6 +40,9 @@ using Test
     @testset "invalid directions" begin
         flat = ones(5, 5)
         @test_throws ArgumentError horizon_angle(flat; directions=6)
+        # Multiples of 8 that aren't powers of 2 (e.g. 24, 40) must also reject.
+        @test_throws ArgumentError horizon_angle(flat; directions=24)
+        @test_throws ArgumentError horizon_angle(flat; directions=40)
     end
 
     @testset "sloping terrain" begin

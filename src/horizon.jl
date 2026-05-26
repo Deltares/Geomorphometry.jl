@@ -21,14 +21,14 @@ function horizon_angle(dem::AbstractMatrix{<:Real};
     directions::Int = 16,
     cellsize = cellsize(dem),
 )
+    ispow2(directions) && directions >= 4 ||
+        throw(ArgumentError("directions must be 4, 8, 16, 32, ..., got $directions"))
     if directions == 4
         _horizon_angle_cardinal(dem, cellsize)
     elseif directions == 8
         _horizon_angle_8(dem, cellsize)
-    elseif directions % 8 == 0 && directions > 8
-        _horizon_angle_rotated(dem, directions, cellsize)
     else
-        throw(ArgumentError("directions must be 4, 8, 16, 32, ..., got $directions"))
+        _horizon_angle_rotated(dem, directions, cellsize)
     end
 end
 
