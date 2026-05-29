@@ -46,27 +46,44 @@ end
     _sweep_line_ka!(out, dem, idx + row_offset, start_col, step_r, step_c, dist, nrows, ncols)
 end
 
-# Shared sweep implementation for any direction
+# Shared sweep implementation for any direction. At each cell C along the
+# sweep, compute the elevation angle to every cell already visited in this
+# ray (`atan(Δz / (k·dist))` for the cell k steps back) and take the max.
+# The earlier formulation `max((prev_elev - elev) / dist)` used a one-cell
+# distance for every comparison, which both overestimated horizons for
+# distant peaks and saturated: once the steepest one-cell rise was seen,
+# `max_tan` stayed put for the rest of the ray, producing constant-value
+# ribbons along every sweep line. O(N²) per ray; allocation-free.
 function _sweep_line_ka!(out, dem, start_r, start_c, step_r, step_c, dist, nrows, ncols)
-    max_tan = -Inf
     r, c = start_r, start_c
+    step_count = 0
+    # First step index of the current visible run; bumps past every NaN so
+    # cells beyond a NaN don't see terrain on its far side (matches the
+    # reset-on-NaN behaviour of the previous algorithm).
+    visible_start = 0
     @inbounds while r >= 1 && r <= nrows && c >= 1 && c <= ncols
         elev_pos = Float64(dem[r, c])
         if isnan(elev_pos)
-            max_tan = -Inf
+            visible_start = step_count + 1
         else
-            pr, pc = r - step_r, c - step_c
-            if pr >= 1 && pr <= nrows && pc >= 1 && pc <= ncols
+            max_tan = -Inf
+            n_back = step_count - visible_start
+            for k in 1:n_back
+                pr = r - k * step_r
+                pc = c - k * step_c
                 prev_elev = Float64(dem[pr, pc])
                 if !isnan(prev_elev)
-                    tan_angle = (prev_elev - elev_pos) / dist
-                    max_tan = max(max_tan, tan_angle)
+                    tan_angle = (prev_elev - elev_pos) / (k * dist)
+                    if tan_angle > max_tan
+                        max_tan = tan_angle
+                    end
                 end
             end
             out[r, c] = Float32(atand(max_tan == -Inf ? 0.0 : max_tan))
         end
         r += step_r
         c += step_c
+        step_count += 1
     end
 end
 

@@ -60,6 +60,47 @@ using Test
         @test h[5, 5, 4] ≈ 0.0 atol=1e-5  # W
     end
 
+    @testset "distant peak beyond flat foreground" begin
+        # 10 m peak at the north edge, 9 cells of flat ground in front.
+        dem = fill(100.0, 10, 5)
+        dem[1, :] .= 110.0
+        h = horizon_angle(dem; directions = 4, cellsize = (1.0, 1.0))
+        # N, E, S, W. From (10, 3) the peak is 9 cells north.
+        @test h[10, 3, 1] ≈ atand(10 / 9) atol = 1e-3
+        @test h[10, 3, 2] ≈ 0.0 atol = 1e-5
+        @test h[10, 3, 4] ≈ 0.0 atol = 1e-5
+    end
+
+    @testset "angle to a spike decays with distance" begin
+        # 10 m spike at row 2; observers south of it must see it shrink.
+        dem = fill(100.0, 10, 5)
+        dem[2, :] .= 110.0
+        h = horizon_angle(dem; directions = 4, cellsize = (1.0, 1.0))
+        @test h[5, 3, 1] ≈ atand(10 / 3) atol = 1e-3
+        @test h[10, 3, 1] ≈ atand(10 / 8) atol = 1e-3
+        @test h[10, 3, 1] < h[5, 3, 1]
+    end
+
+    @testset "NaN blocks line of sight" begin
+        # Tall peak at row 1, full-width NaN occluder at row 2.
+        dem = fill(100.0, 10, 5)
+        dem[1, :] .= 200.0
+        dem[2, :] .= NaN
+        h = horizon_angle(dem; directions = 4, cellsize = (1.0, 1.0))
+        # Cells south of the NaN row see only flat ground.
+        @test h[10, 3, 1] ≈ 0.0 atol = 1e-5
+    end
+
+    @testset "horizon scales with cellsize" begin
+        # 5 m bump at the south edge, observer 4 cells north.
+        dem = fill(100.0, 5, 3)
+        dem[5, :] .= 105.0
+        h1 = horizon_angle(dem; directions = 4, cellsize = (1.0, 1.0))
+        h2 = horizon_angle(dem; directions = 4, cellsize = (2.0, 2.0))
+        @test h1[1, 2, 3] ≈ atand(5 / 4) atol = 1e-3
+        @test h2[1, 2, 3] ≈ atand(5 / 8) atol = 1e-3
+    end
+
     @testset "sky_view_factor" begin
         # Flat terrain should have SVF = 1.0
         flat = ones(10, 10) * 100.0
