@@ -49,17 +49,11 @@ end
 # Shared sweep implementation for any direction. At each cell C along the
 # sweep, compute the elevation angle to every cell already visited in this
 # ray (`atan(Δz / (k·dist))` for the cell k steps back) and take the max.
-# The earlier formulation `max((prev_elev - elev) / dist)` used a one-cell
-# distance for every comparison, which both overestimated horizons for
-# distant peaks and saturated: once the steepest one-cell rise was seen,
-# `max_tan` stayed put for the rest of the ray, producing constant-value
-# ribbons along every sweep line. O(N²) per ray; allocation-free.
 function _sweep_line_ka!(out, dem, start_r, start_c, step_r, step_c, dist, nrows, ncols)
     r, c = start_r, start_c
     step_count = 0
     # First step index of the current visible run; bumps past every NaN so
-    # cells beyond a NaN don't see terrain on its far side (matches the
-    # reset-on-NaN behaviour of the previous algorithm).
+    # cells beyond a NaN don't see terrain on its far side
     visible_start = 0
     @inbounds while r >= 1 && r <= nrows && c >= 1 && c <= ncols
         elev_pos = Float64(dem[r, c])
