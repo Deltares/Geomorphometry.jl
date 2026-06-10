@@ -6,23 +6,29 @@ const Δ = CartesianIndex(1, 1)
 "Spread algorithms."
 abstract type SpreadMethod end
 
+"""
+    Tomlin()
+
+Friction-distance [`spread`](@ref) method based on a priority queue (Dijkstra-like search)
+as described by [Tomlin (1983)](@cite tomlin1983digital). This is the default method.
+"""
 Base.@kwdef struct Tomlin <: SpreadMethod end
 
 """
-    spread(::Tomlin, points::Matrix{<:Real}, initial::Matrix{<:Real}, friction::Matrix{<:Real}; res=1, limit=Inf, method=Tomlin())
+    spread(::Tomlin, locations::Vector{CartesianIndex{2}}, initial::AbstractMatrix{<:Real}, friction::AbstractMatrix{<:Real}; cellsize=cellsize(friction), limit=typemax(T))
 
-Total friction distance spread from `points` as described by [Tomlin (1983)](@cite tomlin1983digital).
+Total friction distance spread from `locations` as described by [Tomlin (1983)](@cite tomlin1983digital).
 This is also the method implemented by [PCRaster](https://pcraster.geo.uu.nl/pcraster/4.0.2/doc/manual/op_spread.html).
 
 # Output
-- `Array{Float64,2}` Total friction distance
+- `Matrix{<:Real}` Total friction distance
 
 # Arguments
-- `points::Matrix{<:Real}` Input Array
-- `initial::Matrix{<:Real}` Initial values of the result
-- `friction::Matrix{<:Real}` Resolution of cell size
-- `res=1` Resolution or cell size
-- `limit=Inf` Initial fill value
+- `locations::Vector{CartesianIndex{2}}` Source cells to spread from
+- `initial::AbstractMatrix{<:Real}` Initial values of the result at the source cells
+- `friction::AbstractMatrix{<:Real}` Friction (cost) per cell
+- `cellsize=cellsize(friction)` Cell size, used to scale distances
+- `limit=typemax(T)` Initial fill value for unreached cells
 """
 function spread(
     ::Tomlin,
@@ -78,26 +84,33 @@ function spread!(pq, mask, result, friction, zone, distances)
     end
 end
 
+"""
+    Eastman(; iterations=3)
+
+Friction-distance [`spread`](@ref) method using the pushbroom approach of
+[Eastman (1989)](@cite eastman1989pushbroom). Scales better (linearly) than [`Tomlin`](@ref),
+but may require more `iterations` for maze-like, uncrossable obstacles.
+"""
 Base.@kwdef struct Eastman <: SpreadMethod
     iterations::Int = 3
 end
 
 """
-    spread(::Eastman, points::Matrix{<:Real}, initial::Matrix{<:Real}, friction::Matrix{<:Real}; res=1, limit=Inf, iterations=3)
+    spread(::Eastman, locations::Vector{CartesianIndex{2}}, initial::AbstractMatrix{<:Real}, friction::AbstractMatrix{<:Real}; cellsize=cellsize(friction), limit=Inf)
 
 Pushbroom method for friction costs as discussed by [Eastman (1989)](@cite eastman1989pushbroom).
 This method should scale better (linearly) than the [Tomlin (1983)](@cite tomlin1983digital) method, but can require more
 `iterations` than set by default (3) in the case of maze-like, uncrossable obstacles.
 
 # Output
-- `Array{Float64,2}` Total friction distance
+- `Matrix{<:Real}` Total friction distance
 
 # Arguments
-- `points::Matrix{<:Real}` Input Array
-- `initial::Matrix{<:Real}` Factor to exaggerate elevation
-- `friction::Matrix{<:Real}` Resolution of cell size
-- `res=1` Resolution or cell size
-- `limit=Inf` Initial fill value
+- `locations::Vector{CartesianIndex{2}}` Source cells to spread from
+- `initial::AbstractMatrix{<:Real}` Initial values of the result at the source cells
+- `friction::AbstractMatrix{<:Real}` Friction (cost) per cell
+- `cellsize=cellsize(friction)` Cell size, used to scale distances
+- `limit=Inf` Initial fill value for unreached cells
 """
 function spread(
     e::Eastman,
@@ -165,8 +178,8 @@ function spread(
 end
 
 """
-    spread(points::Matrix{<:Real}, initial::Matrix{<:Real}, friction::Real; distance=Euclidean(), res=1.0)
-    spread(points::Matrix{<:Real}, initial::Real, friction::Real; distance=Euclidean(), res=1.0)
+    spread(points::AbstractMatrix{<:Real}, initial::AbstractMatrix{<:Real}, friction::Real; distance=Euclidean(), cellsize=cellsize(friction))
+    spread(points::AbstractMatrix{<:Real}, initial::Real, friction::Real; distance=Euclidean(), cellsize=cellsize(friction))
 
 Optimized (and more accurate) function based on the same friction everywhere.
 
@@ -200,6 +213,13 @@ function spread(
     return result
 end
 
+"""
+    FastSweeping(; eps=1e-6, debug=false, iterations=typemax(Int))
+
+Friction-distance [`spread`](@ref) method using an iterative fast sweeping scheme. Sweeps
+the grid in alternating directions until the result converges within `eps` or `iterations`
+is reached.
+"""
 Base.@kwdef struct FastSweeping <: SpreadMethod
     eps::Float64 = 1e-6
     debug::Bool = false
@@ -207,10 +227,14 @@ Base.@kwdef struct FastSweeping <: SpreadMethod
 end
 
 """
-    spread(points::Matrix{<:Real}, initial::Matrix{<:Real}, friction::Matrix{<:Real}; cellsize=(1,1), limit=Inf, method=Tomlin())
+    spread(points, initial, friction::AbstractMatrix{<:Real}; cellsize=cellsize(friction), limit=Inf, method=Tomlin())
 
 Total friction distance spread from `points` from `initial` with `friction`.
-By default uses Tomlin, see SpreadMethod for other algorithms.
+
+`points` may be a `Vector{CartesianIndex{2}}` of source cells, or an `AbstractMatrix{<:Real}`
+in which case the cells with values greater than zero are taken as sources. `initial` is
+either a matrix of source values or a single scalar applied to all sources. By default uses
+[`Tomlin`](@ref); see `SpreadMethod` for other algorithms.
 """
 function spread(
     points::Vector{CartesianIndex{2}},

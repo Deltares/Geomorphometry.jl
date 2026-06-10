@@ -1,17 +1,33 @@
+"""
+    Geomorphometry
+
+Geospatial terrain analysis for digital elevation models (DEMs). Provides terrain
+derivatives such as [`slope`](@ref), [`aspect`](@ref) and curvature; relative relief
+metrics like [`roughness`](@ref), [`topographic_position_index`](@ref) and
+[`terrain_ruggedness_index`](@ref); hydrological algorithms including
+[`filldepressions`](@ref), [`flowaccumulation`](@ref) and
+[`height_above_nearest_drainage`](@ref); ground filters such as
+[`progressive_morphological_filter`](@ref), [`simple_morphological_filter`](@ref) and
+[`skewness_balancing`](@ref); friction-distance [`spread`](@ref) algorithms; and
+visualization helpers like [`pssm`](@ref) and [`hillshade`](@ref).
+
+Functions operate on plain `AbstractMatrix` DEMs. Extensions add support for `GeoArray`
+and `Raster` inputs, from which the cell size is derived automatically.
+"""
 module Geomorphometry
 using StatsBase: skewness
 using Distances: Euclidean, euclidean, evaluate
-using OffsetArrays: centered
+using OffsetArrays: OffsetArray
 using PaddedViews: PaddedView
 using FillArrays: Fill
-using StaticArrays: @SMatrix, @MMatrix, @MVector
+using StaticArrays: @SMatrix, @MVector
 import DataStructures
 using LocalFilters: LocalFilters, dilate, localfilter!
 using Stencils: Stencils, Annulus, Moore, NamedStencil, Stencil, Window, center, mapstencil
 using Statistics: mean, std
 using LocalFilters
 using QuickHeaps: FastPriorityQueue, PriorityQueue, enqueue!, dequeue!
-using KernelAbstractions
+using KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, get_backend
 
 include("utils.jl")
 include("relative.jl")
@@ -40,7 +56,7 @@ export roughness,
     rugosity,
     entropy
 export slope,
-    aspect, curvature, laplacian, plan_curvature, profile_curvature, tangential_curvature
+    aspect, laplacian, plan_curvature, profile_curvature, tangential_curvature
 export skewness_balancing
 export filldepressions,
     flowaccumulation,
@@ -48,6 +64,6 @@ export filldepressions,
     stream_power_index,
     height_above_nearest_drainage
 export FlowDirection, LDD, D8D
-export horizon_angle, sky_view_factor, GridSweep
+export horizon_angle, sky_view_factor
 
 end # module

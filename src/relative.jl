@@ -1,7 +1,8 @@
 """
-    roughness(dem::AbstractMatrix{<:Real})
+    roughness(dem::AbstractMatrix{<:Real}, window::Stencil=Moore(1))
 
 Roughness is the largest inter-cell difference of a central pixel and its surrounding cell, as defined in [Wilson et al. (2007)](@cite wilsonMultiscaleTerrainAnalysis2007).
+The neighborhood is set by `window`.
 """
 function roughness(dem::AbstractMatrix{<:Real}, window::Stencil = Moore(1))
     mapstencil(_roughness, window, dem)
@@ -15,9 +16,10 @@ function _roughness(x)
 end
 
 """
-    topographic_position_index(dem::AbstractMatrix{<:Real})
+    topographic_position_index(dem::AbstractMatrix{<:Real}, window::Stencil=Moore(1))
 
 Topographic Position Index (TPI), which is defined as the difference between a central pixel and the mean of its surrounding cells, as defined in [Wilson et al. (2007)](@cite wilsonMultiscaleTerrainAnalysis2007).
+The neighborhood is set by `window`.
 """
 function topographic_position_index(dem::AbstractMatrix{<:Real}, window::Stencil = Moore(1))
     mapstencil(x -> center(x) - mean(x), window, dem)
@@ -25,18 +27,20 @@ end
 @deprecate TPI topographic_position_index
 
 """
-    bathymetric_position_index(dem::AbstractMatrix{<:Real})
+    bathymetric_position_index(dem::AbstractMatrix{<:Real}, window::Annulus=Annulus(3, 2))
 
 Bathymetric Position Index (BPI) [lundbladBenthicTerrainClassification2006](@cite), which is defined as the difference between a central pixel and the mean of the cells in an annulus around it.
+The annulus is set by `window`.
 """
 bathymetric_position_index(dem::AbstractMatrix{<:Real}, window::Annulus = Annulus(3, 2)) =
     topographic_position_index(dem, window)
 @deprecate BPI bathymetric_position_index
 
 """
-    roughness_index_elevation(dem::AbstractMatrix{<:Real})
+    roughness_index_elevation(dem::AbstractMatrix{<:Real}, window::Stencil=Window(1))
 
-Roughness Index Elevation (RIE), which quantifies the standard deviation of residual topography (Cavalli et al., 2008)
+Roughness Index Elevation (RIE), which quantifies the standard deviation of residual topography (Cavalli et al., 2008).
+The neighborhood is set by `window`.
 """
 function roughness_index_elevation(dem::AbstractMatrix{<:Real}, window::Stencil = Window(1))
     meandem = topographic_position_index(dem, window)
@@ -45,11 +49,17 @@ end
 @deprecate RIE roughness_index_elevation
 
 """
-    terrain_ruggedness_index(dem::AbstractMatrix{<:Real})
+    terrain_ruggedness_index(dem::AbstractMatrix{<:Real}; normalize=false, squared=true)
 
 Terrain Ruggedness Index (TRI), which measures the difference between a central pixel and its surrounding cells.
 This algorithm uses the square root of the sum of the square of the absolute difference between a central pixel and its surrounding cells.
 This is recommended for terrestrial use cases.
+
+# Arguments
+- `dem::AbstractMatrix{<:Real}`: Input digital elevation model.
+- `normalize::Bool=false`: Divide the summed differences by the number of neighbors (8).
+- `squared::Bool=true`: Use squared differences (the classic TRI). When `false`, the mean absolute
+  difference is used; combining `normalize=false` with `squared=false` is not recommended.
 """
 function terrain_ruggedness_index(
     dem::AbstractMatrix{<:Real};
@@ -168,10 +178,11 @@ function cross2(a, b)
 end
 
 """
-    rugosity(dem::AbstractMatrix{<:Real})
+    rugosity(dem::AbstractMatrix{<:Real}; cellsize=cellsize(dem))
 
 Compute the rugosity of a DEM, which is the ratio between the 
-surface area divided by the planimetric area.
+surface area divided by the planimetric area. The `cellsize` is used to scale
+horizontal distances and is derived from `dem` by default.
 
 Jenness 2019 https://onlinelibrary.wiley.com/doi/abs/10.2193/0091-7648%282004%29032%5B0829%3ACLSAFD%5D2.0.CO%3B2
 """
@@ -214,9 +225,9 @@ function area(a, b)
 end
 
 """
-    pitremoval(dem::AbstractMatrix{<:Real})
+    pitremoval(dem::AbstractMatrix{<:Real}; limit=0.0)
 
-Remove pits from a DEM Array if the center cell of a 3x3 patch is `limit` lower than the surrounding cells.
+Remove pits from a DEM Array if the center cell of a 3x3 patch is more than `limit` lower than the surrounding cells.
 """
 function pitremoval(dem::AbstractMatrix{<:Real}; limit = 0.0)
     dst = copy(dem)
@@ -237,7 +248,7 @@ function pitremoval(dem::AbstractMatrix{<:Real}; limit = 0.0)
 end
 
 """
-    percentile_elevation(dem::AbstractMatrix{<:Real}; radius=1)
+    percentile_elevation(dem::AbstractMatrix{<:Real}; radius=1, stencil=Moore(radius))
 
 Computes the percentile rank of each cell's elevation relative to its neighborhood.
 
@@ -254,6 +265,7 @@ Based on [Lundquist et al. (2008)](@cite lundquistAutomatedAlgorithmMapping2008)
 # Arguments
 - `dem::AbstractMatrix{<:Real}`: Digital elevation model
 - `radius::Int=1`: Radius of the circular neighborhood in cells
+- `stencil::Stencil=Moore(radius)`: Neighborhood stencil to compare against; overrides `radius` when given explicitly
 
 # Example
 ```julia
