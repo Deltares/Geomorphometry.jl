@@ -1,16 +1,17 @@
 # using RecipesBase
 """
-    image = pssm(dem; exaggeration=2.3, resolution=1.0)
+    pssm(dem::AbstractMatrix{<:Real}; exaggeration=2.3, cellsize=cellsize(dem), method=Horn())
 
 Perceptually Shaded Slope Map by [Pingel and Clarke (2014)](@cite pingelPerceptuallyShadedSlope2014a).
 
 # Output
-- `image::Gray{T,2}` Grayscale image
+- `Matrix{Float32}` Exaggerated [`slope`](@ref) values, suitable for visualization as a grayscale image.
 
 # Arguments
-- `A::Array{Real,2}` Input Array
+- `dem::AbstractMatrix{<:Real}` Input digital elevation model
 - `exaggeration::Real=2.3` Factor to exaggerate elevation
-- `cellsize::Real=1.0` Size of cell to account for horizontal resolution if different from vertical resolution
+- `cellsize=cellsize(dem)` Cell size, to account for horizontal resolution if different from vertical resolution
+- `method::DerivativeMethod=Horn()` Derivative estimator used for the underlying [`slope`](@ref)
 """
 function pssm(
     dem::AbstractMatrix{<:Real};
@@ -22,11 +23,12 @@ function pssm(
 end
 
 """
-    hillshade(dem::Matrix{<:Real}; azimuth=315.0, zenith=45.0, cellsize=cellsize(dem))
+    hillshade(dem::AbstractMatrix{<:Real}; azimuth=315.0, zenith=45.0, cellsize=cellsize(dem))
 
 hillshade is the simulated illumination of a surface based on its [`slope`](@ref) and
-[`aspect`](@ref) given a light source with azimuth and zenith angles in °, as defined in
+[`aspect`](@ref) given a light source with `azimuth` and `zenith` angles in degrees, as defined in
 [Burrough, P. A., and McDonell, R. A., (1998)](@cite burroughPrinciplesGeographicalInformation2015).
+Returns a `Matrix{Union{Missing,UInt8}}` of illumination values in `0:255`.
 """
 function hillshade(
     dem::AbstractMatrix{<:Real};
@@ -67,11 +69,13 @@ function hillshade(
 end
 
 """
-    multihillshade(dem::AbstractMatrix{<:Real}; cellsize=cellsize(dem))
+    multihillshade(dem::AbstractMatrix{<:Real}; azimuth=[225, 270, 315, 360], zenith=45.0, cellsize=cellsize(dem))
 
 multihillshade is the simulated illumination of a surface based on its [`slope`](@ref) and
-[`aspect`](@ref). Like [`hillshade`](@ref), but now using multiple sources as defined in
-[Mark, R.K. (1992)](@cite mark1992multidirectional), similar to GDALs -multidirectional.
+[`aspect`](@ref). Like [`hillshade`](@ref), but combining multiple light sources at the given
+`azimuth` angles (degrees) as defined in [Mark, R.K. (1992)](@cite mark1992multidirectional),
+similar to GDAL's -multidirectional. Returns a `Matrix{Union{Missing,UInt8}}` of illumination
+values in `0:255`.
 """
 function multihillshade(
     dem::AbstractMatrix{<:Real};

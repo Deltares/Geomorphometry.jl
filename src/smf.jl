@@ -1,17 +1,17 @@
 """
 ```
-B = simple_morphological_filter(A; ω, slope, dhₘ, dh₀, cellsize)
+B = simple_morphological_filter(A; ω, slope, cellsize)
 ```
 Applies the simple morphological filter by [Pingel et al. (2013)](@cite pingelImprovedSimpleMorphological2013a) to `A`.
 
 # Output
-- `B::Array{Float64,2}` A filtered version of A
+- `B::Matrix{Union{Missing,T}}` A copy of `A` with filtered (non-ground) cells set to `missing`.
 
 # Arguments
-- `A::Array{T,2}` Input Array
-- `ω::Float64=18.` Maximum window size [m]
-- `slope::Float64=0.01` Terrain slope [m/m]
-- `cellsize::Float64=1.` Cellsize in [m]
+- `A::AbstractMatrix{<:Real}` Input Array
+- `ω::Real=17.` Maximum window size [m]
+- `slope::Real=0.01` Terrain slope [m/m]
+- `cellsize=abs(first(cellsize(A)))` Cellsize in [m]
 """
 function simple_morphological_filter(
     A::AbstractMatrix{<:Real};
