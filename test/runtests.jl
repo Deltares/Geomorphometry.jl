@@ -3,8 +3,6 @@ using Test
 using Aqua
 using ExplicitImports
 
-include("horizon.jl")
-
 @testset "Geomorphometry" begin
     @testset "Aqua" begin
         Aqua.test_all(Geomorphometry)
@@ -22,6 +20,8 @@ include("horizon.jl")
                                                 (; ignore = (:Kernel,)) : false,
         )
     end
+    # Must run after ExplicitImports
+    include("horizon.jl")
     @testset "pmf" begin
         # Write your own tests here.
         A = rand(25, 25)

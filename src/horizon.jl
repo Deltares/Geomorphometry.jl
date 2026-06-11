@@ -37,6 +37,13 @@ function horizon_angle(dem::AbstractMatrix{<:Real};
     end
 end
 
+# Allocate the (rows, cols, directions) output. The default uses `similar` so that
+# plain matrices and GPU arrays propagate their storage type. Extensions override
+# this for wrapper types like `Raster` and `GeoArray` to attach a direction
+# dimension that `similar` would otherwise drop.
+_alloc_directions(dem, T, ndirs) =
+    similar(dem, T, size(dem, 1), size(dem, 2), ndirs)
+
 # KernelAbstractions kernels for line sweeps
 
 # Sweep from row edge (top or bottom) - index gives column
@@ -85,9 +92,9 @@ function _horizon_angle_cardinal(dem, cellsize, missing_elevation::Float64)
     # Returns 3D array with 4 directions: N, E, S, W
     T = Float32
     nrows, ncols = size(dem)
-    backend = get_backend(dem)
-    result = KernelAbstractions.allocate(backend, T, nrows, ncols, 4)
+    result = _alloc_directions(dem, T, 4)
     fill!(result, T(NaN))
+    backend = get_backend(parent(dem))
 
     cs1, cs2 = Float64(cellsize[1]), Float64(cellsize[2])
     dist_ns = abs(cs1)
@@ -117,9 +124,9 @@ function _horizon_angle_8(dem, cellsize, missing_elevation::Float64)
     # Returns 3D array with 8 directions: N, NE, E, SE, S, SW, W, NW
     T = Float32
     nrows, ncols = size(dem)
-    backend = get_backend(dem)
-    result = KernelAbstractions.allocate(backend, T, nrows, ncols, 8)
+    result = _alloc_directions(dem, T, 8)
     fill!(result, T(NaN))
+    backend = get_backend(parent(dem))
 
     cs1, cs2 = Float64(cellsize[1]), Float64(cellsize[2])
     dist_ns = abs(cs1)
@@ -179,8 +186,7 @@ function _horizon_angle_rotated(dem, ndirs::Int, cellsize, missing_elevation::Fl
     nrows, ncols = size(dem)
     cs1, cs2 = Float64(cellsize[1]), Float64(cellsize[2])
     n_rotations = ndirs ÷ 8
-    backend = get_backend(dem)
-    result = KernelAbstractions.allocate(backend, Float32, nrows, ncols, ndirs)
+    result = _alloc_directions(dem, Float32, ndirs)
     fill!(result, 0f0)
 
     # No rotation needed for first 8
@@ -211,8 +217,8 @@ function _rotate_dem(dem, angle::Float64, cs1, cs2)
     nrows, ncols = size(dem)
     diag = ceil(Int, hypot(nrows, ncols))
 
-    backend = get_backend(dem)
-    rotated = KernelAbstractions.allocate(backend, Float64, diag, diag)
+    rotated = similar(parent(dem), Float64, diag, diag)
+    backend = get_backend(rotated)
     fill!(rotated, NaN)
 
     cos_a, sin_a = cos(angle), sin(angle)
@@ -320,8 +326,8 @@ function sky_view_factor(dem::AbstractMatrix{<:Real};
 )
     horizons = horizon_angle(dem; directions, cellsize, missing_elevation)
     ndirs = size(horizons, 3)
-    backend = get_backend(horizons)
-    result = KernelAbstractions.allocate(backend, Float32, size(dem))
+    result = similar(dem, Float32)
+    backend = get_backend(parent(horizons))
 
     workgroup = backend isa KernelAbstractions.CPU ? 1 : (16, 16)
     kernel! = _sky_view_factor_kernel!(backend, workgroup)
