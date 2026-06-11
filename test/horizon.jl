@@ -81,14 +81,31 @@ using Test
         @test h[10, 3, 1] < h[5, 3, 1]
     end
 
-    @testset "NaN blocks line of sight" begin
-        # Tall peak at row 1, full-width NaN occluder at row 2.
+    @testset "missing cells use missing_elevation (default 0)" begin
+        # 200 m peak at row 1, NaN row at row 2, flat 100 m elsewhere.
         dem = fill(100.0, 10, 5)
         dem[1, :] .= 200.0
         dem[2, :] .= NaN
         h = horizon_angle(dem; directions = 4, cellsize = (1.0, 1.0))
-        # Cells south of the NaN row see only flat ground.
-        @test h[10, 3, 1] ≈ 0.0 atol = 1e-5
+        # NaN row treated as 0 m (below observer) so peak 9 cells north dominates.
+        @test h[10, 3, 1] ≈ atand(100 / 9) atol = 1e-3
+        @test isnan(h[2, 3, 1])
+    end
+
+    @testset "missing_elevation = Inf fully occludes" begin
+        dem = fill(100.0, 10, 5)
+        dem[1, :] .= 200.0
+        dem[2, :] .= NaN
+        h = horizon_angle(dem; directions = 4, cellsize = (1.0, 1.0), missing_elevation = Inf)
+        @test h[10, 3, 1] ≈ 90.0 atol = 1e-3
+    end
+
+    @testset "missing_elevation custom value" begin
+        # NaN row 8 cells north of observer; substitute 150 m → 50 m rise.
+        dem = fill(100.0, 10, 5)
+        dem[2, :] .= NaN
+        h = horizon_angle(dem; directions = 4, cellsize = (1.0, 1.0), missing_elevation = 150.0)
+        @test h[10, 3, 1] ≈ atand(50 / 8) atol = 1e-3
     end
 
     @testset "horizon scales with cellsize" begin

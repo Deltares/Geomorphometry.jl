@@ -1,5 +1,5 @@
 """
-    horizon_angle(dem; method=GridSweep(), cellsize=cellsize(dem))
+    horizon_angle(dem; method=GridSweep(), cellsize=cellsize(dem), missing_elevation=0.0)
 
 Compute horizon angles for each cell in a DEM.
 
@@ -13,6 +13,9 @@ the horizontal (sheltered), negative angles indicate terrain falling below (expo
 # Keywords
 - `directions`: 16 by default, can be 4, 8, 16, 32, ...
 - `cellsize`: Cell size as `(row_size, col_size)` tuple
+- `missing_elevation`: Elevation substituted for NaN cells along a sweep ray
+  (default `0.0`). Use `Inf` to make NaN fully occluding. Cells whose own
+  elevation is NaN always produce `NaN` in the output.
 
 # Returns
 3D array of size `(rows, cols, directions)` with horizon angles in degrees.
@@ -20,57 +23,54 @@ the horizontal (sheltered), negative angles indicate terrain falling below (expo
 function horizon_angle(dem::AbstractMatrix{<:Real};
     directions::Int = 16,
     cellsize = cellsize(dem),
+    missing_elevation::Real = 0.0,
 )
     ispow2(directions) && directions >= 4 ||
         throw(ArgumentError("directions must be 4, 8, 16, 32, ..., got $directions"))
+    me = Float64(missing_elevation)
     if directions == 4
-        _horizon_angle_cardinal(dem, cellsize)
+        _horizon_angle_cardinal(dem, cellsize, me)
     elseif directions == 8
-        _horizon_angle_8(dem, cellsize)
+        _horizon_angle_8(dem, cellsize, me)
     else
-        _horizon_angle_rotated(dem, directions, cellsize)
+        _horizon_angle_rotated(dem, directions, cellsize, me)
     end
 end
 
 # KernelAbstractions kernels for line sweeps
 
 # Sweep from row edge (top or bottom) - index gives column
-@kernel function _sweep_row_edge_kernel!(out, @Const(dem), start_row::Int, step_r::Int, step_c::Int, dist::Float64, nrows::Int, ncols::Int)
+@kernel function _sweep_row_edge_kernel!(out, @Const(dem), start_row::Int, step_r::Int, step_c::Int, dist::Float64, nrows::Int, ncols::Int, missing_elevation::Float64)
     col = @index(Global)
-    _sweep_line_ka!(out, dem, start_row, col, step_r, step_c, dist, nrows, ncols)
+    _sweep_line_ka!(out, dem, start_row, col, step_r, step_c, dist, nrows, ncols, missing_elevation)
 end
 
 # Sweep from col edge (left or right) - index gives row
-@kernel function _sweep_col_edge_kernel!(out, @Const(dem), row_offset::Int, start_col::Int, step_r::Int, step_c::Int, dist::Float64, nrows::Int, ncols::Int)
+@kernel function _sweep_col_edge_kernel!(out, @Const(dem), row_offset::Int, start_col::Int, step_r::Int, step_c::Int, dist::Float64, nrows::Int, ncols::Int, missing_elevation::Float64)
     idx = @index(Global)
-    _sweep_line_ka!(out, dem, idx + row_offset, start_col, step_r, step_c, dist, nrows, ncols)
+    _sweep_line_ka!(out, dem, idx + row_offset, start_col, step_r, step_c, dist, nrows, ncols, missing_elevation)
 end
 
-# Shared sweep implementation for any direction. At each cell C along the
-# sweep, compute the elevation angle to every cell already visited in this
-# ray (`atan(Δz / (k·dist))` for the cell k steps back) and take the max.
-function _sweep_line_ka!(out, dem, start_r, start_c, step_r, step_c, dist, nrows, ncols)
+# For each cell, take max `atan(Δz / (k·dist))` over every prior cell on the ray.
+# NaN look-back substitutes `missing_elevation`; NaN at the current cell leaves
+# the output as NaN (from the initial fill).
+function _sweep_line_ka!(out, dem, start_r, start_c, step_r, step_c, dist, nrows, ncols, missing_elevation::Float64)
     r, c = start_r, start_c
     step_count = 0
-    # First step index of the current visible run; bumps past every NaN so
-    # cells beyond a NaN don't see terrain on its far side
-    visible_start = 0
     @inbounds while r >= 1 && r <= nrows && c >= 1 && c <= ncols
         elev_pos = Float64(dem[r, c])
-        if isnan(elev_pos)
-            visible_start = step_count + 1
-        else
+        if !isnan(elev_pos)
             max_tan = -Inf
-            n_back = step_count - visible_start
-            for k in 1:n_back
+            for k in 1:step_count
                 pr = r - k * step_r
                 pc = c - k * step_c
                 prev_elev = Float64(dem[pr, pc])
-                if !isnan(prev_elev)
-                    tan_angle = (prev_elev - elev_pos) / (k * dist)
-                    if tan_angle > max_tan
-                        max_tan = tan_angle
-                    end
+                if isnan(prev_elev)
+                    prev_elev = missing_elevation
+                end
+                tan_angle = (prev_elev - elev_pos) / (k * dist)
+                if tan_angle > max_tan
+                    max_tan = tan_angle
                 end
             end
             out[r, c] = Float32(atand(max_tan == -Inf ? 0.0 : max_tan))
@@ -81,7 +81,7 @@ function _sweep_line_ka!(out, dem, start_r, start_c, step_r, step_c, dist, nrows
     end
 end
 
-function _horizon_angle_cardinal(dem, cellsize)
+function _horizon_angle_cardinal(dem, cellsize, missing_elevation::Float64)
     # Returns 3D array with 4 directions: N, E, S, W
     T = Float32
     nrows, ncols = size(dem)
@@ -103,17 +103,17 @@ function _horizon_angle_cardinal(dem, cellsize)
     sweep_col_edge! = _sweep_col_edge_kernel!(backend, workgroup)
 
     # N/S from top/bottom edges (step_c=0 for cardinal)
-    sweep_row_edge!(S, dem, nrows, -1, 0, dist_ns, nrows, ncols, ndrange=ncols)
-    sweep_row_edge!(N, dem, 1, 1, 0, dist_ns, nrows, ncols, ndrange=ncols)
+    sweep_row_edge!(S, dem, nrows, -1, 0, dist_ns, nrows, ncols, missing_elevation, ndrange=ncols)
+    sweep_row_edge!(N, dem, 1, 1, 0, dist_ns, nrows, ncols, missing_elevation, ndrange=ncols)
     # E/W from left/right edges (step_r=0 for cardinal)
-    sweep_col_edge!(E, dem, 0, ncols, 0, -1, dist_ew, nrows, ncols, ndrange=nrows)
-    sweep_col_edge!(W, dem, 0, 1, 0, 1, dist_ew, nrows, ncols, ndrange=nrows)
+    sweep_col_edge!(E, dem, 0, ncols, 0, -1, dist_ew, nrows, ncols, missing_elevation, ndrange=nrows)
+    sweep_col_edge!(W, dem, 0, 1, 0, 1, dist_ew, nrows, ncols, missing_elevation, ndrange=nrows)
 
     KernelAbstractions.synchronize(backend)
     return result
 end
 
-function _horizon_angle_8(dem, cellsize)
+function _horizon_angle_8(dem, cellsize, missing_elevation::Float64)
     # Returns 3D array with 8 directions: N, NE, E, SE, S, SW, W, NW
     T = Float32
     nrows, ncols = size(dem)
@@ -140,22 +140,22 @@ function _horizon_angle_8(dem, cellsize)
     sweep_col_edge! = _sweep_col_edge_kernel!(backend, workgroup)
 
     # Sweeps from top/bottom edges (ndrange=ncols)
-    sweep_row_edge!(S, dem, nrows, -1, 0, dist_ns, nrows, ncols, ndrange=ncols)
-    sweep_row_edge!(N, dem, 1, 1, 0, dist_ns, nrows, ncols, ndrange=ncols)
-    sweep_row_edge!(SW, dem, nrows, -1, 1, dist_diag, nrows, ncols, ndrange=ncols)
-    sweep_row_edge!(NE, dem, 1, 1, -1, dist_diag, nrows, ncols, ndrange=ncols)
-    sweep_row_edge!(SE, dem, nrows, -1, -1, dist_diag, nrows, ncols, ndrange=ncols)
-    sweep_row_edge!(NW, dem, 1, 1, 1, dist_diag, nrows, ncols, ndrange=ncols)
+    sweep_row_edge!(S, dem, nrows, -1, 0, dist_ns, nrows, ncols, missing_elevation, ndrange=ncols)
+    sweep_row_edge!(N, dem, 1, 1, 0, dist_ns, nrows, ncols, missing_elevation, ndrange=ncols)
+    sweep_row_edge!(SW, dem, nrows, -1, 1, dist_diag, nrows, ncols, missing_elevation, ndrange=ncols)
+    sweep_row_edge!(NE, dem, 1, 1, -1, dist_diag, nrows, ncols, missing_elevation, ndrange=ncols)
+    sweep_row_edge!(SE, dem, nrows, -1, -1, dist_diag, nrows, ncols, missing_elevation, ndrange=ncols)
+    sweep_row_edge!(NW, dem, 1, 1, 1, dist_diag, nrows, ncols, missing_elevation, ndrange=ncols)
 
     # Sweeps from left/right edges (ndrange=nrows for E/W)
-    sweep_col_edge!(E, dem, 0, ncols, 0, -1, dist_ew, nrows, ncols, ndrange=nrows)
-    sweep_col_edge!(W, dem, 0, 1, 0, 1, dist_ew, nrows, ncols, ndrange=nrows)
+    sweep_col_edge!(E, dem, 0, ncols, 0, -1, dist_ew, nrows, ncols, missing_elevation, ndrange=nrows)
+    sweep_col_edge!(W, dem, 0, 1, 0, 1, dist_ew, nrows, ncols, missing_elevation, ndrange=nrows)
 
     # Diagonal sweeps from left/right edges (ndrange=nrows-1)
-    sweep_col_edge!(SW, dem, 0, 1, -1, 1, dist_diag, nrows, ncols, ndrange=nrows-1)
-    sweep_col_edge!(SE, dem, 0, ncols, -1, -1, dist_diag, nrows, ncols, ndrange=nrows-1)
-    sweep_col_edge!(NE, dem, 1, ncols, 1, -1, dist_diag, nrows, ncols, ndrange=nrows-1)
-    sweep_col_edge!(NW, dem, 1, 1, 1, 1, dist_diag, nrows, ncols, ndrange=nrows-1)
+    sweep_col_edge!(SW, dem, 0, 1, -1, 1, dist_diag, nrows, ncols, missing_elevation, ndrange=nrows-1)
+    sweep_col_edge!(SE, dem, 0, ncols, -1, -1, dist_diag, nrows, ncols, missing_elevation, ndrange=nrows-1)
+    sweep_col_edge!(NE, dem, 1, ncols, 1, -1, dist_diag, nrows, ncols, missing_elevation, ndrange=nrows-1)
+    sweep_col_edge!(NW, dem, 1, 1, 1, 1, dist_diag, nrows, ncols, missing_elevation, ndrange=nrows-1)
 
     KernelAbstractions.synchronize(backend)
     return result
@@ -175,7 +175,7 @@ function _bilinear_kernel(dem, r, c, nrows, ncols)
            fr * fc * dem[r1, c1]
 end
 
-function _horizon_angle_rotated(dem, ndirs::Int, cellsize)
+function _horizon_angle_rotated(dem, ndirs::Int, cellsize, missing_elevation::Float64)
     nrows, ncols = size(dem)
     cs1, cs2 = Float64(cellsize[1]), Float64(cellsize[2])
     n_rotations = ndirs ÷ 8
@@ -184,7 +184,7 @@ function _horizon_angle_rotated(dem, ndirs::Int, cellsize)
     fill!(result, 0f0)
 
     # No rotation needed for first 8
-    h = _horizon_angle_8(dem, cellsize)
+    h = _horizon_angle_8(dem, cellsize, missing_elevation)
     for i in 1:8
         di = (i - 1) * n_rotations + 1
         copyto!(view(result, :, :, di), view(h, :, :, i))
@@ -195,7 +195,7 @@ function _horizon_angle_rotated(dem, ndirs::Int, cellsize)
         angle = rot * (π / 4 / n_rotations)  # Rotation angle in radians
 
         rotated = _rotate_dem(dem, angle, cs1, cs2)
-        h = _horizon_angle_8(rotated, cellsize)
+        h = _horizon_angle_8(rotated, cellsize, missing_elevation)
 
         # Map results back to original grid positions
         for i in 1:8
@@ -293,7 +293,7 @@ end
 end
 
 """
-    sky_view_factor(dem; directions=16, cellsize=cellsize(dem))
+    sky_view_factor(dem; directions=16, cellsize=cellsize(dem), missing_elevation=0.0)
 
 Compute the Sky View Factor (SVF) for each cell in a DEM.
 
@@ -307,6 +307,8 @@ across all directions.
 # Keywords
 - `directions`: Number of directions (default: 16)
 - `cellsize`: Cell size as `(row_size, col_size)` tuple
+- `missing_elevation`: Elevation substituted for missing cells in `dem` when computing
+  horizons (default `0.0`). See [`horizon_angle`](@ref).
 
 # Returns
 A matrix of SVF values in the range [0, 1].
@@ -314,8 +316,9 @@ A matrix of SVF values in the range [0, 1].
 function sky_view_factor(dem::AbstractMatrix{<:Real};
     directions::Int = 16,
     cellsize = cellsize(dem),
+    missing_elevation::Real = 0.0,
 )
-    horizons = horizon_angle(dem; directions, cellsize)
+    horizons = horizon_angle(dem; directions, cellsize, missing_elevation)
     ndirs = size(horizons, 3)
     backend = get_backend(horizons)
     result = KernelAbstractions.allocate(backend, Float32, size(dem))
