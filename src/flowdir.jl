@@ -16,12 +16,14 @@ A flow direction value in convention `C`, stored as type `T`.
 - `FlowDirection{C}(ci::CartesianIndex{2})`: Create from a CartesianIndex offset.
 
 # Conversion
-- `CartesianIndex(d::Direction)`: Convert to CartesianIndex offset.
+- `CartesianIndex(d::FlowDirection)`: Convert to CartesianIndex offset.
 - `convert(FlowDirection{C2}, d::FlowDirection{C1})`: Convert between conventions.
-- `Int(d::Direction)`: Get the raw integer value.
+- `Int(d::FlowDirection)`: Get the raw integer value.
 """
 struct FlowDirection{C <: FlowDirectionConvention, T <: Integer} <: Integer
     value::T
+    FlowDirection{C, T}(value::Integer) where {C <: FlowDirectionConvention, T <: Integer} =
+        new{C, T}(value)
 end
 
 FlowDirection{C}(v::T) where {C <: FlowDirectionConvention, T <: Integer} =
@@ -33,8 +35,11 @@ Base.show(io::IO, d::FlowDirection{C}) where {C} = print(io, _arrow(C, d.value))
 Base.CartesianIndex(d::FlowDirection{C}) where {C} = _dir_to_ci(C, d.value)
 Base.Int(d::FlowDirection) = Int(d.value)
 Base.:(==)(a::FlowDirection{C}, b::FlowDirection{C}) where {C} = a.value == b.value
+Base.:(==)(a::FlowDirection{C1}, b::FlowDirection{C2}) where {C1, C2} = false
 Base.:(==)(a::FlowDirection{C}, b::Integer) where {C} = a.value == b
 Base.:(==)(a::Integer, b::FlowDirection{C}) where {C} = a == b.value
+Base.:(==)(a::FlowDirection{C}, b::BigInt) where {C} = a.value == b
+Base.:(==)(a::BigInt, b::FlowDirection{C}) where {C} = a == b.value
 
 Base.convert(::Type{CartesianIndex{2}}, d::FlowDirection{C}) where {C} =
     _dir_to_ci(C, d.value)
@@ -43,8 +48,9 @@ Base.convert(::Type{FlowDirection{C}}, ci::CartesianIndex{2}) where {C} =
 Base.convert(t::Type{T}, d::FlowDirection{C, T}) where {C, T <: Integer} = d.value
 Base.convert(::Type{FlowDirection{C}}, d::T) where {C, T <: Integer} =
     FlowDirection{C, T}(d)
-Base.convert(::Type{FlowDirection{C}}, d::T) where {C, T <: FlowDirection} =
+Base.convert(::Type{FlowDirection{C}}, d::FlowDirection{C2}) where {C, C2} =
     FlowDirection{C}(Base.convert(CartesianIndex{2}, d))
+Base.convert(::Type{FlowDirection{C}}, d::FlowDirection{C, <:FlowDirection}) where {C} = d
 
 """Return the `FlowDirectionConvention` type of a direction."""
 convention(::Type{FlowDirection{C}}) where {C} = C
@@ -65,7 +71,7 @@ Local Drainage Direction (PCRaster) convention using 1-9 numpad encoding:
 ```
 
 Axis convention: dim1 = x (East+), dim2 = y (North+).
-The table equals `centered(reshape(1:9, 3, 3))`:
+The table equals `OffsetArray(reshape(1:9, 3, 3), -2, -2)`:
 ```
 # 1 4 7    W
 # 2 5 8  S   N
@@ -76,7 +82,7 @@ struct LDD <: FlowDirectionConvention end
 
 _arrow(::Type{LDD}, d::Integer) = ('↖', '←', '↙', '↑', '·', '↓', '↗', '→', '↘')[d]
 
-const _ldd_ci2dir = centered(reshape(UInt8.(1:9), 3, 3))
+const _ldd_ci2dir = OffsetArray(reshape(UInt8.(1:9), 3, 3), -2, -2)
 const _ldd_dir2ci = (
     CartesianIndex(-1, -1),  # 1 = SW
     CartesianIndex(0, -1),   # 2 = S
@@ -138,7 +144,7 @@ function _arrow(::Type{D8D}, d::Integer)
     return '✳'  # 3+ directions
 end
 
-const _d8_ci2dir = centered(UInt8[8 16 32; 4 0 64; 2 1 128])
+const _d8_ci2dir = OffsetArray(UInt8[8 16 32; 4 0 64; 2 1 128], -2, -2)
 const _d8_offsets = (
     CartesianIndex(1, 0),    # bit 0: 1 = E
     CartesianIndex(1, -1),   # bit 1: 2 = SE

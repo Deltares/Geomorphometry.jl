@@ -1,11 +1,15 @@
 """
-    mask = skewness_balancing(A; mean=mean(A))
+    mask = skewness_balancing(A; mean=_mean(A))
 
 Applies skewness balancing by [Bartels et al. (2006)](@cite bartelsDTMGenerationLIDAR2006) to `A`.
 Improved the performance by applying a binary search to find the threshold value.
 
 # Output
-- `mask::BitMatrix` Mask of allowed values
+- `mask::BitMatrix` Mask of allowed (ground) values
+
+# Arguments
+- `A::AbstractArray` Input array of elevations
+- `mean=_mean(A)` Mean elevation used to seed the skewness computation
 """
 function skewness_balancing(iA::AbstractArray; mean = _mean(iA))
 
@@ -94,11 +98,11 @@ more (sloped) terrain.
 """
 function skbr(A::AbstractMatrix{<:Real}; iterations = 1, mean = _mean(A))
     @info mean
-    terrain_mask = skb(A; mean)
+    terrain_mask = skewness_balancing(A; mean)
     object_mask = .!terrain_mask
     while iterations > 1 && sum(object_mask) > 0
         @info "Iteration $iterations"
-        terrain_mask[object_mask] .|= skb(A[object_mask])
+        terrain_mask[object_mask] .|= skewness_balancing(A[object_mask])
         object_mask .= .!terrain_mask
         iterations -= 1
     end

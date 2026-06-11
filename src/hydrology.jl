@@ -14,13 +14,13 @@ function edges(CI::CartesianIndices)
 end
 
 """
-    filldepressions(dem::AbstractMatrix, mask::Matrix{Bool})
+    filldepressions(dem::AbstractMatrix, mask=falses(size(dem)))
 
 Performs the Priority-Flood algorithm [barnesPriorityFloodOptimalDepressionFilling2014](@cite) on the given digital elevation model (DEM) `dem` with an optional `mask`.
 
 # Arguments
 - `dem::AbstractMatrix`: A 2D array representing the digital elevation model (DEM).
-- `mask::AbstractMatrix{Bool}`: A 2D boolean array representing the mask. Cells with `true` values are considered in the computation, while cells with `false` values are ignored.
+- `mask::AbstractMatrix{Bool}`: An optional 2D boolean array representing the mask. Cells with `true` values are treated as already filled (queued) and excluded from the computation. Defaults to all `false`.
 """
 function filldepressions(dem::AbstractMatrix, mask = falses(size(dem)))
     filldepressions!(copy(dem), mask)
@@ -36,7 +36,13 @@ struct D8 <: FlowDirectionMethod end
 """DInf Flow Direction method by [Tarboton (1997)](@cite tarbotonNewMethodDetermination1997)."""
 struct DInf <: FlowDirectionMethod end
 
-"""FD8 Flow Direction method by [Quinn (1991)](@cite quinnPredictionHillslopeFlow1991)."""
+"""
+    FD8(; p=1.1)
+
+FD8 (multiple) Flow Direction method by [Quinn (1991)](@cite quinnPredictionHillslopeFlow1991).
+The exponent `p` controls how strongly flow concentrates towards the steepest descent: higher
+values approach single-direction flow, lower values spread flow more evenly.
+"""
 Base.@kwdef struct FD8 <: FlowDirectionMethod
     p::Float32 = 1.1
 end
@@ -182,10 +188,10 @@ function infa(aspect)
 end
 
 """
-    flowaccumulation(dem::AbstractMatrix, closed::Matrix{Bool}, method::FlowDirectionMethod)
+    flowaccumulation(dem::AbstractMatrix, closed=falses(size(dem)); method=DInf(), cellsize=cellsize(dem))
 
 Computes the flow accumulation of a digital elevation model (DEM) `dem` with an optional `closed` mask and a `method` for flow direction.
-Returns the flow accumulation and the flow direction (local drainage direction or ldd)
+Returns the flow accumulation and the flow direction (local drainage direction or ldd).
 """
 function flowaccumulation(
     dem::AbstractMatrix,
@@ -401,7 +407,7 @@ end
 @deprecate SPI stream_power_index
 
 """
-    height_above_nearest_drainage(dem::AbstractMatrix; method=DInf(), cellsize=cellsize(dem), threshold=1e10)
+    height_above_nearest_drainage(dem::AbstractMatrix; method=DInf(), cellsize=cellsize(dem), threshold=100)
 
 Compute Height Above Nearest Drainage (HAND, [nobreHeightNearestDrainage2011](@cite)) of a digital elevation model (DEM) `dem` 
 with an optional `method` for flow direction, a `cellsize`, and a flow accumulation `threshold` for stream definition.

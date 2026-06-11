@@ -1,5 +1,5 @@
 """
-    horizon_angle(dem; method=GridSweep(), cellsize=cellsize(dem), missing_elevation=0.0)
+    horizon_angle(dem; directions=16, cellsize=cellsize(dem), missing_elevation=0.0)
 
 Compute horizon angles for each cell in a DEM.
 
