@@ -174,4 +174,92 @@ using Rasters.DimensionalData.Lookups
         @test svf isa GeoArray
         @test size(svf) == (16, 16)
     end
+    @testset "viewshed" begin
+        # Flat terrain: every cell is visible from any observer (dense Bool).
+        flat = ones(11, 11) * 100.0
+        v = viewshed(flat, (6, 6); cellsize = (1.0, 1.0))
+        @test size(v) == (11, 11)
+        @test eltype(v) == Bool
+        @test all(v)                  # everything visible on a flat plane
+        @test v[6, 6]                 # observer
+
+        # A wall hides everything directly behind it.
+        dem = fill(100.0, 10, 3)
+        dem[5, :] .= 110.0
+        v = viewshed(dem, (10, 2); cellsize = (1.0, 1.0))
+        @test all(v[r, 2] for r in 5:10)        # observer up to the wall
+        @test !any(v[r, 2] for r in 1:4)        # hidden behind the wall
+
+        # Off-axis line of sight: a spike between observer and target hides it.
+        dem2 = fill(100.0, 7, 7)
+        dem2[4, 5] = 130.0                       # spike on the way to (1, 7)
+        v2 = viewshed(dem2, (7, 3); cellsize = (1.0, 1.0))
+        @test !v2[1, 7]                          # blocked by the off-axis spike
+        @test v2[7, 3]                           # observer
+
+        # A peak observer sees more than one in a pit.
+        cone = fill(100.0, 21, 21)
+        for i in 1:21, j in 1:21
+            cone[i, j] = 100.0 + max(0.0, 10.0 - hypot(i - 11, j - 11))
+        end
+        @test count(viewshed(cone, (11, 11); cellsize = (1.0, 1.0))) >
+              count(viewshed(cone, (1, 1); cellsize = (1.0, 1.0)))
+
+        # Accepts a CartesianIndex observer.
+        vc = viewshed(flat, CartesianIndex(6, 6); cellsize = (1.0, 1.0))
+        @test all(vc)
+
+        # observer_height lets the observer see over a low obstacle.
+        demh = fill(100.0, 1, 9)
+        demh[1, 5] = 101.0                       # 1 m bump between observer and target
+        @test !viewshed(demh, (1, 1); cellsize = (1.0, 1.0))[1, 9]
+        @test viewshed(demh, (1, 1); cellsize = (1.0, 1.0), observer_height = 3.0)[1, 9]
+
+        # NaN handling: a NaN target is not visible; a NaN observer hides all.
+        demn = fill(100.0, 5, 5)
+        demn[1, 1] = NaN
+        @test !viewshed(demn, (5, 5); cellsize = (1.0, 1.0))[1, 1]
+        @test !any(viewshed(demn, (1, 1); cellsize = (1.0, 1.0)))
+
+        # Invalid observer.
+        @test_throws ArgumentError viewshed(flat, (0, 6))
+        @test_throws ArgumentError viewshed(flat, (6, 99))
+    end
+
+    @testset "total_viewshed" begin
+        # Flat terrain: everything visible everywhere.
+        flat = ones(12, 12) * 100.0
+        tv = total_viewshed(flat; directions = 8, cellsize = (1.0, 1.0))
+        @test size(tv) == (12, 12)
+        @test all(tv .≈ 1.0f0)
+
+        # Uniform slope: no occlusion anywhere. A small observer height makes the
+        # grazing line of sight robust (every cell visible).
+        slope = [Float64(r) for r in 1:12, c in 1:12]
+        tvs = total_viewshed(slope; directions = 8, cellsize = (1.0, 1.0), observer_height = 1.6)
+        @test all(tvs .≈ 1.0f0)
+
+        # A peak sees everything; cells in its shadow see less. Observer height of
+        # ~1.6 m lets the peak see over the grazing cone surface.
+        dem = fill(100.0, 21, 21)
+        for i in 1:21, j in 1:21
+            d = hypot(i - 11, j - 11)
+            dem[i, j] = 100.0 + max(0.0, 10.0 - d)
+        end
+        tvp = total_viewshed(dem; directions = 8, cellsize = (1.0, 1.0), observer_height = 1.6)
+        @test tvp[11, 11] ≈ 1.0f0          # peak sees all
+        @test tvp[1, 1] < tvp[11, 11]      # corner partly blocked by the peak
+        @test all(0.0 .<= tvp .<= 1.0)
+
+        # Without an observer height the grazing cone surface is not fully visible.
+        tvp0 = total_viewshed(dem; directions = 8, cellsize = (1.0, 1.0))
+        @test tvp0[11, 11] < 1.0f0
+
+        # Rotation path (>8 directions) runs and stays in range.
+        tv16 = total_viewshed(dem; directions = 16, cellsize = (1.0, 1.0), observer_height = 1.6)
+        @test all(0.0 .<= tv16 .<= 1.0)
+
+        @test_throws ArgumentError total_viewshed(flat; directions = 6)
+    end
+
 end
