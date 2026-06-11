@@ -1,5 +1,9 @@
 using Geomorphometry
 using Test
+using Rasters
+using GeoArrays
+using Rasters.DimensionalData
+using Rasters.DimensionalData.Lookups
 
 @testset "horizon" begin
     @testset "4 directions" begin
@@ -70,4 +74,43 @@ using Test
         @test svf_slope[5, 5] > 0.0
     end
 
+    @testset "Raster wrapping is preserved" begin
+        A = Float64[row + sin(col/3) for row in 1:16, col in 1:16]
+        x = Rasters.X(Sampled(1.0:1.0:16.0; sampling=Intervals(Start()),
+                              order=ForwardOrdered(), span=Regular(1.0)))
+        y = Rasters.Y(Sampled(1.0:1.0:16.0; sampling=Intervals(Start()),
+                              order=ForwardOrdered(), span=Regular(1.0)))
+        r = Raster(A, (x, y); crs=Rasters.EPSG(32633))
+
+        h8 = horizon_angle(r; directions=8)
+        @test h8 isa Raster
+        @test size(h8) == (16, 16, 8)
+        @test Rasters.dims(h8)[3] isa Rasters.Band
+
+        h16 = horizon_angle(r; directions=16)
+        @test h16 isa Raster
+        @test size(h16) == (16, 16, 16)
+
+        svf = sky_view_factor(r; directions=8)
+        @test svf isa Raster
+        @test size(svf) == (16, 16)
+    end
+
+    @testset "GeoArray wrapping is preserved" begin
+        A = Float64[row + sin(col/3) for row in 1:16, col in 1:16]
+        ga = GeoArray(A)
+        GeoArrays.bbox!(ga, (min_x=0.0, min_y=0.0, max_x=16.0, max_y=16.0))
+
+        h8 = horizon_angle(ga; directions=8)
+        @test h8 isa GeoArray
+        @test size(h8) == (16, 16, 8)
+
+        h16 = horizon_angle(ga; directions=16)
+        @test h16 isa GeoArray
+        @test size(h16) == (16, 16, 16)
+
+        svf = sky_view_factor(ga; directions=8)
+        @test svf isa GeoArray
+        @test size(svf) == (16, 16)
+    end
 end
