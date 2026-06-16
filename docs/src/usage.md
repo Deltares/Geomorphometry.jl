@@ -292,7 +292,7 @@ heatmap(percentile_elevation(dtm; radius=5); colormap=:delta, colorrange=(0,1))
 :::
 
 ## Horizon
-Related to the relative position is the category related to the view (to a horizon) from any cell in a DEM. We have [`horizon_angle`](@ref) to compute the maximum horizon angle for a given number of directions, and [`sky_view_factor`](@ref) to compute fraction of the sky (hemisphere) visible from a cell.
+Related to the relative position is the category related to the view (to a horizon) from any cell in a DEM. We have [`horizon_angle`](@ref) to compute the maximum horizon angle for a given number of directions, and [`sky_view_factor`](@ref) to compute fraction of the sky (hemisphere) visible from a cell. The same running-maximum test powers [`viewshed`](@ref), the line-of-sight visibility map of a single observer cell, and [`total_viewshed`](@ref), a normalized visibility index for every cell.
 
 :::tabs
 
@@ -304,12 +304,25 @@ heatmap(hor[:,:,1]; colormap=:curl, colorrange=(-90, 90))  # first direction (ea
 == Sky View Factor (SVF) in 16 directions
 ```@example plots
 skf = sky_view_factor(dtm)
-heatmap(skf; colormap=Reverse(:deep))
+heatmap(skf; colormap=:ice)
 ```
 == Sky View Factor (SVF) in 64 directions
 ```@example plots
-skf = sky_view_factor(dtm;directions=64)
-heatmap(skf; colormap=Reverse(:deep))
+skf = sky_view_factor(dtm; directions=64)
+heatmap(skf; colormap=:ice)
+```
+== Viewshed
+```@example plots
+point = CartesianIndex(400,400)
+vs = viewshed(dtm, point; observer_height=500)
+f = heatmap(vs; colormap=:ice, colorrange=(-0.5,1.5))
+scatter!(GeoArrays.coords(dtm, point); color=:orange)
+f
+```
+== Total Viewshed
+```@example plots
+tvs = total_viewshed(dtm)
+heatmap(tvs; colormap=:ice)
 ```
 
 :::

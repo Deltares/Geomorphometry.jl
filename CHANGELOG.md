@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+## Added
+- Added `viewshed` (single-observer line-of-sight visibility) and `total_viewshed` (normalized visibility index).
+
+## Fixed
+- `sky_view_factor` and `horizon_angle` now work on for longer distance.
+
+## Changed
+- `sky_view_factor` and `horizon_angle` now use similar(input) for output, e.g. keeping a Raster or GeoArray.
+
 ## [0.7.3] - 2026-03-07
 
 ## Added

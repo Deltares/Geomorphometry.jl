@@ -64,6 +64,6 @@ export filldepressions,
     stream_power_index,
     height_above_nearest_drainage
 export FlowDirection, LDD, D8D
-export horizon_angle, sky_view_factor
+export horizon_angle, sky_view_factor, viewshed, total_viewshed
 
 end # module
