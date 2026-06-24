@@ -1,3 +1,4 @@
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.10395/status.svg)](https://doi.org/10.21105/joss.10395)
 [![CI](https://github.com/Deltares/GeoRasterFiltering.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/Deltares/GeoRasterFiltering.jl/actions/workflows/CI.yml)
 [![Codecov](https://codecov.io/gh/Deltares/Geomorphometry.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/Deltares/Geomorphometry.jl)
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://deltares.github.io/Geomorphometry.jl/stable/)
