@@ -12,7 +12,14 @@ authors:
     family-names: Pronk
     affiliation: Deltares
     orcid: 'https://orcid.org/0000-0001-8758-3939'
+  - given-names: Rafael
+    family-names: Schouten
+    orcid: 'https://orcid.org/0000-0002-8380-0884'
+    affiliation: University of Melbourne
 identifiers:
+  - type: doi
+    value: 10.21105/joss.10395
+    description: JOSS
   - type: doi
     value: 10.5281/zenodo.18851928
 repository-code: 'https://github.com/Deltares/Geomorphometry.jl'
