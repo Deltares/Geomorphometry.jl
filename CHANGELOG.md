@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-07-01
+
 ## Added
 - Added `viewshed` (single-observer line-of-sight visibility) and `total_viewshed` (normalized visibility index).
 
