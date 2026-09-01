@@ -10,17 +10,14 @@ function roughness(dem::AbstractMatrix{<:Real}, window::Stencil = Moore(1))
     mapstencil(_roughness, window, dem)
 end
 function roughness(dem)
-    dst = similar(dem)
-    cells = eachindex(dem)
-    for cell in cells
-        value = zero(eltype(dem))
-        for neighbor in neighbors(dem, cell)
-            neighbor in cells || continue
-            value = max(value, abs(dem[neighbor] - dem[cell]))
-        end
-        dst[cell] = value
+    return mapneighbors(_roughness_kernel, dem; threaded = true)
+end
+function _roughness_kernel(cell, value, values)
+    o = zero(value)
+    for v in values
+        o = max(o, abs(v - value))
     end
-    return dst
+    return o
 end
 function _roughness(x)
     o = zero(eltype(x))
@@ -42,19 +39,16 @@ function topographic_position_index(dem::AbstractMatrix{<:Real}, window::Stencil
     mapstencil(x -> center(x) - mean(x), window, dem)
 end
 function topographic_position_index(dem)
-    dst = similar(dem, Float32)
-    cells = eachindex(dem)
-    for cell in cells
-        total = 0.0
-        count = 0
-        for neighbor in neighbors(dem, cell)
-            neighbor in cells || continue
-            total += dem[neighbor]
-            count += 1
-        end
-        dst[cell] = dem[cell] - total / count
+    return mapneighbors(_tpi_kernel, dem; threaded = true)
+end
+function _tpi_kernel(cell, value, values)
+    total = 0.0
+    count = 0
+    for v in values
+        total += v
+        count += 1
     end
-    return dst
+    return Float32(value - total / count)
 end
 @deprecate TPI topographic_position_index
 
@@ -127,23 +121,19 @@ function terrain_ruggedness_index(dem; normalize = false, squared = true)
         @warn "TRI: normalize=false and squared=false is not recommended."
     end
 
-    dst = copy(dem)
-    cells = eachindex(dem)
-    for cell in cells
-        value = 0.0
+    return mapneighbors(dem; threaded = true) do cell, value, values
+        total = 0.0
         count = 0
-        for neighbor in neighbors(dem, cell)
-            neighbor in cells || continue
-            difference = abs(dem[neighbor] - dem[cell])
-            value += squared ? difference^2 : difference
+        for v in values
+            difference = abs(v - value)
+            total += squared ? difference^2 : difference
             count += 1
         end
         if normalize
-            value /= count
+            total /= count
         end
-        dst[cell] = squared ? sqrt(value) : value
+        return convert(typeof(value), squared ? sqrt(total) : total)
     end
-    return dst
 end
 @deprecate TRI terrain_ruggedness_index
 
@@ -165,17 +155,14 @@ function prominence(dem::AbstractMatrix{<:Real})
     return localfilter!(dst, dem, 3, initial, update, store!)
 end
 function prominence(dem)
-    dst = similar(dem, Int8)
-    cells = eachindex(dem)
-    for cell in cells
-        count = 0
-        for neighbor in neighbors(dem, cell)
-            neighbor in cells || continue
-            count += dem[neighbor] <= dem[cell]
-        end
-        dst[cell] = count
+    return mapneighbors(_prominence_kernel, dem; threaded = true)
+end
+function _prominence_kernel(cell, value, values)
+    count = 0
+    for v in values
+        count += v <= value
     end
-    return dst
+    return Int8(count)
 end
 
 round_step(x, step) = round(x / step) * step
