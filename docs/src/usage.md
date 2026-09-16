@@ -328,6 +328,30 @@ heatmap(tvs; colormap=:ice)
 :::
 
 
+## Landforms
+The same lines of sight also classify the terrain itself. [`geomorphon`](@ref) reduces the view in eight directions to a ternary pattern of rising, flat and falling directions, and maps it onto one of ten [`Landform`](@ref) classes. The `radius` keyword sets the scale of the classification, while `flatness` sets how much relief a direction needs before it is no longer considered flat.
+
+:::tabs
+
+== Geomorphons
+```@example plots
+forms = geomorphon(dtm)
+heatmap(Int.(forms); colormap=:tab10, colorrange=(0.5, 10.5), lowclip=:transparent)
+```
+== Geomorphons at a larger scale
+```@example plots
+forms = geomorphon(dtm; radius=25, skip=2)
+heatmap(Int.(forms); colormap=:tab10, colorrange=(0.5, 10.5), lowclip=:transparent)
+```
+== Ridges only
+```@example plots
+forms = geomorphon(dtm)
+heatmap(forms .== Ridge; colormap=:ice, colorrange=(-0.5, 1.5))
+```
+
+:::
+
+
 ## Hydrology
 Hydrological operations are used to analyze the flow of water on the terrain. We provide [`filldepressions`](@ref) to fill depressions, [`depression_depth`](@ref) to calculate the depth of each depression (difference between filled dem and dem) and [`depression_volume`](@ref) that sums all depression depths. The major depression in the example is the caldera of the dormant volcano ([Mount Scenery](https://en.wikipedia.org/wiki/Mount_Scenery)).
 

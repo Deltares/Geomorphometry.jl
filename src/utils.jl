@@ -197,6 +197,12 @@ end
     o
 end
 
+# Allocate an output array of element type `T` for `dem`. The default uses `similar`, so
+# that plain matrices and GPU arrays propagate their storage type. Extensions override it
+# for wrapper types that carry a missing value which cannot be converted to `T`, such as
+# the categorical `Landform`.
+_alloc(dem, T) = similar(dem, T)
+
 """
     cellsize(dem)
 
