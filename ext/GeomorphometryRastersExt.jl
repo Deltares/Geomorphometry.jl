@@ -11,6 +11,13 @@ function Geomorphometry._alloc_directions(dem::Raster, T, ndirs)
     Rasters.rebuild(dem; data, dims=(Rasters.dims(dem)..., Rasters.Band(1:ndirs)))
 end
 
+# A landform is not an elevation, so the missing value of the classification is
+# `Undefined` rather than a conversion of the elevation's missing value.
+function Geomorphometry._alloc(dem::Raster, ::Type{Geomorphometry.Landform})
+    data = similar(parent(dem), Geomorphometry.Landform)
+    Rasters.rebuild(dem; data, missingval=Geomorphometry.Undefined)
+end
+
 function Geomorphometry.cellsize(dem::Raster)
     T = _crstrait(dem)
     _cellsize(T, dem)
