@@ -1,6 +1,7 @@
 [deps]
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
+DimensionalData = "0703355e-b756-11e9-17c0-8b28908087d0"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 DocumenterCitations = "daee34ce-89f3-4625-b898-19384cb65244"
 DocumenterVitepress = "4710194d-e776-4893-9690-8d956a29c365"
@@ -16,4 +17,7 @@ Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 Geomorphometry = {path = ".."}
 
 [compat]
-Makie = "0.24"
+# DimensionalData 0.30.2 breaks Makie 0.22 plotting, and GeoArrays 0.9.5 cannot plot
+# arrays with missing values on Makie 0.24.
+DimensionalData = "=0.30.1"
+Makie = "0.22"
