@@ -336,12 +336,12 @@ The same lines of sight also classify the terrain itself. [`geomorphon`](@ref) r
 == Geomorphons
 ```@example plots
 forms = geomorphon(dtm)
-heatmap(Int.(forms); colormap=:tab10, colorrange=(0.5, 10.5), lowclip=:transparent)
+heatmap(forms; colormap=:tab10, colorrange=(0.5, 10.5), lowclip=:transparent)
 ```
 == Geomorphons at a larger scale
 ```@example plots
 forms = geomorphon(dtm; radius=25, skip=2)
-heatmap(Int.(forms); colormap=:tab10, colorrange=(0.5, 10.5), lowclip=:transparent)
+heatmap(forms; colormap=:tab10, colorrange=(0.5, 10.5), lowclip=:transparent)
 ```
 == Ridges only
 ```@example plots

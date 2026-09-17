@@ -54,8 +54,12 @@ const _LANDFORM_NAMES = (
 Base.show(io::IO, l::Landform) = print(io, _LANDFORM_NAMES[l.value + 1])
 Base.:(==)(a::Landform, b::Landform) = a.value == b.value
 Base.:(<)(a::Landform, b::Landform) = a.value < b.value
-Base.Int(l::Landform) = Int(l.value)
-Base.UInt8(l::Landform) = l.value
+# Convert to the primitive number types through the category number, so that numeric code
+# such as plotting libraries can use a classification directly.
+(::Type{T})(l::Landform) where {
+    T <: Union{Int8, Int16, Int32, Int64, Int128, UInt8, UInt16, UInt32, UInt64, UInt128, Float32, Float64},
+} = T(l.value)
+Base.AbstractFloat(l::Landform) = float(l.value)
 # The category numbers run from `Undefined` to `Pit`; wrapper types use these to pick a
 # missing value for a classification.
 Base.typemin(::Type{Landform}) = Undefined
