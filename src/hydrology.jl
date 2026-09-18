@@ -75,7 +75,7 @@ function filldepressions!(dem::AbstractMatrix, queued = falses(size(dem)))
 end
 
 nbs =
-    CartesianIndex.([(-1, -1), (-1, 1), (1, -1), (1, 1), (-1, 0), (0, -1), (0, 1), (1, 0)])
+    CartesianIndex.([(-1, 0), (0, -1), (0, 1), (1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1)])
 
 function watersheds(dem::AbstractMatrix, queued = falses(size(dem)))
     open = PriorityQueue{CartesianIndex{2}, eltype(dem)}()
