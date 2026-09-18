@@ -1,7 +1,9 @@
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.10395/status.svg)](https://doi.org/10.21105/joss.10395)
 [![CI](https://github.com/Deltares/GeoRasterFiltering.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/Deltares/GeoRasterFiltering.jl/actions/workflows/CI.yml)
 [![Codecov](https://codecov.io/gh/Deltares/Geomorphometry.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/Deltares/Geomorphometry.jl)
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://deltares.github.io/Geomorphometry.jl/stable/)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://deltares.github.io/Geomorphometry.jl/dev/)
+[![Aqua QA](https://juliatesting.github.io/Aqua.jl/dev/assets/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
 # Geomorphometry
 Geospatial operations, cost and filtering algorithms as used for elevation rasters.
@@ -19,6 +21,13 @@ From the Julia REPL, type `]` to enter the Pkg REPL mode and run:
 ```
 pkg> add Geomorphometry
 ```
+
+## Contributing
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to:
+
+- Report bugs and issues
+- Request new features
+- Submit pull requests
 
 ## Alternative Packages
 If you are working in Python the [xDEM](https://xdem.readthedocs.io/en/stable/) package provides a comprehensive suite of tools for DEM analysis

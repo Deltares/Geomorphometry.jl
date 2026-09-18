@@ -2,6 +2,50 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+## Added
+- Added `geomorphon` to classify each cell of a DEM into one of ten `Landform` classes.
+
+## [0.7.4] - 2026-07-01
+
+## Added
+- Added `viewshed` (single-observer line-of-sight visibility) and `total_viewshed` (normalized visibility index).
+
+## Fixed
+- `sky_view_factor` and `horizon_angle` now work on for longer distance.
+
+## Changed
+- `sky_view_factor` and `horizon_angle` now use similar(input) for output, e.g. keeping a Raster or GeoArray.
+
+## [0.7.3] - 2026-03-07
+
+## Added
+- Added methods `depression_depth`, `depression_volume`, `drainage_potential` and `percentile_elevation`.
+- Added `FlowDirection` that wraps integer encodings for flow direction. 
+
+## Fixed
+- No more double flow accumulation on edges (cells without flow direction)
+
+## Changed
+- The second returned argument `ldd` of `flowaccumulation` now returns a `Matrix{Direction{C, UInt8}}` instead of a `Matrix{UInt8}`.
+- The second returned argument `ldd` of `flowaccumulation` now return multiple flow direction encodings (LDD) when `DInf()` and `FD8` are used for the `method` kwarg. These range from 0 to 128, not just 1-9.
+- Changed default `method` for all flow related methods from `D8()` to `DInf()`.
+
+## Deprecated
+- *All* shorthand names (e.g. `TPI`, `HAND`) are now deprecated in favour of their written out names (e.g. `topographic_position_index`).
+
+## [0.7.2] - 2026-03-03
+
+## Added
+- Added `horizon_angle` and `sky_view_factor` methods.
+
+## [0.7.1] - 2025-09-03
+
+## Fixed
+- Fixed incorrect flows of DInf and FD8 methods
+
+
 ## [0.7.0] - 2025-03-21
 
 ### Added

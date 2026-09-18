@@ -1,13 +1,17 @@
 """
-    mask = skb(A; mean=mean(A))
+    mask = skewness_balancing(A; mean=_mean(A))
 
-Applies skewness balancing by [Bartels e.a (2006)](@cite bartelsDTMGenerationLIDAR2006) to `A`.
+Applies skewness balancing by [Bartels et al. (2006)](@cite bartelsDTMGenerationLIDAR2006) to `A`.
 Improved the performance by applying a binary search to find the threshold value.
 
 # Output
-- `mask::BitMatrix` Mask of allowed values
+- `mask::BitMatrix` Mask of allowed (ground) values
+
+# Arguments
+- `A::AbstractArray` Input array of elevations
+- `mean=_mean(A)` Mean elevation used to seed the skewness computation
 """
-function skb(iA::AbstractArray; mean = _mean(iA))
+function skewness_balancing(iA::AbstractArray; mean = _mean(iA))
 
     # Replace infinite values with maxintfloat
     mask = .!isfinite.(iA)
@@ -47,6 +51,7 @@ function skb(iA::AbstractArray; mean = _mean(iA))
     mask[I[i:end]] .= false
     return mask
 end
+@deprecate skb skewness_balancing
 
 function skb2(iA::AbstractArray; mean = mean(iA))
     m = .!isfinite.(iA)
@@ -84,8 +89,8 @@ _mean(A::AbstractArray) = mean(filter(isfinite, vec(A)))
 """
     mask = skbr(A; iterations=10)
 
-Applies recursive skewness balancing by [Bartels e.a (2010)](@cite bartelsThresholdfreeObjectGround2010) to `A`.
-Applies `skb` `iterations` times to the object (non-terrain) mask, as to include
+Applies recursive skewness balancing by [Bartels et al. (2010)](@cite bartelsThresholdfreeObjectGround2010) to `A`.
+Applies `skewness_balancing` `iterations` times to the object (non-terrain) mask, as to include
 more (sloped) terrain.
 
 # Output
@@ -93,11 +98,11 @@ more (sloped) terrain.
 """
 function skbr(A::AbstractMatrix{<:Real}; iterations = 1, mean = _mean(A))
     @info mean
-    terrain_mask = skb(A; mean)
+    terrain_mask = skewness_balancing(A; mean)
     object_mask = .!terrain_mask
     while iterations > 1 && sum(object_mask) > 0
         @info "Iteration $iterations"
-        terrain_mask[object_mask] .|= skb(A[object_mask])
+        terrain_mask[object_mask] .|= skewness_balancing(A[object_mask])
         object_mask .= .!terrain_mask
         iterations -= 1
     end

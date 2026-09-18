@@ -13,8 +13,19 @@ struct ZevenbergenThorne <: DerivativeMethod end
 """Third order finite difference estimator using all 8 neighbors by [Horn, (1981)](@cite hornHillShadingReflectance1981)."""
 struct Horn <: DerivativeMethod end
 
-"""Maximum Downward Gradient"""
+"""
+    MaximumDownwardGradient()
+
+Maximum Downward Gradient derivative estimator, which uses the steepest descent towards
+a neighboring cell. Also available under the alias [`MDG`](@ref).
+"""
 struct MaximumDownwardGradient <: DerivativeMethod end
+
+"""
+    MDG
+
+Alias for [`MaximumDownwardGradient`](@ref).
+"""
 const MDG = MaximumDownwardGradient
 
 struct LandSerf <: DerivativeMethod end
@@ -22,9 +33,17 @@ struct LandSerf <: DerivativeMethod end
 struct GDAL <: DerivativeMethod end
 
 """
-    slope(dem::Matrix{<:Real}; cellsize=cellsize(dem), method=Horn(), exaggeration=1.0)
+    slope(dem::AbstractMatrix{<:Real}; cellsize=cellsize(dem), method=Horn(), exaggeration=1.0, direction=nothing)
 
 Slope is the rate of change between a cell and its neighbors.
+
+# Arguments
+- `dem::AbstractMatrix{<:Real}`: Input digital elevation model.
+- `cellsize`: Cell size, used to scale horizontal distances. Derived from `dem` by default.
+- `method::DerivativeMethod=Horn()`: Derivative estimator, e.g. [`Horn`](@ref) or [`ZevenbergenThorne`](@ref).
+- `exaggeration=1.0`: Factor to exaggerate elevation differences.
+- `direction::Union{Nothing,Real}=nothing`: If given a compass direction in degrees, returns the
+  directional (signed) slope along that azimuth instead of the steepest slope.
 """
 function slope(
     dem::AbstractMatrix{<:Real};
@@ -101,9 +120,9 @@ function slope!(
 end
 
 """
-    aspect(dem::Matrix{<:Real}, method=Horn())
+    aspect(dem::AbstractMatrix{<:Real}; method=Horn(), cellsize=cellsize(dem))
 
-Aspect is direction of [`slope`](@ref).
+Aspect is the direction of the steepest [`slope`](@ref), in degrees clockwise from north.
 """
 function aspect(
     dem::AbstractMatrix{<:Real};
@@ -240,7 +259,20 @@ function _aspect(compass::Real)
 end
 
 @deprecate curvature(args...; kwargs...) laplacian(args...; gis = true, kwargs...)
+"""
+    laplacian(dem::AbstractMatrix{<:Real}; cellsize=cellsize(dem), radius=1, gis=false, direction=nothing)
 
+Laplacian of the DEM, the second derivative of elevation, highlighting local convexity
+(ridges, positive) and concavity (valleys, negative).
+
+# Arguments
+- `dem::AbstractMatrix{<:Real}`: Input digital elevation model.
+- `cellsize`: Cell size, used to scale horizontal distances. Derived from `dem` by default.
+- `radius=1`: Radius (in cells) of the neighborhood used to estimate the derivatives.
+- `gis=false`: If `true`, scale the result by 100, following the convention used by some GIS tools.
+- `direction=nothing`: If given a compass direction in degrees, computes the directional
+  Laplacian along that azimuth.
+"""
 function laplacian(
     dem::AbstractMatrix{<:Real};
     cellsize = cellsize(dem),

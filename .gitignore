@@ -3,6 +3,7 @@
 *.jl.mem
 .DS_Store
 Manifest.toml
+Manifest-v*.toml
 docs/build/
 *.tif
 *.gif
@@ -16,4 +17,5 @@ _extensions
 scripts
 .documenter
 docs/src/CHANGELOG.md
+docs/src/CONTRIBUTING.md
 *.png

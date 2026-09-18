@@ -12,9 +12,9 @@ CairoMakie.activate!(type = "png")
 A = GeoArrays.read("saba.tif") # hide
 B = GeoArrays.read("saba_dsm.tif") # hide
 mask = ismissing.(A) # hide
-# dem = coalesce(A, NaN).A # hide
-dtm = coalesce(A, NaN) # hide
-dsm = coalesce(B, NaN) # hide
+# dem = coalesce(A, NaN32).A # hide
+dtm = coalesce(A, NaN32) # hide
+dsm = coalesce(B, NaN32) # hide
 # ndem = GeoArrays.flipud!(deepcopy(dtm))
 
 fdtm = deepcopy(dtm)
@@ -61,7 +61,62 @@ end
 In Geomorphometry.jl we provide a set of tools to analyze and visualize the shape of the Earth. The package is designed to be fast, flexible, and easy to use.
 Moreover, we have implemented several algorithms for a common operation so that you can choose the one that best fits your needs.
 
-In these pages we will use the elevation model of [Saba](https://en.wikipedia.org/wiki/Saba_(island)) to showcase the different categories of operations that are available in Geomorphometry.jl.
+In these pages we will use the elevation model of [Saba](https://en.wikipedia.org/wiki/Saba_(island)) to showcase the different categories of operations that are available in Geomorphometry.jl. However, any DEM should work, most algorithms accept an `AbstractMatrix{<:Real}`. Note that you thus need to remove missing values from your DEM, which is ideally done by interpolation, but a quick `coalesce.(dem, NaN32)` will work too (but will cause NaN gaps in your output). Below are the steps to reproduce the example plots.
+
+::: tabs
+
+== Downloading
+```julia
+using Downloads
+
+dtm_fn = abspath("saba.tif")
+isfile(dtm_fn) || Downloads.download(
+    "https://github.com/Deltares/Geomorphometry.jl/releases/download/v0.6.0/saba.tif",
+    dtm_fn,
+)
+dsm_fn = abspath("saba_dsm.tif")
+isfile(dsm_fn) || Downloads.download(
+    "https://github.com/Deltares/Geomorphometry.jl/releases/download/v0.6.0/saba_dsm.tif",
+    dsm_fn,
+)
+```
+
+== Reading (using Rasters.jl)
+```julia
+using Rasters
+import ArchGDAL
+
+dtm = Raster(dtm_fn)
+dsm = Raster(dsm_fn)
+mask = ismissing.(dtm)  # used for hiding nodata areas in plots
+dtm = replace_missing(dtm, NaN32)
+dsm = replace_missing(dsm, NaN32)
+```
+
+== Reading (using GeoArrays.jl)
+```julia
+using GeoArrays
+
+dtm = GeoArrays.read(dtm_fn)
+dsm = GeoArrays.read(dsm_fn)
+mask = ismissing.(dtm)  # used for hiding nodata areas in plots
+dtm = coalesce(dtm, NaN32)
+dsm = coalesce(dsm, NaN32)
+```
+
+== Plotting
+```julia
+using CairoMakie  # or GLMakie, Plots
+
+heatmap(dtm)
+```
+:::
+
+::: details
+
+You can download the data yourself from https://www.beeldmateriaal.nl/dataroom-caribisch-nederland, specifically the [DTM](https://basisdata.nl/hwh-ortho/Caribisch_NL/LiDAR/caribisch/Saba/02a_DTM_50cm/M_SABA2023.TIF) and [DSM](https://basisdata.nl/hwh-ortho/Caribisch_NL/LiDAR/caribisch/Saba/03a_DSM_50cm/R_SABA2023.TIF). I've resampled them to a coarser resolution (from 0.5 m to 5 m), interpolated some nodata areas, and attached them to a Github release https://github.com/Deltares/Geomorphometry.jl/releases/tag/v0.6.0.
+
+:::
 
 ## Visualization
 Visualization is done using the [`hillshade`](@ref), [`multihillshade`](@ref), and [`pssm`](@ref) functions. The first two shade the terrain by using a single or multiple light source(s) respectively, while `pssm` is a slope map exaggerated for human perception.
@@ -94,7 +149,7 @@ f
 ```
 
 ## Derivatives
-Common derivatives are implemented in Geomorphometry.jl. These include [`slope`](@ref), [`aspect`](@ref), and `curvature`. The latter is ill-defined, here we provide [`plan_curvature`](@ref) (also called *projected contour curvature*), [`profile_curvature`](@ref) (also called *normal slope line curvature*), and [`tangential_curvature`](@ref) (also called *normal contour curvature*). Note that functions here allow for a custom radius (but fixed positions, see X), as demonstrated for `profile_curvature`.
+Common derivatives are implemented in Geomorphometry.jl. These include [`slope`](@ref), [`aspect`](@ref), and `curvature`. The latter is ill-defined, here we provide [`plan_curvature`](@ref) (also called *projected contour curvature*), [`profile_curvature`](@ref) (also called *normal slope line curvature*), and [`tangential_curvature`](@ref) (also called *normal contour curvature*). Note that functions here allow for a custom radius, as demonstrated for `profile_curvature`.
 
 
 ### Slope
@@ -132,7 +187,7 @@ heatmap(slope(dtm; method=ZevenbergenThorne(), direction=0); colormap=:matter, c
 ```@example plots
 heatmap(slope(dtm; method=Horn(), direction=90); colormap=:matter, colorrange=(-45, 45))
 ```
-== ZevenbergenThorne (90°))
+== ZevenbergenThorne (90°)
 ```@example plots
 heatmap(slope(dtm; method=ZevenbergenThorne(), direction=90); colormap=:matter, colorrange=(-45, 45))
 ```
@@ -201,25 +256,25 @@ heatmap(laplacian(dtm, radius=1, direction=0); colorrange=(-1,1), colormap=:tarn
 :::
 
 ## Relative position
-There are several terrain descriptors that can be used to analyze the relative position of a point with respect to its neighbors. These include [`TPI`](@ref), [`TRI`](@ref), [`RIE`](@ref), [`BPI`](@ref), [`rugosity`](@ref) and [`roughness`](@ref). Here we use `BPI`, but with a custom sized `Window` (from Stencils.jl). All these functions can be used with a custom window size.
+There are several terrain descriptors that can be used to analyze the relative position of a point with respect to its neighbors. These include [`topographic_position_index`](@ref), [`terrain_ruggedness_index`](@ref), [`roughness_index_elevation`](@ref), [`bathymetric_position_index`](@ref), [`rugosity`](@ref), [`roughness`](@ref) and [`percentile_elevation`](@ref). Here we use `bathymetric_position_index`, but with a custom sized `Window` (from Stencils.jl). All these functions can be used with a custom window size.
 
 :::tabs
 
-== BPI
+== Bathymetric Position Index (BPI)
 ```@example plots
-heatmap(BPI(dtm, Geomorphometry.Annulus(5, 3)); colormap=:delta, colorrange=(-10,10))
+heatmap(bathymetric_position_index(dtm, Geomorphometry.Annulus(5, 3)); colormap=:delta, colorrange=(-10,10))
 ```
-== TPI
+== Topographic Position Index (TPI)
 ```@example plots
-heatmap(TPI(dtm); colormap=:delta, colorrange=(-10,10))
+heatmap(topographic_position_index(dtm); colormap=:delta, colorrange=(-10,10))
 ```
-== TRI
+== Terrain Ruggedness Index (TRI)
 ```@example plots
-heatmap(TRI(dtm); colormap=:speed)
+heatmap(terrain_ruggedness_index(dtm); colormap=:speed)
 ```
-== RIE
+== Roughness Index Elevation (RIE)
 ```@example plots
-heatmap(RIE(dtm); colormap=:speed)
+heatmap(roughness_index_elevation(dtm); colormap=:speed)
 ```
 == rugosity
 ```@example plots
@@ -229,31 +284,136 @@ heatmap(rugosity(dtm); colormap=:speed)
 ```@example plots
 heatmap(roughness(dtm); colormap=:speed)
 ```
+== Percentile Elevation
+```@example plots
+heatmap(percentile_elevation(dtm; radius=5); colormap=:delta, colorrange=(0,1))
+```
 
 :::
 
+## Horizon
+Related to the relative position is the category related to the view (to a horizon) from any cell in a DEM. We have [`horizon_angle`](@ref) to compute the maximum horizon angle for a given number of directions, and [`sky_view_factor`](@ref) to compute fraction of the sky (hemisphere) visible from a cell. The same running-maximum test powers [`viewshed`](@ref), the line-of-sight visibility map of a single observer cell, and [`total_viewshed`](@ref), a normalized visibility index for every cell.
+
+:::tabs
+
+== Horizon Angle (to the west)
+```@example plots
+hor = horizon_angle(dtm)  # this produces a width,height,directions sized raster
+heatmap(hor[:,:,1]; colormap=:curl, colorrange=(-90, 90))  # first direction (east) out of 16
+```
+== Sky View Factor (SVF) in 16 directions
+```@example plots
+skf = sky_view_factor(dtm)
+heatmap(skf; colormap=:ice)
+```
+== Sky View Factor (SVF) in 64 directions
+```@example plots
+skf = sky_view_factor(dtm; directions=64)
+heatmap(skf; colormap=:ice)
+```
+== Viewshed
+```@example plots
+point = CartesianIndex(400,400)
+vs = viewshed(dtm, point; observer_height=500)
+f = heatmap(vs; colormap=:ice, colorrange=(-0.5,1.5))
+scatter!(GeoArrays.coords(dtm, point); color=:orange)
+f
+```
+== Total Viewshed
+```@example plots
+tvs = total_viewshed(dtm)
+heatmap(tvs; colormap=:ice)
+```
+
+:::
+
+
+## Landforms
+The same lines of sight also classify the terrain itself. [`geomorphon`](@ref) reduces the view in eight directions to a ternary pattern of rising, flat and falling directions, and maps it onto one of ten [`Landform`](@ref) classes. The `radius` keyword sets the scale of the classification, while `flatness` sets how much relief a direction needs before it is no longer considered flat.
+
+:::tabs
+
+== Geomorphons
+```@example plots
+forms = geomorphon(dtm)
+heatmap(forms; colormap=:tab10, colorrange=(0.5, 10.5), lowclip=:transparent)
+```
+== Geomorphons at a larger scale
+```@example plots
+forms = geomorphon(dtm; radius=25, skip=2)
+heatmap(forms; colormap=:tab10, colorrange=(0.5, 10.5), lowclip=:transparent)
+```
+== Ridges only
+```@example plots
+forms = geomorphon(dtm)
+heatmap(forms .== Ridge; colormap=:ice, colorrange=(-0.5, 1.5))
+```
+
+:::
+
+
 ## Hydrology
-Hydrological operations are used to analyze the flow of water on the terrain. We provide [`filldepressions`](@ref) to fill depressions, and [`flowaccumulation`](@ref) to calculate the flow accumulation. Here we use `flowaccumulation` to calculate the flow accumulation. Note that the local drainage direction is also returned. By default the FD8 algorithm is used, but you can also use the D∞ or D8 algorithm by setting the `method` keyword argument to `DInf()` or `D8()`.
+Hydrological operations are used to analyze the flow of water on the terrain. We provide [`filldepressions`](@ref) to fill depressions, [`depression_depth`](@ref) to calculate the depth of each depression (difference between filled dem and dem) and [`depression_volume`](@ref) that sums all depression depths. The major depression in the example is the caldera of the dormant volcano ([Mount Scenery](https://en.wikipedia.org/wiki/Mount_Scenery)).
+
+
+:::tabs
+
+== Fill depressions
+```@example plots
+cdtm = copy(dtm)
+cdtm[mask] .= -Inf  # Sea should be lower than terrain
+fdtm = filldepressions(cdtm)
+heatmap(fdtm)
+```
+== Depression depth
+```@example plots
+depth = depression_depth(dtm; filled=fdtm)
+depth[mask] .= NaN32  # ignore nodata areas for plotting
+heatmap(depth; colormap=:tempo)
+```
+== Depression volume
+```@example plots
+depression_volume(dtm; filled=fdtm)
+```
+
+:::
+
+Filling the depressions in a DEM is not necessary to calculate the flow accumulation. Here we use [`flowaccumulation`](@ref) to do so, and it automatically carves out depressions. Note that the local drainage direction is also returned. By default the FD8 algorithm is used, but you can also use the D∞ or D8 algorithm by setting the `method` keyword argument to `DInf()` or `D8()`.
+
+::: warning
+
+Most hydrology related methods iterate through all DEM cells, thus producing output for all DEM cells, including cells containing nodata values (e.g. `NaN32`, `Inf`).
+Here we manually hide these nodata areas for plotting.
+
+:::
+
 
 :::tabs
 
 == Flow accumulation with FD8
 ```@example plots
 acc, ldd = flowaccumulation(dtm; method=FD8(2))
-acc[mask] .= NaN  # hide
+acc[mask] .= NaN32  # ignore nodata areas for plotting
 heatmap(log10.(acc); colormap=:rain)
 ```
 == Flow accumulation with D∞
 ```@example plots
 acc, ldd = flowaccumulation(dtm; method=DInf())
-acc[mask] .= NaN  # hide
+acc[mask] .= NaN32  # ignore nodata areas for plotting
 heatmap(log10.(acc); colormap=:rain)
 ```
 == Flow accumulation with D8
 ```@example plots
 acc, ldd = flowaccumulation(dtm; method=D8())
-acc[mask] .= NaN  # hide
+acc[mask] .= NaN32  # ignore nodata areas for plotting
 heatmap(log10.(acc); colormap=:rain)
+```
+== Drainage direction
+
+The ldd is a Matrix of FlowDirections that visualizes the integer encodings.
+```@example plots
+acc, ldd = flowaccumulation(dtm; method=D8())
+parent(ldd[400:800, 300:700])  # overland flow directions
 ```
 == Underlying method
 
@@ -265,48 +425,78 @@ We use the Priority Flood method by [barnesPriorityFloodOptimalDepressionFilling
 
 :::
 
-Combined with the previous analysis, we can calculate [`TWI`](@ref) and [`SPI`](@ref) indices. These indices are used to analyze the terrain's ability to accumulate water and the terrain's ability to store water respectively.
-
+Combined with the previous analysis, we can calculate [`topographic_wetness_index`](@ref), [`stream_power_index`](@ref) and 
+[`drainage_potential`](@ref) indices. These indices are used to analyze the terrain's ability to accumulate water, the terrain's ability to store water respectively, and the ability to drain water respectively.
 
 :::tabs
 
-== TWI
+== Topographic Wetness Index (TWI)
 ```@example plots
-twi = TWI(dtm; method=FD8())
+twi = topographic_wetness_index(dtm; method=FD8())
 heatmap(twi; colormap=:tempo)
 ```
-== SPI
+== Stream Power Index (SPI)
 ```@example plots
-twi = SPI(dtm; method=FD8())
+twi = stream_power_index(dtm; method=FD8())
 heatmap(twi; colormap=:tempo)
+```
+== Drainage Potential
+```@example plots
+dp = drainage_potential(dtm; method=FD8())
+heatmap(dp; colormap=:tempo)
+```
+
+:::
+
+We can also calculate the Height Above Nearest Drainage (HAND) using the [`height_above_nearest_drainage`](@ref) function. This function requires a flow accumulation map to determine the stream network. Here we use a threshold based on the flow accumulation to define streams.
+
+:::tabs
+
+== HAND threshold 1e3
+```@example plots
+hand = height_above_nearest_drainage(dtm; threshold=1e3)
+hand[mask] .= NaN32  # ignore nodata areas for plotting
+heatmap(hand; colormap=:turbo)
+```
+== HAND threshold 1e5
+```@example plots
+hand = height_above_nearest_drainage(dtm; threshold=1e5)
+hand[mask] .= NaN32  # ignore nodata areas for plotting
+heatmap(hand; colormap=:turbo)
+```
+== HAND threshold 1e5 with FD8 method
+```@example plots
+hand = height_above_nearest_drainage(dtm; method=FD8(), threshold=1e5)
+hand[mask] .= NaN32  # ignore nodata areas for plotting
+heatmap(hand; colormap=:turbo)
 ```
 
 :::
 
 
 ## Terrain filters
-While filters seem unrelated to the previously discussed methods, these are used to filter (rasterized) pointclouds i.e. surface models (DSM) to arrive at a terrain model (DTM). We provide [`pmf`](@ref), [`smf`](@ref), and [`skb`](@ref) filters. Here we use the `pmf` filter to remove elevations that do not pass the slope filter (normally vegetation and buildings).
+While filters seem unrelated to the previously discussed methods, these are used to filter (rasterized) pointclouds i.e. surface models (DSM) to arrive at a terrain model (DTM). We provide [`progressive_morphological_filter`](@ref), [`simple_morphological_filter`](@ref), and [`skewness_balancing`](@ref) filters. Here we use the `progressive_morphological_filter` filter to remove elevations that do not pass the slope filter (normally vegetation and buildings).
 
 
 :::tabs
 
-== PMF
+== Progressive Morphological Filter (PMF)
 ```@example plots
-B, flags = pmf(dsm, ωₘ = 15.0, slope = 0.2, dhₘ = 5.0, dh₀ = 0.3)
+B, flags = progressive_morphological_filter(dsm, ωₘ = 15.0, slope = 0.2, dhₘ = 5.0, dh₀ = 0.3)
 A = copy(dsm)
-A[A .> B] .= NaN
+A[A .> B] .= NaN32
 heatmap(A)
 ```
-== SMF
+== Simple Morphological Filter (SMF)
 ```@example plots
-A = smf(dsm; ω=15.0, slope=0.2)
+A = simple_morphological_filter(dsm; ω=15.0, slope=0.2)
 heatmap(A)
 ```
-== SKB
+== Skewness Balancing (SKB)
 ```@example plots
-B, flags = skb(dsm)
+smask = skewness_balancing(dsm)
 A = copy(dsm)
-A[A .> B] .= NaN
+A[.!smask] .= NaN32
 heatmap(A)
 ```
 :::
@@ -321,14 +511,23 @@ Here we use the top of the volcano as the starting point, and the squared slope 
 
 == Tomlin
 ```@example plots
-heatmap(spread(dtm .> 850, 0, slope(dtm).^2), colormap=:dense)
+tspread = spread(dtm .> 850, 0, slope(dtm).^2)
+tspread[mask] .= NaN32  # ignore nodata areas for plotting
+heatmap(tspread, colormap=:dense)
 ```
+
 == Eikonal
 ```@example plots
-heatmap(spread(dtm .> 850, 0, slope(dtm).^2, method=FastSweeping()), colormap=:dense)
+fspread = spread(dtm .> 850, 0, slope(dtm).^2, method=FastSweeping())
+fspread[mask] .= NaN32  # ignore nodata areas for plotting
+heatmap(fspread, colormap=:dense)
 ```
+
 == Eastman
 ```@example plots
-heatmap(spread(dtm .> 850, 0, slope(dtm).^2, method=Eastman(iterations=25)), colormap=:dense)
+espread = spread(dtm .> 850, 0, slope(dtm).^2, method=Eastman(iterations=25))
+espread[mask] .= NaN32  # ignore nodata areas for plotting
+heatmap(espread, colormap=:dense)
 ```
+
 :::

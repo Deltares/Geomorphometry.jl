@@ -10,13 +10,5 @@ end
 ```
 
 ```@docs
-Geomorphometry.prominence
-```
-
-```@docs
 Geomorphometry.skbr
-```
-
-```docs
-Geomorphometry.pmf2
 ```

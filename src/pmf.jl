@@ -1,7 +1,9 @@
 """
-    B, flags = pmf(A; ωₘ, slope, dhₘ, dh₀, cellsize, adjust, erode)
+    B, flags = progressive_morphological_filter(A; ωₘ, slope, dhₘ, dh₀, cellsize, circular, adjust, erode)
 
 Applies the progressive morphological filter by [Zhang (2003)](@cite keqizhangProgressiveMorphologicalFilter2003) to `A`.
+
+A 3D `A` with a singleton third dimension is also accepted and filtered as its 2D slice.
 
 # Output
 - `B::Array{T,2}` Maximum allowable values
@@ -16,8 +18,11 @@ Afterwards, one can retrieve the resulting mask for `A` by `A .<= B` or `flags .
 - `dhₘ::Real=2.5` Maximum elevation threshold [m]
 - `dh₀::Real=0.2` Initial elevation threshold [m]
 - `cellsize::Real=1.` Cellsize in [m]
+- `circular::Bool=false` Use a circular (disk) structuring element instead of a square one
+- `adjust::Bool=false` Adjust elevation thresholds for the initial window
+- `erode::Bool=false` Apply an erosion step before the opening
 """
-function pmf(
+function progressive_morphological_filter(
     A::AbstractMatrix{<:Real};
     ωₘ = 20.0,
     slope = 0.01,
@@ -30,6 +35,7 @@ function pmf(
 )
     _pmf(A, ωₘ, slope, dhₘ, dh₀, cellsize, circular, adjust, erode)
 end
+@deprecate pmf progressive_morphological_filter
 
 function _pmf(
     A::AbstractMatrix{<:Real},
@@ -72,10 +78,10 @@ function _pmf(
     κ_max = floor(Int, log2(ωₘ - 1))  # determine iterations based on exp growth
     windowsizes = Int.(exp2.(1:κ_max)) .+ 1
 
-    # Compute tresholds
+    # Compute thresholds
     dwindows = vcat(windowsizes[1], windowsizes)  # prepend first element so we get 0 as diff
     window_diffs = [dwindows[i] - dwindows[i - 1] for i in 2:length(dwindows)]
-    # height_tresholds = [min(dhₘ, slope * window_diff * cellsize + dh₀) for window_diff in window_diffs]
+    # height_thresholds = [min(dhₘ, slope * window_diff * cellsize + dh₀) for window_diff in window_diffs]
 
     # Set up arrays
     Af = copy(A)  # array to be morphed
@@ -91,7 +97,7 @@ function _pmf(
 
     mask = falses(size(A))
 
-    # Iterate over window sizes and height tresholds
+    # Iterate over window sizes and height thresholds
     for (i, ωₖ) in enumerate(windowsizes)
         s = (i > 1) && adjust ? dilate(slope, window_diffs[i]) : slope
         nωₖ = (i > 1) ? window_diffs[i] : ωₖ
@@ -128,9 +134,9 @@ function _pmf(
     B, flags
 end
 
-function pmf(A::AbstractArray{<:Real, 3}; kwargs...)
+function progressive_morphological_filter(A::AbstractArray{<:Real, 3}; kwargs...)
     size(A, 3) == 1 || throw(ArgumentError("Only singleton 3rd dimension allowed"))
-    pmf(view(A, :, :, 1); kwargs...)
+    progressive_morphological_filter(view(A, :, :, 1); kwargs...)
 end
 
 function pmf2(
@@ -206,10 +212,10 @@ function _pmf2(
     # windowsizes = Int.(exp2.(1:κ_max)) .+ 1
     windowsizes = halve_range(ωₘ)
 
-    # Compute tresholds
+    # Compute thresholds
     dwindows = vcat(windowsizes[1], windowsizes)  # prepend first element so we get 0 as diff
     window_diffs = [dwindows[i] - dwindows[i - 1] for i in 2:length(dwindows)]
-    # height_tresholds = [min(dhₘ, slope * window_diff * cellsize + dh₀) for window_diff in window_diffs]
+    # height_thresholds = [min(dhₘ, slope * window_diff * cellsize + dh₀) for window_diff in window_diffs]
 
     # Set up arrays
     Af = copy(A)  # array to be morphed
@@ -225,7 +231,7 @@ function _pmf2(
 
     mask = falses(size(A))
 
-    # Iterate over window sizes and height tresholds
+    # Iterate over window sizes and height thresholds
     for (i, ωₖ) in enumerate(windowsizes)
         s = (i > 1) && adjust ? dilate(slope, window_diffs[i]) : slope
         @debug "Window $(ωₖ), $(window_diffs[i]) slope sum: $(sum(s))"

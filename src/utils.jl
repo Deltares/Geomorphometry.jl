@@ -84,7 +84,7 @@ function mapwindow_sep!(f, img, window, out, fill = Inf)
     A = PaddedView(fill, img, ((-Δ + 1):(w + Δ), (-Δ + 1):(h + Δ)))
     out2 = copy(out)
 
-    # Maximum/minimum is seperable into 1d
+    # Maximum/minimum is separable into 1d
     @inbounds for i in 1:h, j in 1:w
         out2[j, i] = f(@view A[(j - Δ):(j + Δ), i])
     end
@@ -196,6 +196,12 @@ end
     end
     o
 end
+
+# Allocate an output array of element type `T` for `dem`. The default uses `similar`, so
+# that plain matrices and GPU arrays propagate their storage type. Extensions override it
+# for wrapper types that carry a missing value which cannot be converted to `T`, such as
+# the categorical `Landform`.
+_alloc(dem, T) = similar(dem, T)
 
 """
     cellsize(dem)

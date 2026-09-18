@@ -6,6 +6,11 @@ using FillArrays
 
 degwidth::Float64 = 111_000.0
 
+function Geomorphometry._alloc_directions(dem::GeoArray, T, ndirs)
+    data = similar(parent(dem), T, size(dem, 1), size(dem, 2), ndirs)
+    GeoArray(data, dem.f, dem.crs, dem.metadata)
+end
+
 function Geomorphometry.cellsize(dem::GeoArray)
     T = GeoArrays.GI.crstrait(dem)
     _cellsize(T, dem)
