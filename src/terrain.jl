@@ -3,9 +3,12 @@
 # const neib_8_mask = @SMatrix Bool[1 1 1; 1 0 1; 1 1 1]
 const neib_8_dist = @SMatrix [√2 1 √2; 1 0 1; √2 1 √2]
 
-const nbkernel = LocalFilters.Kernel{Int8, 2}(reshape(1:9, 3, 3))
+const nbkernel = LocalFilters.Kernel{Int8,2}(reshape(1:9, 3, 3))
 
 abstract type DerivativeMethod end
+
+"""Symmetric finite difference estimator using the distance and bearing of all neighboring cells."""
+struct SymmetricGradient <: DerivativeMethod end
 
 """Second order finite difference estimator using all 4 neighbors by [Zevenbergen and Thorne, (1987)](@cite zevenbergen1987quantitative)."""
 struct ZevenbergenThorne <: DerivativeMethod end
@@ -35,8 +38,11 @@ struct GDAL <: DerivativeMethod end
 
 """
     slope(dem::AbstractMatrix{<:Real}; cellsize=cellsize(dem), method=Horn(), exaggeration=1.0, direction=nothing)
+    slope(dem; cellsize=cellsize(dem), method=MDG(), exaggeration=1.0, direction=nothing)
 
 Slope is the rate of change between a cell and its neighbors.
+Non-matrix grids use [`MDG`](@ref) with dispatched `neighbors` and `celldistance`
+methods.
 
 # Arguments
 - `dem::AbstractMatrix{<:Real}`: Input digital elevation model.
@@ -48,13 +54,87 @@ Slope is the rate of change between a cell and its neighbors.
 """
 function slope(
     dem::AbstractMatrix{<:Real};
-    cellsize = cellsize(dem),
-    method::DerivativeMethod = Horn(),
-    exaggeration = 1.0,
-    direction::Union{Nothing, Real} = nothing,
+    cellsize=cellsize(dem),
+    method::DerivativeMethod=Horn(),
+    exaggeration=1.0,
+    direction::Union{Nothing,Real}=nothing,
 )
     dst = similar(dem, Float32)
     slope!(method, dst, dem, cellsize, exaggeration, direction)
+end
+
+function slope(
+    dem;
+    cellsize=cellsize(dem),
+    method::DerivativeMethod=MDG(),
+    exaggeration=1.0,
+    direction::Union{Nothing,Real}=nothing,
+)
+    dst = similar(dem, Float32)
+    slope!(method, dst, dem, cellsize, exaggeration, direction)
+end
+
+function celldistance(
+    dem::AbstractMatrix,
+    from::CartesianIndex{2},
+    to::CartesianIndex{2};
+    cellsize=cellsize(dem),
+)
+    offset = to - from
+    hypot(offset[1] * cellsize[1], offset[2] * cellsize[2])
+end
+
+"""
+    cellbearing(dem, from, to)
+
+Return the bearing from cell `from` to cell `to` in degrees clockwise from local north.
+"""
+function cellbearing(
+    dem::AbstractMatrix,
+    from::CartesianIndex{2},
+    to::CartesianIndex{2};
+    cellsize=cellsize(dem),
+)
+    _cellbearing(dem, from, to, cellsize)
+end
+
+function _cellbearing(
+    dem::AbstractMatrix,
+    from::CartesianIndex{2},
+    to::CartesianIndex{2},
+    cellsize,
+)
+    offset = to - from
+    east = offset[1] * cellsize[1]
+    north = offset[2] * cellsize[2]
+    mod(atand(east, north), 360)
+end
+
+_cellbearing(dem, from, to, cellsize) = cellbearing(dem, from, to; cellsize)
+
+function slope!(
+    ::MaximumDownwardGradient,
+    dst,
+    dem,
+    cellsize,
+    exaggeration,
+    direction,
+)
+    isnothing(direction) || throw(ArgumentError("Direction is not supported for MDG."))
+    cells = eachindex(dem)
+    for cell in cells
+        gradient = 0.0
+        for neighbor in neighbors(dem, cell)
+            neighbor in cells || continue
+            gradient = max(
+                gradient,
+                abs(dem[neighbor] - dem[cell]) /
+                celldistance(dem, cell, neighbor; cellsize),
+            )
+        end
+        dst[cell] = atand(gradient * exaggeration)
+    end
+    return dst
 end
 
 function slope!(::Horn, dst, dem::AbstractMatrix{<:Real}, cellsize, exaggeration, direction)
@@ -97,6 +177,38 @@ function slope!(
 end
 
 function slope!(
+    ::SymmetricGradient,
+    dst,
+    dem,
+    cellsize,
+    exaggeration,
+    direction,
+)
+    function kernel(cell, z0, zs)
+        gx, gy = _symmetric_gradient(
+            SymmetricGradient(),
+            dem,
+            cell,
+            z0,
+            zs,
+            cellsize,
+        )
+        if isnothing(direction)
+            return atand(hypot(gx, gy) * exaggeration)
+        else
+            return atand(
+                (-gx * sind(direction) + gy * cosd(direction)) *
+                exaggeration,
+            )
+        end
+    end
+
+    return mapneighbors!(kernel, dst, dem)
+end
+
+
+
+function slope!(
     ::MaximumDownwardGradient,
     dst,
     dem::AbstractMatrix{<:Real},
@@ -120,6 +232,33 @@ function slope!(
     return localfilter!(dst, dem, nbkernel, initial, mdg, store!)
 end
 
+function _symmetric_gradient(
+    ::SymmetricGradient,
+    dem,
+    cell,
+    z0,
+    neighbor_values,
+    cellsize,
+)
+    gx = zero(float(z0))
+    gy = zero(float(z0))
+    r2 = zero(float(z0))
+
+    for (neighbor, z) in zip(neighbors(dem, cell), neighbor_values)
+        d = celldistance(dem, cell, neighbor; cellsize)
+        θ = cellbearing(dem, cell, neighbor; cellsize)
+        east, north = sincosd(θ)
+        dz = z - z0
+
+        gx += d * east * dz
+        gy += d * north * dz
+        r2 += d^2
+    end
+
+    scale = 2 / r2
+    return gx * scale, gy * scale
+end
+
 """
     aspect(dem::AbstractMatrix{<:Real}; method=Horn(), cellsize=cellsize(dem))
 
@@ -127,8 +266,17 @@ Aspect is the direction of the steepest [`slope`](@ref), in degrees clockwise fr
 """
 function aspect(
     dem::AbstractMatrix{<:Real};
-    method::DerivativeMethod = Horn(),
-    cellsize = cellsize(dem),
+    method::DerivativeMethod=Horn(),
+    cellsize=cellsize(dem),
+)
+    dst = similar(dem, Float32)
+    aspect!(method, dst, dem, cellsize)
+end
+
+function aspect(
+    dem;
+    method::DerivativeMethod=SymmetricGradient(),
+    cellsize=cellsize(dem),
 )
     dst = similar(dem, Float32)
     aspect!(method, dst, dem, cellsize)
@@ -170,6 +318,44 @@ function aspect!(::Horn, dst, dem::AbstractMatrix{<:Real}, cellsize)
         d[i] = compass(atand(-δzδy, -δzδx))
     end
     return localfilter!(dst, dem, nbkernel, initial, horn, store!)
+end
+
+function aspect!(
+    ::SymmetricGradient,
+    dst,
+    dem,
+    cellsize,
+)
+    function kernel(cell, z0, zs)
+        gx, gy = _symmetric_gradient(
+            SymmetricGradient(),
+            dem,
+            cell,
+            z0,
+            zs,
+            cellsize,
+        )
+        mod(atand(-gx, -gy), 360)
+    end
+
+    return mapneighbors!(kernel, dst, dem)
+end
+
+function aspect!(::MaximumDownwardGradient, dst, dem, cellsize)
+    fill!(dst, NaN)
+    cells = eachindex(dem)
+    for cell in cells
+        slope = -Inf
+        for neighbor in neighbors(dem, cell)
+            nslope = abs(dem[neighbor] - dem[cell]) /
+                     celldistance(dem, cell, neighbor; cellsize)
+            if nslope > slope
+                slope = nslope
+                dst[cell] = cellbearing(dem, cell, neighbor; cellsize)
+            end
+        end
+    end
+    return dst
 end
 
 function aspect!(::ZevenbergenThorne, dst, dem::AbstractMatrix{<:Real}, cellsize)
@@ -259,7 +445,7 @@ function _aspect(compass::Real)
     return (compass - 90) % 360
 end
 
-@deprecate curvature(args...; kwargs...) laplacian(args...; gis = true, kwargs...)
+@deprecate curvature(args...; kwargs...) laplacian(args...; gis=true, kwargs...)
 """
     laplacian(dem::AbstractMatrix{<:Real}; cellsize=cellsize(dem), radius=1, gis=false, direction=nothing)
 
@@ -276,10 +462,10 @@ Laplacian of the DEM, the second derivative of elevation, highlighting local con
 """
 function laplacian(
     dem::AbstractMatrix{<:Real};
-    cellsize = cellsize(dem),
-    radius = 1,
-    gis = false,
-    direction = nothing,
+    cellsize=cellsize(dem),
+    radius=1,
+    gis=false,
+    direction=nothing,
 )
     mapstencil(
         x ->
@@ -295,15 +481,15 @@ function laplacian(
 end
 
 scaled8nb(R::Int) = NamedStencil(;
-    Z1 = (-1R, -1R),
-    Z2 = (0, -1R),  # South
-    Z3 = (1R, -1R),
-    Z4 = (-1R, 0),  # West
-    Z5 = (0, 0),  # Center
-    Z6 = (1R, 0),  # East
-    Z7 = (-1R, 1R),
-    Z8 = (0, 1R),  # North
-    Z9 = (1R, 1R),
+    Z1=(-1R, -1R),
+    Z2=(0, -1R),  # South
+    Z3=(1R, -1R),
+    Z4=(-1R, 0),  # West
+    Z5=(0, 0),  # Center
+    Z6=(1R, 0),  # East
+    Z7=(-1R, 1R),
+    Z8=(0, 1R),  # North
+    Z9=(1R, 1R),
 )
 
 # https://www.spatialanalysisonline.com/HTML/index.html?profiles_and_curvature.htm
@@ -311,49 +497,49 @@ scaled8nb(R::Int) = NamedStencil(;
 
 # Zevenbergen and Thorne (1987) method
 # Surface fit by $Z = Ax²y² + Bx²y + Cxy² + Dx² + Ey² + Fxy + Gx + Hy + I$
-_A(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) =
+_A(::ZevenbergenThorne, s::Stencil, δx=1, δy=1) =
     ((s.Z1 + s.Z3 + s.Z7 + s.Z9) / 4 - (s.Z2 + s.Z4 + s.Z6 + s.Z8) / 2 + s.Z5) / δy^2 * δx^2
-_B(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) =
+_B(::ZevenbergenThorne, s::Stencil, δx=1, δy=1) =
     ((s.Z1 + s.Z3 - s.Z7 - s.Z9) / 4 - (s.Z2 - s.Z8) / 2) / (δx^1.5 * δy^1.5)
-_C(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) =
+_C(::ZevenbergenThorne, s::Stencil, δx=1, δy=1) =
     ((-s.Z1 + s.Z3 - s.Z7 + s.Z9) / 4 + (s.Z4 - s.Z6) / 2) / (δx^1.5 * δy^1.5)
-_D(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = ((s.Z4 + s.Z6) / 2 - s.Z5) / δx^2  # δ²z/δx²
-_E(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = ((s.Z2 + s.Z8) / 2 - s.Z5) / δy^2  # δ²z/δy²
-_F(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) =
+_D(::ZevenbergenThorne, s::Stencil, δx=1, δy=1) = ((s.Z4 + s.Z6) / 2 - s.Z5) / δx^2  # δ²z/δx²
+_E(::ZevenbergenThorne, s::Stencil, δx=1, δy=1) = ((s.Z2 + s.Z8) / 2 - s.Z5) / δy^2  # δ²z/δy²
+_F(::ZevenbergenThorne, s::Stencil, δx=1, δy=1) =
     (-s.Z1 + s.Z3 + s.Z7 - s.Z9) / (4δx * δy)   # δ²z/δxδy
-_G(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = (-s.Z4 + s.Z6) / 2δx  # δz/δx
-_H(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = (s.Z2 - s.Z8) / 2δy  # δz/δy
-_I(::ZevenbergenThorne, s::Stencil, δx = 1, δy = 1) = s.Z5
+_G(::ZevenbergenThorne, s::Stencil, δx=1, δy=1) = (-s.Z4 + s.Z6) / 2δx  # δz/δx
+_H(::ZevenbergenThorne, s::Stencil, δx=1, δy=1) = (s.Z2 - s.Z8) / 2δy  # δz/δy
+_I(::ZevenbergenThorne, s::Stencil, δx=1, δy=1) = s.Z5
 
 # Landserf 
 # Surface fit by $ z = Ax² + By² + Cxy + Dx + Ey + F $
 # Note that the approximations ABCDEF here are (almost) identical to the DEFGHI in Zevenbergen and Thorne
-_A(::LandSerf, s::Stencil, δx = 1, δy = 1) = (s.Z6 + s.Z4 - 2s.Z5) / δx^2 # δ²z/δx²
-_B(::LandSerf, s::Stencil, δx = 1, δy = 1) = (s.Z8 + s.Z2 - 2s.Z5) / δy^2 # δ²z/δy²
-_C(::LandSerf, s::Stencil, δx = 1, δy = 1) = (s.Z9 - s.Z7 - s.Z3 + s.Z1) / (4δx * δy)  # δ²z/δxδy
-_D(::LandSerf, s::Stencil, δx = 1, δy = 1) = (s.Z6 - s.Z4) / 2δx  # δz/δx
-_E(::LandSerf, s::Stencil, δx = 1, δy = 1) = (s.Z8 - s.Z2) / 2δy  # δz/δy
+_A(::LandSerf, s::Stencil, δx=1, δy=1) = (s.Z6 + s.Z4 - 2s.Z5) / δx^2 # δ²z/δx²
+_B(::LandSerf, s::Stencil, δx=1, δy=1) = (s.Z8 + s.Z2 - 2s.Z5) / δy^2 # δ²z/δy²
+_C(::LandSerf, s::Stencil, δx=1, δy=1) = (s.Z9 - s.Z7 - s.Z3 + s.Z1) / (4δx * δy)  # δ²z/δxδy
+_D(::LandSerf, s::Stencil, δx=1, δy=1) = (s.Z6 - s.Z4) / 2δx  # δz/δx
+_E(::LandSerf, s::Stencil, δx=1, δy=1) = (s.Z8 - s.Z2) / 2δy  # δz/δy
 _F(::LandSerf, s::Stencil) = s.Z5
 
-function coefficients(::LandSerf, s::Stencil, δx = 1, δy = 1, direction = nothing)
+function coefficients(::LandSerf, s::Stencil, δx=1, δy=1, direction=nothing)
     if isnothing(direction)
         (;
-            a = _A(LandSerf(), s, δx, δy),
-            b = _B(LandSerf(), s, δx, δy),
-            c = _C(LandSerf(), s, δx, δy),
-            d = _D(LandSerf(), s, δx, δy),
-            e = _E(LandSerf(), s, δx, δy),
-            f = _F(LandSerf(), s),
+            a=_A(LandSerf(), s, δx, δy),
+            b=_B(LandSerf(), s, δx, δy),
+            c=_C(LandSerf(), s, δx, δy),
+            d=_D(LandSerf(), s, δx, δy),
+            e=_E(LandSerf(), s, δx, δy),
+            f=_F(LandSerf(), s),
         )
     else
         direction = _aspect(direction)
         (;
-            a = _A(LandSerf(), s, δx, δy) * cosd(direction)^2,
-            b = _B(LandSerf(), s, δx, δy) * sind(direction)^2,
-            c = _C(LandSerf(), s, δx, δy) * sind(direction) * cosd(direction),
-            d = _D(LandSerf(), s, δx, δy) * cosd(direction),
-            e = _E(LandSerf(), s, δx, δy) * sind(direction),
-            f = _F(LandSerf(), s),
+            a=_A(LandSerf(), s, δx, δy) * cosd(direction)^2,
+            b=_B(LandSerf(), s, δx, δy) * sind(direction)^2,
+            c=_C(LandSerf(), s, δx, δy) * sind(direction) * cosd(direction),
+            d=_D(LandSerf(), s, δx, δy) * cosd(direction),
+            e=_E(LandSerf(), s, δx, δy) * sind(direction),
+            f=_F(LandSerf(), s),
         )
     end
 end
@@ -374,8 +560,8 @@ Calculate normal slope line curvature (profile curvature) as defined by [Minár 
 """
 function profile_curvature(
     dem::AbstractMatrix{<:Real};
-    cellsize = cellsize(dem),
-    radius = 1,
+    cellsize=cellsize(dem),
+    radius=1,
     # direction = nothing,
 )
     mapstencil(x -> _profile(x, cellsize[1], cellsize[2], nothing), scaled8nb(radius), dem)
@@ -397,8 +583,8 @@ Calculate normal contour curvature (tangential curvature) as defined by [Minár 
 """
 function tangential_curvature(
     dem::AbstractMatrix{<:Real};
-    cellsize = cellsize(dem),
-    radius = 1,
+    cellsize=cellsize(dem),
+    radius=1,
     # direction = nothing,
 )
     mapstencil(
@@ -424,8 +610,8 @@ Calculate projected contour curvature (plan curvature) as defined by [Minár et 
 """
 function plan_curvature(
     dem::AbstractMatrix{<:Real};
-    cellsize = cellsize(dem),
-    radius = 1,
+    cellsize=cellsize(dem),
+    radius=1,
     # direction = nothing,
 )
     mapstencil(x -> _plan(x, cellsize[1], cellsize[2], nothing), scaled8nb(radius), dem)

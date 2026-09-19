@@ -203,6 +203,11 @@ end
 # the categorical `Landform`.
 _alloc(dem, T) = similar(dem, T)
 
+# Allocate scratch storage shaped like `dem` for an element type that is not a number,
+# such as the offset between two cells. Georeferenced wrappers that only hold numbers
+# override it to allocate on their parent array, which indexes the same way.
+_alloc_offsets(dem, T) = similar(dem, T)
+
 """
     cellsize(dem)
 

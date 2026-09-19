@@ -1,11 +1,26 @@
 """
     roughness(dem::AbstractMatrix{<:Real}, window::Stencil=Moore(1))
+    roughness(dem)
 
 Roughness is the largest inter-cell difference of a central pixel and its surrounding cell, as defined in [Wilson et al. (2007)](@cite wilsonMultiscaleTerrainAnalysis2007).
-The neighborhood is set by `window`.
+For matrices, the neighborhood is set by `window`. Other indexed grids use
+`neighbors`.
 """
 function roughness(dem::AbstractMatrix{<:Real}, window::Stencil = Moore(1))
     mapstencil(_roughness, window, dem)
+end
+function roughness(dem)
+    dst = similar(dem)
+    cells = eachindex(dem)
+    for cell in cells
+        value = zero(eltype(dem))
+        for neighbor in neighbors(dem, cell)
+            neighbor in cells || continue
+            value = max(value, abs(dem[neighbor] - dem[cell]))
+        end
+        dst[cell] = value
+    end
+    return dst
 end
 function _roughness(x)
     o = zero(eltype(x))
@@ -17,12 +32,29 @@ end
 
 """
     topographic_position_index(dem::AbstractMatrix{<:Real}, window::Stencil=Moore(1))
+    topographic_position_index(dem)
 
 Topographic Position Index (TPI), which is defined as the difference between a central pixel and the mean of its surrounding cells, as defined in [Wilson et al. (2007)](@cite wilsonMultiscaleTerrainAnalysis2007).
-The neighborhood is set by `window`.
+For matrices, the neighborhood is set by `window`. Other indexed grids use
+`neighbors`.
 """
 function topographic_position_index(dem::AbstractMatrix{<:Real}, window::Stencil = Moore(1))
     mapstencil(x -> center(x) - mean(x), window, dem)
+end
+function topographic_position_index(dem)
+    dst = similar(dem, Float32)
+    cells = eachindex(dem)
+    for cell in cells
+        total = 0.0
+        count = 0
+        for neighbor in neighbors(dem, cell)
+            neighbor in cells || continue
+            total += dem[neighbor]
+            count += 1
+        end
+        dst[cell] = dem[cell] - total / count
+    end
+    return dst
 end
 @deprecate TPI topographic_position_index
 
@@ -50,6 +82,7 @@ end
 
 """
     terrain_ruggedness_index(dem::AbstractMatrix{<:Real}; normalize=false, squared=true)
+    terrain_ruggedness_index(dem; normalize=false, squared=true)
 
 Terrain Ruggedness Index (TRI), which measures the difference between a central pixel and its surrounding cells.
 This algorithm uses the square root of the sum of the square of the absolute difference between a central pixel and its surrounding cells.
@@ -91,13 +124,38 @@ function terrain_ruggedness_index(
 
     return localfilter!(dst, dem, 3, initial, update, store!)
 end
+function terrain_ruggedness_index(dem; normalize = false, squared = true)
+    if !normalize && !squared
+        @warn "TRI: normalize=false and squared=false is not recommended."
+    end
+
+    dst = copy(dem)
+    cells = eachindex(dem)
+    for cell in cells
+        value = 0.0
+        count = 0
+        for neighbor in neighbors(dem, cell)
+            neighbor in cells || continue
+            difference = abs(dem[neighbor] - dem[cell])
+            value += squared ? difference^2 : difference
+            count += 1
+        end
+        if normalize
+            value /= count
+        end
+        dst[cell] = squared ? sqrt(value) : value
+    end
+    return dst
+end
 @deprecate TRI terrain_ruggedness_index
 
 """
     prominence(dem::AbstractMatrix{<:Real})
+    prominence(dem)
 
 Prominence calculates the number of cells that are lower or equal than the central cell.
 Thus, 8 is a local maximum (peak), while 0 is a local minimum (pit).
+Other indexed grids use their dispatched `neighbors`.
 """
 function prominence(dem::AbstractMatrix{<:Real})
     dst = similar(dem, Int8)
@@ -107,6 +165,19 @@ function prominence(dem::AbstractMatrix{<:Real})
     store!(d, i, v) = @inbounds d[i] = v.count - 1
 
     return localfilter!(dst, dem, 3, initial, update, store!)
+end
+function prominence(dem)
+    dst = similar(dem, Int8)
+    cells = eachindex(dem)
+    for cell in cells
+        count = 0
+        for neighbor in neighbors(dem, cell)
+            neighbor in cells || continue
+            count += dem[neighbor] <= dem[cell]
+        end
+        dst[cell] = count
+    end
+    return dst
 end
 
 round_step(x, step) = round(x / step) * step

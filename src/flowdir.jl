@@ -16,9 +16,13 @@ A flow direction value in convention `C`, stored as type `T`.
 - `FlowDirection{C}(ci::CartesianIndex{2})`: Create from a CartesianIndex offset.
 
 # Conversion
-- `CartesianIndex(d::FlowDirection)`: Convert to CartesianIndex offset.
+- `CartesianIndex(d::FlowDirection)`: Convert to a CartesianIndex offset.
+- `decompose(R, d::FlowDirection, center)`: Decompose into relative indices of type `R`.
 - `convert(FlowDirection{C2}, d::FlowDirection{C1})`: Convert between conventions.
 - `Int(d::FlowDirection)`: Get the raw integer value.
+
+Grid implementations can support flow-direction traversal by defining
+`decompose(::Type{R}, d::FlowDirection, center)` for their relative-index type `R`.
 """
 struct FlowDirection{C <: FlowDirectionConvention, T <: Integer} <: Integer
     value::T
@@ -182,25 +186,46 @@ ndirections(d::FlowDirection{D8D}) = count_ones(d.value)
 
 """
     decompose(d::Direction)
+    decompose(R, d::Direction)
+    decompose(R, d::Direction, center)
 
-Decompose a direction into a tuple of individual single-direction values.
-For [`LDD`](@ref), returns a 1-tuple. For [`D8D`](@ref), extracts each set bit.
+Lazily iterate over the individual single-direction values encoded by a direction,
+or over relative grid indices of type `R`. The `center` argument supports grids
+whose relative indices depend on the cell from which they originate.
+For [`LDD`](@ref), returns a 1-tuple. For [`D8D`](@ref), iterates over each set bit.
 
 # Examples
 ```julia
 decompose(FlowDirection{D8D}(7))   # (→, ↘, ↓) → E + SE + S
 decompose(FlowDirection{LDD}(9))   # (↘,) → SE
+decompose(CartesianIndex{2}, FlowDirection{D8D}(3))
+decompose(CartesianIndex{2}, FlowDirection{D8D}(3), CartesianIndex(2, 2))
 ```
 """
 decompose(d::FlowDirection{LDD}) = (d,)
-decompose(d::FlowDirection{D8D}) = Tuple(FlowDirection{D8D}.(decompose(D8D, d.value)))
-function decompose(::Type{D8D}, d::Integer)
-    d == 0 && return (zero(d),)
-    dirs = typeof(d)[]
-    while d > 0
-        bit = one(d) << trailing_zeros(d)
-        push!(dirs, bit)
-        d ⊻= bit
-    end
-    return Tuple(dirs)
+decompose(d::FlowDirection{D8D}) =
+    (FlowDirection{D8D}(bit) for bit in decompose(D8D, d.value))
+decompose(::Type{CartesianIndex{2}}, d::FlowDirection) =
+    (CartesianIndex(direction) for direction in decompose(d))
+decompose(::Type{R}, d::FlowDirection, center) where {R} = decompose(R, d)
+
+struct DirectionBits{T <: Integer}
+    value::T
 end
+
+Base.eltype(::Type{DirectionBits{T}}) where {T} = T
+Base.length(directions::DirectionBits) = max(1, count_ones(directions.value))
+
+function Base.iterate(directions::DirectionBits)
+    iszero(directions.value) && return zero(directions.value), zero(directions.value)
+    return _iterate_direction_bits(directions.value)
+end
+Base.iterate(::DirectionBits, remaining) =
+    iszero(remaining) ? nothing : _iterate_direction_bits(remaining)
+
+function _iterate_direction_bits(remaining)
+    bit = one(remaining) << trailing_zeros(remaining)
+    return bit, remaining ⊻ bit
+end
+
+decompose(::Type{D8D}, d::Integer) = DirectionBits(d)

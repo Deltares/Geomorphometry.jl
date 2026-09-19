@@ -3,6 +3,19 @@ using Test
 using Aqua
 using ExplicitImports
 
+function Geomorphometry.decompose(
+    ::Type{Int},
+    direction::FlowDirection{D8D},
+    center,
+)
+    map(decompose(direction)) do branch
+        Int(branch) == 0 && return 0
+        Int(branch) == 1 && return 1
+        Int(branch) == 16 && return -1
+        error("Unsupported test direction")
+    end
+end
+
 @testset "Geomorphometry" begin
     @testset "Aqua" begin
         Aqua.test_all(Geomorphometry)
@@ -73,9 +86,10 @@ using ExplicitImports
         roughness(A)
         slope(A; method = Horn())
         slope(A; cellsize = (5, 5), method = ZevenbergenThorne())
-        slope(A; cellsize = (10, 10), method = MDG())
+        slope(A; cellsize = (10, 10), method = MaximumDownwardGradient())
+        slope(A; cellsize = (10, 10), method = SymmetricGradient())
         aspect(A)
-        aspect(A; method = MDG())
+        aspect(A; method = MaximumDownwardGradient())
         laplacian(A; gis = true)
         hillshade(A)
     end
@@ -90,9 +104,171 @@ using ExplicitImports
         ]
 
         rdem = height_above_nearest_drainage(dem)
-        @test rdem[1, 1] == 0  # all descending
-        @test rdem[4, 4] == 3  # highest ascending point
-        @test maximum(rdem) == 3
+        @test all(iszero, rdem)
+
+        @testset "HAND path clipping" begin
+            path_dem = Float32[4, 6, 5, 7, 0]
+            output = zeros(Float32, length(path_dem))
+            directions = [1, 1, 1, 1, 0]
+            stream_mask = falses(length(path_dem))
+            stream_mask[end] = true
+            Geomorphometry._hand!(
+                output,
+                reverse(eachindex(path_dem)),
+                directions,
+                eachindex(path_dem),
+                path_dem,
+                stream_mask,
+            )
+            @test output == path_dem
+
+            below_stream_dem = Float32[-2, 1, 0]
+            fill!(output, 0)
+            resize!(output, length(below_stream_dem))
+            directions = [1, 1, 0]
+            stream_mask = Bool[false, false, true]
+            Geomorphometry._hand!(
+                output,
+                reverse(eachindex(below_stream_dem)),
+                directions,
+                eachindex(below_stream_dem),
+                below_stream_dem,
+                stream_mask,
+            )
+            @test output == Float32[0, 1, 0]
+        end
+
+        @testset "HAND flow directions" begin
+            branch_dem = zeros(Float32, 3, 3)
+            branch_dem[2, 2] = 10
+            branch_dem[3, 2] = 6
+            branch_dem[2, 3] = 8
+            streams = falses(3, 3)
+            streams[3, 2] = true
+            streams[2, 3] = true
+            order = [filter(!=(5), collect(eachindex(branch_dem))); 5]
+            cells = CartesianIndices(branch_dem)
+            output = similar(branch_dem)
+
+            d8 = fill(FlowDirection{LDD, UInt8}(5), size(branch_dem))
+            d8[2, 2] = FlowDirection{LDD, UInt8}(6)
+            Geomorphometry._hand!(
+                output,
+                order,
+                d8,
+                cells,
+                branch_dem,
+                streams,
+                (1, 1),
+            )
+            @test output[2, 2] == 4
+
+            dinf = fill(FlowDirection{D8D, UInt8}(0), size(branch_dem))
+            dinf[2, 2] = FlowDirection{D8D, UInt8}(1 | 64)
+            Geomorphometry._hand!(
+                output,
+                order,
+                dinf,
+                cells,
+                branch_dem,
+                streams,
+                (1, 1),
+            )
+            @test output[2, 2] == 2
+
+            north_down = fill(FlowDirection{D8D, UInt8}(0), size(branch_dem))
+            north_down[2, 2] = FlowDirection{D8D, UInt8}(64)
+            north_stream = falses(3, 3)
+            north_stream[2, 1] = true
+            branch_dem[2, 1] = 7
+            Geomorphometry._hand!(
+                output,
+                order,
+                north_down,
+                cells,
+                branch_dem,
+                north_stream,
+                (1, -1),
+            )
+            @test output[2, 2] == 3
+        end
+
+        @testset "HAND stream burning and depression filling" begin
+            depression_dem = reshape(Float32[0, 7, 5, 6, 4], 5, 1)
+            cells = CartesianIndices(depression_dem)
+            order = collect(eachindex(depression_dem))
+            directions =
+                fill(FlowDirection{D8D, UInt8}(16), size(depression_dem))
+            directions[1] = FlowDirection{D8D, UInt8}(0)
+            priority_directions =
+                fill(CartesianIndex(-1, 0), size(depression_dem))
+            priority_directions[1] = CartesianIndex(0, 0)
+
+            streams = falses(size(depression_dem))
+            streams[end] = true
+            Geomorphometry._burn_streams!(
+                streams,
+                order,
+                priority_directions,
+                cells,
+            )
+            @test all(streams)
+
+            filled = similar(depression_dem)
+            Geomorphometry._fill_flow_depressions!(
+                filled,
+                order,
+                directions,
+                cells,
+                depression_dem,
+                (1, 1),
+            )
+            @test vec(filled) == Float32[0, 7, 7, 7, 7]
+
+            streams .= false
+            streams[1] = true
+            output = similar(depression_dem)
+            Geomorphometry._hand!(
+                output,
+                order,
+                directions,
+                cells,
+                filled,
+                streams,
+                (1, 1),
+            )
+            @test vec(output) == Float32[0, 7, 7, 7, 7]
+
+            generic_dem = Float32[4, 6, 5, 7, 0]
+            generic_cells = eachindex(generic_dem)
+            generic_order = reverse(eachindex(generic_dem))
+            generic_directions =
+                fill(FlowDirection{D8D, UInt8}(1), length(generic_dem))
+            generic_directions[end] = FlowDirection{D8D, UInt8}(0)
+            generic_priority = ones(Int, length(generic_dem))
+            generic_priority[end] = 0
+
+            generic_streams = falses(length(generic_dem))
+            generic_streams[1] = true
+            Geomorphometry._burn_streams!(
+                generic_streams,
+                generic_order,
+                generic_priority,
+                generic_cells,
+            )
+            @test all(generic_streams)
+
+            generic_filled = similar(generic_dem)
+            Geomorphometry._fill_flow_depressions!(
+                generic_filled,
+                generic_order,
+                generic_directions,
+                generic_cells,
+                generic_dem,
+                nothing,
+            )
+            @test generic_filled == Float32[7, 7, 7, 7, 0]
+        end
 
         acc, dir = flowaccumulation(dem; method = D8())
         @test maximum(acc) == 10
@@ -106,6 +282,14 @@ using ExplicitImports
         @test maximum(acc) == 10
         @test acc[2, 2] == 9
         @test acc[5, 5] == 1
+
+        @testset "FD8 conserves flow" begin
+            conservation_dem =
+                Float32[mod(i + j + 6i * j, 101) for i in 1:8, j in 1:8]
+            acc, _ =
+                flowaccumulation(conservation_dem; method = FD8(), cellsize = (1, 1))
+            @test maximum(acc) <= length(conservation_dem)
+        end
 
         fdem = filldepressions(dem)
         @test all(==(10), fdem)
@@ -176,10 +360,22 @@ using ExplicitImports
         @testset "CartesianIndex round-trip" begin
             # For each LDD direction, converting to CI and back should be identity
             for code in UInt8(1):UInt8(9)
-                ci = CartesianIndex(FlowDirection{LDD}(code))
+                ci = only(decompose(
+                    CartesianIndex{2},
+                    FlowDirection{LDD}(code),
+                ))
                 code2 = FlowDirection{LDD}(ci).value
                 @test code == code2
             end
+            @test collect(decompose(
+                CartesianIndex{2},
+                FlowDirection{D8D}(1 | 64),
+            )) == [CartesianIndex(1, 0), CartesianIndex(0, 1)]
+            @test collect(decompose(
+                CartesianIndex{2},
+                FlowDirection{D8D}(1 | 64),
+                CartesianIndex(2, 2),
+            )) == [CartesianIndex(1, 0), CartesianIndex(0, 1)]
         end
 
         @testset "D8 tilted plane" begin
@@ -259,7 +455,8 @@ using ExplicitImports
         @test all(0 .<= a[2:7, 2:7] .< 360)
         # On a constant-gradient plane ZevenbergenThorne and Horn agree
         @test aspect(tilt; method = ZevenbergenThorne())[4, 4] ≈
-              aspect(tilt; method = Horn())[4, 4]
+              aspect(tilt; method = Horn())[4, 4] ≈ aspect(tilt; method = SymmetricGradient())[4, 4]
+              
     end
 
     @testset "directional slope and laplacian" begin
