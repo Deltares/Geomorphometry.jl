@@ -42,7 +42,7 @@ include("flowdir.jl")
 include("hydrology.jl")
 include("horizon.jl")
 
-export ZevenbergenThorne, Horn, MaximumDownwardGradient, SymmetricGradient
+export ZevenbergenThorne, Horn, MaximumDownwardGradient, MDG, SymmetricGradient
 export D8, DInf, FD8
 export progressive_morphological_filter, simple_morphological_filter
 export pssm, hillshade, multihillshade
