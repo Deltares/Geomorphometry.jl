@@ -41,6 +41,7 @@ include("skew.jl")
 include("flowdir.jl")
 include("hydrology.jl")
 include("horizon.jl")
+include("geomorphon.jl")
 
 export ZevenbergenThorne, Horn, MaximumDownwardGradient, MDG, SymmetricGradient
 export D8, DInf, FD8
@@ -66,5 +67,8 @@ export filldepressions,
     height_above_nearest_drainage
 export FlowDirection, LDD, D8D, decompose
 export horizon_angle, sky_view_factor, viewshed, total_viewshed
+export geomorphon
+export Landform,
+    Undefined, Flat, Peak, Ridge, Shoulder, Spur, Slope, Hollow, Footslope, Valley, Pit
 
 end # module

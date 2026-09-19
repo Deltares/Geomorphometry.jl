@@ -75,7 +75,7 @@ function filldepressions!(dem, queued = fill!(similar(dem, Bool), false))
 end
 
 const nbs =
-    CartesianIndex.(((-1, -1), (-1, 1), (1, -1), (1, 1), (-1, 0), (0, -1), (0, 1), (1, 0)))
+    CartesianIndex.([(-1, 0), (0, -1), (0, 1), (1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1)])
 
 """
     neighbors(dem, cell)

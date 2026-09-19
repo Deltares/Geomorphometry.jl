@@ -536,4 +536,97 @@ end
         @test size(mask) == size(B)
         @test mask isa BitMatrix
     end
+    @testset "geomorphon" begin
+        cone(f) = [100.0 + f * hypot(i - 6, j - 6) for i in 1:11, j in 1:11]
+
+        @testset "landform classes" begin
+            @test geomorphon(fill(100.0, 11, 11))[6, 6] == Flat
+            @test geomorphon(cone(-1.0))[6, 6] == Peak
+            @test geomorphon(cone(1.0))[6, 6] == Pit
+            # A tilted plane falls in three directions, rises in three and is flat in two
+            @test geomorphon([100.0 + 0.5i for i in 1:11, j in 1:11])[6, 6] == Slope
+            @test geomorphon([100.0 - abs(i - 6) for i in 1:11, j in 1:11])[6, 6] == Ridge
+            @test geomorphon([100.0 + abs(i - 6) for i in 1:11, j in 1:11])[6, 6] == Valley
+            # Convex and concave breaks between flat and falling terrain
+            shoulder = [i <= 6 ? 100.0 : 100.0 - (i - 6) for i in 1:11, j in 1:11]
+            @test geomorphon(shoulder)[6, 6] == Shoulder
+            footslope = [i <= 6 ? 100.0 + (6 - i) : 100.0 for i in 1:11, j in 1:11]
+            @test geomorphon(footslope)[6, 6] == Footslope
+            # Convex and concave cross profiles on a falling slope
+            @test geomorphon([100.0 - i - 0.5abs(j - 6) for i in 1:11, j in 1:11])[6, 6] ==
+                  Spur
+            @test geomorphon([100.0 - i + 0.5abs(j - 6) for i in 1:11, j in 1:11])[6, 6] ==
+                  Hollow
+        end
+
+        @testset "output type" begin
+            dem = cone(-1.0)
+            forms = geomorphon(dem)
+            @test size(forms) == size(dem)
+            @test eltype(forms) == Landform
+            @test Int(Peak) == 2
+            @test Peak == 2
+            @test sprint(show, Peak) == "Peak"
+        end
+
+        @testset "flatness threshold" begin
+            # A 0.4° slope; the zenith and nadir angles sum to 0.8°
+            gentle = [100.0 + tand(0.4) * i for i in 1:11, j in 1:11]
+            @test geomorphon(gentle)[6, 6] == Flat
+            @test geomorphon(gentle; flatness = 0.5)[6, 6] == Slope
+        end
+
+        @testset "search radius" begin
+            # A pit of adjacent cells only, invisible once the first cell is skipped
+            bump = fill(100.0, 11, 11)
+            bump[5:7, 5:7] .= 110.0
+            bump[6, 6] = 100.0
+            @test geomorphon(bump)[6, 6] == Pit
+            @test geomorphon(bump; skip = 1)[6, 6] == Flat
+            # Larger cells lower all angles below the flatness threshold
+            slanted = [100.0 + 0.1i for i in 1:11, j in 1:11]
+            @test geomorphon(slanted)[6, 6] == Slope
+            @test geomorphon(slanted; cellsize = (100.0, 100.0))[6, 6] == Flat
+        end
+
+        @testset "missing elevation" begin
+            dem = cone(-1.0)
+            dem[6, 6] = NaN
+            @test geomorphon(dem)[6, 6] == Undefined
+            # Neighbouring cells skip the missing elevation, but are still classified
+            @test geomorphon(dem)[5, 5] != Undefined
+        end
+
+        @testset "wrapping is preserved" begin
+            A = Float64[row + sin(col / 3) for row in 1:16, col in 1:16]
+            A[8, 8] = NaN
+            x = Rasters.X(Sampled(1.0:1.0:16.0; sampling=Intervals(Start()),
+                                  order=ForwardOrdered(), span=Regular(1.0)))
+            y = Rasters.Y(Sampled(1.0:1.0:16.0; sampling=Intervals(Start()),
+                                  order=ForwardOrdered(), span=Regular(1.0)))
+            r = Raster(A, (x, y); crs=Rasters.EPSG(32633), missingval=NaN)
+
+            forms = geomorphon(r)
+            @test forms isa Raster
+            @test eltype(forms) == Landform
+            @test Rasters.dims(forms) == Rasters.dims(r)
+            # The elevation missing value has no landform, unclassified cells are Undefined
+            @test Rasters.missingval(forms) == Undefined
+            @test forms[8, 8] == Undefined
+            @test parent(forms) == geomorphon(A)
+
+            ga = GeoArray(A)
+            GeoArrays.bbox!(ga, (min_x = 0.0, min_y = 0.0, max_x = 16.0, max_y = 16.0))
+            @test geomorphon(ga) isa GeoArray
+            @test parent(geomorphon(ga)) == geomorphon(A)
+        end
+
+        @testset "invalid arguments" begin
+            dem = fill(100.0, 11, 11)
+            @test_throws ArgumentError geomorphon(dem; radius = 0)
+            @test_throws ArgumentError geomorphon(dem; radius = 3, skip = 3)
+            @test_throws ArgumentError geomorphon(dem; skip = -1)
+            @test_throws ArgumentError geomorphon(dem; flatness = -1.0)
+        end
+    end
 end

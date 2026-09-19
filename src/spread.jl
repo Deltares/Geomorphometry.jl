@@ -216,9 +216,9 @@ end
 """
     FastSweeping(; eps=1e-6, debug=false, iterations=typemax(Int))
 
-Friction-distance [`spread`](@ref) method using an iterative fast sweeping scheme. Sweeps
-the grid in alternating directions until the result converges within `eps` or `iterations`
-is reached.
+Friction-distance [`spread`](@ref) method using an iterative fast sweeping scheme, as
+described by [Zhao (2005)](@cite zhaoFastSweepingMethod2005). Sweeps the grid in
+alternating directions until the result converges within `eps` or `iterations` is reached.
 """
 Base.@kwdef struct FastSweeping <: SpreadMethod
     eps::Float64 = 1e-6

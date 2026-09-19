@@ -33,7 +33,7 @@ end
 
 hillshade is the simulated illumination of a surface based on its [`slope`](@ref) and
 [`aspect`](@ref) given a light source with `azimuth` and `zenith` angles in degrees, as defined in
-[Burrough, P. A., and McDonell, R. A., (1998)](@cite burroughPrinciplesGeographicalInformation2015).
+[Burrough et al. (2015)](@cite burroughPrinciplesGeographicalInformation2015).
 Returns a `Matrix{Union{Missing,UInt8}}` for matrix DEMs and `similar(dem, Union{Missing,UInt8})`
 for protocol-generic grids using [`SymmetricGradient`](@ref), with illumination values in `0:255`.
 """

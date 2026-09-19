@@ -31,6 +31,7 @@ Alias for [`MaximumDownwardGradient`](@ref).
 """
 const MDG = MaximumDownwardGradient
 
+"""Quadratic surface fit estimator used by the LandSerf software, by [Wood (1996)](@cite woodGeomorphologicalCharacterisation1996)."""
 struct LandSerf <: DerivativeMethod end
 
 struct GDAL <: DerivativeMethod end

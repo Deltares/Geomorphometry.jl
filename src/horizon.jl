@@ -355,7 +355,7 @@ Compute the Sky View Factor (SVF) for each cell in a DEM.
 
 SVF is the fraction of the sky hemisphere visible from each point, ranging from 0 (fully
 obstructed) to 1 (full sky visible). It is computed as the mean of cos²(horizon_angle)
-across all directions.
+across all directions, as described by [Zakšek et al. (2011)](@cite zaksekSkyViewFactorRelief2011).
 
 # Arguments
 - `dem`: Digital elevation model matrix
@@ -402,7 +402,8 @@ end
 """
     total_viewshed(dem; directions=16, cellsize=cellsize(dem), observer_height=0.0, missing_elevation=0.0)
 
-Compute the total viewshed (a normalized visibility index) for each cell in a DEM.
+Compute the total viewshed (a normalized visibility index) for each cell in a DEM, as
+described by [Llobera et al. (2004)](@cite lloberaCalculatingInherentVisual2004).
 
 For every cell, and along each direction, the fraction of the cells behind it (toward the
 sweep origin) that are directly visible (unobstructed line of sight) is computed; these

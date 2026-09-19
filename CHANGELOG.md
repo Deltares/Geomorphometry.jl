@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## Added
+- Added `geomorphon` to classify each cell of a DEM into one of ten `Landform` classes.
+
 ## [0.7.4] - 2026-07-01
 
 ## Added
