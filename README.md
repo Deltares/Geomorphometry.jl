@@ -30,4 +30,4 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 - Submit pull requests
 
 ## Alternative Packages
-If you are working in Python the [xDEM](https://xdem.readthedocs.io/en/stable/) package provides a comprehensive suite of tools for DEM analysis
+If you are working in Python the [xDEM](https://xdem.readthedocs.io/en/stable/) package provides a comprehensive suite of tools for DEM analysis. In Julia, the [WhereTheWaterFlows.jl](https://github.com/mauro3/WhereTheWaterFlows.jl) package also provides tools for hydrological analysis.
