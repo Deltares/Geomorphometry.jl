@@ -90,6 +90,7 @@ function _pmf(
 
     B = copy(Af)  # max_elevation raster
     out = copy(Af)  # max_elevation raster
+    prev = similar(Af)  # surface before this iteration's opening/erosion
 
     flags = similar(A, Float64)  # 0 = ground, other values indicate window size
     fill!(flags, 0.0)
@@ -103,6 +104,7 @@ function _pmf(
         nωₖ = (i > 1) ? window_diffs[i] : ωₖ
         # @info "Window $nωₖ, $(ωₖ), $(window_diffs[i]) slope sum: $(sum(s))"
         dhₜ = min.(dhₘ, s * window_diffs[i] * cellsize .+ dh₀)
+        copyto!(prev, Af)  # snapshot surface before this iteration morphs Af in place
         if erode
             if circular
                 # Modifies A and out in place
@@ -122,7 +124,7 @@ function _pmf(
                 LocalFilters.opening!(Af, out, Af, ωₖ)
             end
         end
-        mask .= (A .- Af) .> dhₜ
+        mask .= (prev .- Af) .> dhₜ
         for I in eachindex(flags)
             if mask[I] && (flags[I] <= 0)
                 flags[I] = ωₖ
@@ -130,6 +132,11 @@ function _pmf(
         end
         B .= min.(B, Af .+ dhₜ)
     end
+
+    # B accumulates independently of `flags` and can end up tighter than a
+    # cell's own elevation now that ground is decided incrementally; widen it
+    # there so `A .<= B` still agrees with `flags .== 0` (never the reverse).
+    B .= ifelse.(flags .== 0.0, max.(A, B), B)
 
     B, flags
 end

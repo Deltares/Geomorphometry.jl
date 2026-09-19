@@ -39,7 +39,7 @@ bathymetric_position_index(dem::AbstractMatrix{<:Real}, window::Annulus = Annulu
 """
     roughness_index_elevation(dem::AbstractMatrix{<:Real}, window::Stencil=Window(1))
 
-Roughness Index Elevation (RIE), which quantifies the standard deviation of residual topography (Cavalli et al., 2008).
+Roughness Index Elevation (RIE), which quantifies the standard deviation of residual topography, as defined in [Cavalli et al. (2008)](@cite cavalliEffectivenessAirborneLidar2008).
 The neighborhood is set by `window`.
 """
 function roughness_index_elevation(dem::AbstractMatrix{<:Real}, window::Stencil = Window(1))
@@ -60,6 +60,8 @@ This is recommended for terrestrial use cases.
 - `normalize::Bool=false`: Divide the summed differences by the number of neighbors (8).
 - `squared::Bool=true`: Use squared differences (the classic TRI). When `false`, the mean absolute
   difference is used; combining `normalize=false` with `squared=false` is not recommended.
+
+As defined in [Riley et al. (1999)](@cite rileyTerrainRuggednessIndex1999).
 """
 function terrain_ruggedness_index(
     dem::AbstractMatrix{<:Real};
@@ -180,11 +182,11 @@ end
 """
     rugosity(dem::AbstractMatrix{<:Real}; cellsize=cellsize(dem))
 
-Compute the rugosity of a DEM, which is the ratio between the 
+Compute the rugosity of a DEM, which is the ratio between the
 surface area divided by the planimetric area. The `cellsize` is used to scale
 horizontal distances and is derived from `dem` by default.
 
-Jenness 2019 https://onlinelibrary.wiley.com/doi/abs/10.2193/0091-7648%282004%29032%5B0829%3ACLSAFD%5D2.0.CO%3B2
+As defined in [Jenness (2004)](@cite jennessCalculatingLandscapeSurface2004).
 """
 function rugosity(dem::AbstractMatrix{<:Real}; cellsize = cellsize(dem))
     dst = similar(dem, eltype(dem))
