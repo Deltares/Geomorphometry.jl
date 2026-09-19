@@ -28,7 +28,7 @@ pit = Geomorphometry.DataStructures.Queue{CartesianIndex{2}}()
 R = CartesianIndices(fdtm)
 I_first, I_last = first(R), last(R)
 fps=60
-for cell in Geomorphometry.edges(R)
+for cell in Geomorphometry.outlets(fdtm)
     Geomorphometry.enqueue!(openn, cell, fdtm[cell])
     queued[cell] = true  # queued
 end
