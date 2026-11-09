@@ -7,6 +7,9 @@ All notable changes to this project will be documented in this file.
 ## Added
 - Added `geomorphon` to classify each cell of a DEM into one of ten `Landform` classes.
 
+## Deprecated
+- `MDG` is deprecated, use `MaximumDownwardGradient` instead.
+
 ## [0.7.4] - 2026-07-01
 
 ## Added

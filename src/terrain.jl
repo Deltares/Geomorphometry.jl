@@ -20,16 +20,11 @@ struct Horn <: DerivativeMethod end
     MaximumDownwardGradient()
 
 Maximum Downward Gradient derivative estimator, which uses the steepest descent towards
-a neighboring cell. Also available under the alias [`MDG`](@ref).
+a neighboring cell.
 """
 struct MaximumDownwardGradient <: DerivativeMethod end
 
-"""
-    MDG
-
-Alias for [`MaximumDownwardGradient`](@ref).
-"""
-const MDG = MaximumDownwardGradient
+Base.@deprecate_binding MDG MaximumDownwardGradient
 
 """Quadratic surface fit estimator used by the LandSerf software, by [Wood (1996)](@cite woodGeomorphologicalCharacterisation1996)."""
 struct LandSerf <: DerivativeMethod end
@@ -38,10 +33,10 @@ struct GDAL <: DerivativeMethod end
 
 """
     slope(dem::AbstractMatrix{<:Real}; cellsize=cellsize(dem), method=Horn(), exaggeration=1.0, direction=nothing)
-    slope(dem; cellsize=cellsize(dem), method=MDG(), exaggeration=1.0, direction=nothing)
+    slope(dem; cellsize=cellsize(dem), method=MaximumDownwardGradient(), exaggeration=1.0, direction=nothing)
 
 Slope is the rate of change between a cell and its neighbors.
-Non-matrix grids use [`MDG`](@ref) with dispatched `neighbors` and `celldistance`
+Non-matrix grids use [`MaximumDownwardGradient`](@ref) with dispatched `neighbors` and `celldistance`
 methods.
 
 # Arguments
@@ -66,7 +61,7 @@ end
 function slope(
     dem;
     cellsize=cellsize(dem),
-    method::DerivativeMethod=MDG(),
+    method::DerivativeMethod=MaximumDownwardGradient(),
     exaggeration=1.0,
     direction::Union{Nothing,Real}=nothing,
 )
@@ -120,7 +115,7 @@ function slope!(
     exaggeration,
     direction,
 )
-    isnothing(direction) || throw(ArgumentError("Direction is not supported for MDG."))
+    isnothing(direction) || throw(ArgumentError("Direction is not supported for MaximumDownwardGradient."))
     cells = eachindex(dem)
     for cell in cells
         gradient = 0.0
@@ -216,7 +211,7 @@ function slope!(
     exaggeration,
     direction,
 )
-    isnothing(direction) || throw(ArgumentError("Direction is not supported for MDG."))
+    isnothing(direction) || throw(ArgumentError("Direction is not supported for MaximumDownwardGradient."))
     initial(A) =
         (zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), zero(eltype(A)), cellsize)
     function store!(d, i, v)

@@ -24,13 +24,15 @@ end
         # `LocalFilters.Kernel` is a deliberate dependency on non-public API:
         # it carries the per-neighbour coefficients (1..9) that the terrain
         # update functions switch on, which no public LocalFilters neighbourhood
-        # exposes. The public-ness checks use `Base.ispublic` only on Julia
-        # 1.11+, so gate them by version to avoid false positives on 1.10.
+        # exposes. `Base.@deprecate_binding` is the standard way to deprecate a
+        # name, but it is not public either. The public-ness checks use
+        # `Base.ispublic` only on Julia 1.11+, so gate them by version to avoid
+        # false positives on 1.10.
         test_explicit_imports(
             Geomorphometry;
             all_explicit_imports_are_public = VERSION >= v"1.11",
             all_qualified_accesses_are_public = VERSION >= v"1.11" ?
-                                                (; ignore = (:Kernel,)) : false,
+                                                (; ignore = (:Kernel, Symbol("@deprecate_binding"))) : false,
         )
     end
     # Must run after ExplicitImports
@@ -494,9 +496,9 @@ end
         end
 
         # Maximum Downward Gradient does not support a direction
-        @test_throws "Direction is not supported for MDG." slope(
+        @test_throws "Direction is not supported for MaximumDownwardGradient." slope(
             tilt;
-            method = MDG(),
+            method = MaximumDownwardGradient(),
             direction = 10.0,
         )
 
