@@ -367,6 +367,60 @@ end
     posinf[1, 2] = Inf
     _, uphill = flowaccumulation(copy(posinf); method = D8(), cellsize = unitcell)
     @test CartesianIndex(uphill[2, 2]) != CartesianIndex(-1, 0)
+
+@testset "flowaccumulation over a given direction field" begin
+    @testset "every cell counts once" begin
+        z = filldepressions(rough_dem(40, 40))
+        for method in (D8(), DInf(), FD8())
+            dirs, weights = flowdirection(z; method, cellsize = unitcell)
+            acc = flowaccumulation(z, dirs, weights; cellsize = unitcell)
+            # Each cell contributes its own area, so nothing is created or lost.
+            @test minimum(acc) >= 1
+            @test maximum(acc) <= length(z)
+        end
+    end
+
+    @testset "a single chain accumulates linearly" begin
+        # A staircase down one column: each cell passes its own area plus all above it.
+        dem = Float32[10.0f0 - i for i in 1:6, j in 1:1]
+        dirs, weights = flowdirection(dem; method = D8(), cellsize = unitcell)
+        acc = flowaccumulation(dem, dirs, weights; cellsize = unitcell)
+        @test vec(acc) == Float32[1, 2, 3, 4, 5, 6]
+    end
+
+    @testset "it follows the directions it is given, not the terrain" begin
+        # A flat DEM has no directions of its own, so these are purely the ones given:
+        # send everything east along the row.
+        dem = zeros(Float32, 1, 4)
+        dirs, _ = flowdirection(dem; method = D8(), cellsize = unitcell)
+        dirs[1, 1:3] .= FlowDirection{LDD}(CartesianIndex(0, 1))
+        acc = flowaccumulation(dem, dirs; cellsize = unitcell)
+        @test vec(acc) == Float32[1, 2, 3, 4]
+
+        # Cutting a cell off makes it a pit: it keeps its own flow and passes none on.
+        dirs[1, 2] = FlowDirection{LDD}(CartesianIndex(0, 0))
+        @test vec(flowaccumulation(dem, dirs; cellsize = unitcell)) == Float32[1, 2, 1, 2]
+    end
+
+    @testset "the methods route the same water off the grid" begin
+        # Divergent methods spread flow differently, but the total leaving must match.
+        z = filldepressions(rough_dem(50, 50))
+        R = CartesianIndices(z)
+        function leaving(method)
+            dirs, weights = flowdirection(z; method, cellsize = unitcell)
+            acc = flowaccumulation(z, dirs, weights; cellsize = unitcell)
+            sum(
+                acc[cell] for cell in R if
+                Geomorphometry.ispit(dirs[cell]) || any(
+                    !(cell + Geomorphometry._orient(o, unitcell) in R) for
+                    o in Geomorphometry.decompose(CartesianIndex{2}, dirs[cell])
+                )
+            )
+        end
+        @test leaving(D8()) ≈ length(z) rtol = 1e-4
+        @test leaving(DInf()) ≈ leaving(D8()) rtol = 1e-3
+        @test leaving(FD8()) ≈ leaving(D8()) rtol = 1e-3
+    end
 end
 
 @testset "accumulation follows the facet, not the carved D8 direction" begin

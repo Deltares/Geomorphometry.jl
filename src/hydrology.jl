@@ -463,6 +463,99 @@ function flowaccumulation(
 end
 
 """
+    flowaccumulation(dem, directions[, weights]; cellsize=cellsize(dem))
+
+Accumulate flow over a direction field that has already been derived, and return the
+accumulation.
+
+Every cell starts with its own area and is released to its receivers once all of its own
+contributors have been, so the grid is traversed in dependency order without sorting it.
+This is the accumulation of
+[Barnes (2017)](@cite barnesParallelNonDivergentFlow2017), separated from the flood that
+the one-argument [`flowaccumulation`](@ref) uses to carve directions as it goes.
+
+Pass the `weights` [`flowdirection`](@ref) returned beside the directions; there is no
+`method` to name, as the directions already settle it. Left out, a cell's receivers split
+its flow evenly.
+
+`dem` should already drain — see [`filldepressions`](@ref). Cells that `directions` leaves
+in a cycle keep their own area and pass nothing on.
+
+```julia
+z = filldepressions(dem)
+directions, weights = flowdirection(z; method = FD8())
+acc = flowaccumulation(z, directions, weights)
+```
+"""
+function flowaccumulation(
+    dem,
+    directions::AbstractArray{<:FlowDirection},
+    weights = Fill(one(Float32), size(dem)..., 1);
+    cellsize = cellsize(dem),
+)
+    acc = similar(dem, Float32)
+    for cell in eachcell(dem)
+        acc[cell] = cellarea(dem, cell; cellsize)
+    end
+    return flowaccumulation!(dem, acc, directions, weights; cellsize)
+end
+
+function flowaccumulation!(
+    dem,
+    acc::AbstractArray{<:Real},
+    directions::AbstractArray{<:FlowDirection},
+    weights = Fill(one(Float32), size(dem)..., 1);
+    cellsize = cellsize(dem),
+)
+    R = eachcell(dem)
+    Cell = typeof(first(R))
+    contributors = fill!(similar(dem, UInt8), 0)
+
+    @inbounds for cell in R
+        for offset in decompose(CartesianIndex{2}, directions[cell], cell)
+            iszero(offset) && continue
+            target = cell + _orient(offset, cellsize)
+            target in R && (contributors[target] += one(UInt8))
+        end
+    end
+
+    ready = Cell[]
+    sizehint!(ready, length(dem) ÷ 4)
+    @inbounds for cell in R
+        iszero(contributors[cell]) && push!(ready, cell)
+    end
+
+    head = 1
+    @inbounds while head <= length(ready)
+        cell = ready[head]
+        head += 1
+        direction = directions[cell]
+        count = ndirections(direction)
+        count == 0 && continue
+        slot = 0
+        for bit in decompose(direction)
+            offset = CartesianIndex(bit)
+            iszero(offset) && continue
+            slot += 1
+            target = cell + _orient(offset, cellsize)
+            target in R || continue
+            acc[target] += acc[cell] * _share(weights, cell, slot, count)
+            contributors[target] -= one(UInt8)
+            iszero(contributors[target]) && push!(ready, target)
+        end
+    end
+    return acc
+end
+
+"""
+Share of a cell's flow taking one of its directions. A [`Fill`](@extref FillArrays.Fill)
+records no shares, so its receivers split the flow evenly, which for the single receiver of
+a [`D8`](@ref) field is all of it.
+"""
+@inline _share(weights::Fill, cell, slot, count) = first(weights) / count
+@inline _share(weights, cell, slot, count) = @inbounds Float32(weights[cell, slot])
+
+"""
     _carve(dem, closed, cellsize)
 
 Flood `dem` inwards from its outlets and return the order cells were reached in, together
