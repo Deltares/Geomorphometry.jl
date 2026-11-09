@@ -20,9 +20,12 @@ Share of each cell's flow per receiver, one dimension larger than the DEM, the t
 axis in [`D8D`](@ref) bit order. A single-receiver method stores nothing: its weights are a
 [`Fill`](@extref FillArrays.Fill) and cost no memory.
 """
-_weights(method::FlowDirectionMethod, dem, T) =
-    hasweights(method) ? zeros(T, size(dem)..., maxreceivers(method)) :
-    Fill(one(T), size(dem)..., maxreceivers(method))
+function _weights(method::FlowDirectionMethod, dem, T)
+    n = maxreceivers(method)
+    # A single receiver takes everything, so there is nothing to store.
+    hasweights(method) || return Fill(one(T), size(dem)..., n)
+    return fill!(_alloc_directions(dem, T, n), zero(T))
+end
 
 
 """Record the share of a cell's `slot`-th receiver. Nothing to record without weights."""
@@ -61,7 +64,7 @@ function flowdirection(
     weighttype::Type{<:AbstractFloat} = Float32,
 )
     C = _convention(method)
-    directions = similar(dem, FlowDirection{C, UInt8})
+    directions = _directiongrid(dem, C)
     weights = _weights(method, dem, weighttype)
     state = _directionstate(method, dem, cellsize)
     @inbounds for cell in eachcell(dem)

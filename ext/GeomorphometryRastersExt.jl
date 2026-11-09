@@ -52,4 +52,10 @@ end
 Geomorphometry.outlets(r::Raster) = Geomorphometry.outlets(parent(r))
 Geomorphometry.neighbors(r::Raster, cell::CartesianIndex{2}) = Geomorphometry.neighbors(parent(r), cell)
 
+# A direction eltype cannot represent the source missingval, so allocate without one.
+Geomorphometry._directiongrid(
+    dem::Raster, ::Type{C}
+) where {C <: Geomorphometry.FlowDirectionConvention} =
+    similar(dem, FlowDirection{C, UInt8}; missingval = nothing)
+
 end # module

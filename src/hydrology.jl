@@ -424,19 +424,26 @@ function flowaccumulation!(
     return acc, dirs
 end
 
+"""
+Allocate a direction grid shaped like `dem`. A hook, because a direction eltype has no
+representation for a source `missingval` and some grid types must drop theirs.
+"""
+_directiongrid(dem, ::Type{C}) where {C <: FlowDirectionConvention} =
+    similar(dem, FlowDirection{C, UInt8})
+
 function _accumulate!(::D8, acc, order, dir, R, dem, cellsize)
     for i in reverse(order)
         iszero(dir[i]) && continue
         acc[R[i] + dir[i]] += acc[i]
     end
-    output = similar(dem, FlowDirection{LDD, UInt8})
+    output = _directiongrid(dem, LDD)
     output .= FlowDirection{LDD}.(_orient.(dir, Ref(cellsize)))
     return output
 end
 function _accumulate!(::DInf, acc, order, dir, R, dem, cellsize)
     aspects = _dinf_aspects(dem, cellsize)
     visited = fill!(similar(dem, Bool), false)
-    output = similar(dem, FlowDirection{D8D, UInt8})
+    output = _directiongrid(dem, D8D)
     fill!(output, 0)
 
     for i in reverse(order)
@@ -509,7 +516,7 @@ function _accumulate!(fd8::FD8, acc, order, dir, R::CartesianIndices{2}, dem, ce
 
     visited = falses(size(acc))
     nb = vec(collect(CartesianIndices(dists)) .- CartesianIndex(2, 2))
-    output = similar(dem, FlowDirection{D8D, UInt8})
+    output = _directiongrid(dem, D8D)
     fill!(output, 0)
 
     weights = zeros(size(contour_lengths))
@@ -555,7 +562,7 @@ end
 
 function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
     visited = fill!(similar(dem, Bool), false)
-    output = similar(dem, FlowDirection{D8D, UInt8})
+    output = _directiongrid(dem, D8D)
     fill!(output, 0)
     scratch = _fd8scratch(dem)
 

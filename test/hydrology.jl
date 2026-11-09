@@ -138,3 +138,14 @@ end
         @test all(isfinite, weights)
     end
 end
+
+@testset "direction and weight grids follow the input type" begin
+    # A direction eltype has no representation for a source missingval, and the weights
+    # need a direction dimension that `similar` would otherwise drop. Both go through
+    # hooks the wrapper extensions override.
+    @test Geomorphometry._directiongrid(zeros(Float32, 3, 3), Geomorphometry.LDD) isa
+          Matrix{<:Geomorphometry.FlowDirection}
+    dirs, weights = flowdirection(rough_dem(8, 8); method = FD8(), cellsize = unitcell)
+    @test size(weights) == (8, 8, maxreceivers(FD8()))
+    @test all(>=(0), weights)
+end
