@@ -1,7 +1,13 @@
-# Fallbacks visit every index and delegate lookup to `neighbors(dem, cell)`.
+"""
+    eachcell(dem)
 
-_neighborhood_cells(dem) = eachindex(dem)
-_neighborhood_cells(dem::AbstractMatrix) = CartesianIndices(dem)
+Iterate over every cell of `dem`, as indices that `dem` accepts directly.
+Matrices yield `CartesianIndex{2}`, other grids fall back to `eachindex`.
+Grids with their own cell type extend this method, together with
+[`neighbors`](@ref).
+"""
+eachcell(dem) = eachindex(dem)
+eachcell(dem::AbstractMatrix) = CartesianIndices(dem)
 
 """
     neighbors(dem)
@@ -9,7 +15,7 @@ _neighborhood_cells(dem::AbstractMatrix) = CartesianIndices(dem)
 Iterate over `(cell, neighbors(dem, cell))` for every cell in `dem`. Neighbor
 iterators contain only indices within `dem`.
 """
-neighbors(dem) = ((cell, neighbors(dem, cell)) for cell in _neighborhood_cells(dem))
+neighbors(dem) = ((cell, neighbors(dem, cell)) for cell in eachcell(dem))
 
 _neighborvalues(dem, cell) = (dem[neighbor] for neighbor in neighbors(dem, cell))
 
@@ -23,7 +29,7 @@ directly into `dst` and returning it. `neighbor_values` contains samples from
 ignores both keywords.
 """
 function mapneighbors!(f::F, dst, dem; order=nothing, threaded=false) where {F}
-    for cell in _neighborhood_cells(dem)
+    for cell in eachcell(dem)
         dst[cell] = f(cell, dem[cell], _neighborvalues(dem, cell))
     end
     return dst
@@ -39,7 +45,7 @@ results in a grid shaped like `dem`. `neighbor_values` contains samples from
 ignores both keywords.
 """
 function mapneighbors(f::F, dem; order=nothing, threaded=false) where {F}
-    cells = _neighborhood_cells(dem)
+    cells = eachcell(dem)
     values = map(cell -> f(cell, dem[cell], _neighborvalues(dem, cell)), cells)
     dst = similar(dem, eltype(values))
     for (cell, value) in zip(cells, values)

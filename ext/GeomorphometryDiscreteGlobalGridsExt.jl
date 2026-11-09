@@ -15,7 +15,7 @@ _cells(r::IGeo7Raster) = parent(_lookup(r))
 
 # `CellVector` is lazy and its `in` method searches compressed position windows
 # rather than scanning cell ids.
-Base.eachindex(r::IGeo7Raster) = _cells(r)
+GM.eachcell(r::IGeo7Raster) = _cells(r)
 
 function _position(r::IGeo7Raster, c::Cell)
     p = DGG.cellposition(_lookup(r), c)

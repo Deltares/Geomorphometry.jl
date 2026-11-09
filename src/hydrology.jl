@@ -9,9 +9,6 @@ function outlets(A::AbstractMatrix)
     unique(indices)
 end
 
-_cells(dem) = eachindex(dem)
-_cells(dem::AbstractMatrix) = CartesianIndices(dem)
-
 cellarea(dem::AbstractMatrix, cell; cellsize = cellsize(dem)) =
     abs(cellsize[1] * cellsize[2])
 
@@ -48,7 +45,7 @@ Base.@kwdef struct FD8 <: FlowDirectionMethod
 end
 
 function filldepressions!(dem, queued = fill!(similar(dem, Bool), false))
-    R = _cells(dem)
+    R = eachcell(dem)
     first_cell = first(R)
     open = PriorityQueue{typeof(first_cell), eltype(dem)}()
     pit = DataStructures.Queue{typeof(first_cell)}()
@@ -88,7 +85,7 @@ neighbors(dem, cell::CartesianIndex{2}) =
     Iterators.filter(in(CartesianIndices(dem)), cell + nb for nb in nbs)
 
 function watersheds(dem, queued = fill!(similar(dem, Bool), false))
-    R = _cells(dem)
+    R = eachcell(dem)
     first_cell = first(R)
     open = PriorityQueue{typeof(first_cell), eltype(dem)}()
     pit = DataStructures.Queue{typeof(first_cell)}()
@@ -201,7 +198,7 @@ _dinf_aspect(::Nothing, dem, cell, cellsize) = _localaspect(dem, cell, cellsize)
 
 function _localaspect(dem, cell, cellsize)
     xx = xy = yy = xz = yz = 0.0
-    cells = _cells(dem)
+    cells = eachcell(dem)
     center = dem[cell]
     for neighbor in neighbors(dem, cell)
         neighbor in cells || continue
@@ -239,7 +236,7 @@ function flowaccumulation(
     cellsize = cellsize(dem),
 )
     acc = similar(dem, Float32)
-    for cell in _cells(dem)
+    for cell in eachcell(dem)
         acc[cell] = cellarea(dem, cell; cellsize)
     end
     flowaccumulation!(dem, acc, copy(closed); method, cellsize)
@@ -252,7 +249,7 @@ function flowaccumulation!(
     method = DInf(),
     cellsize = cellsize(dem),
 )
-    R = _cells(dem)
+    R = eachcell(dem)
     L = similar(dem, Int64)
     L .= LinearIndices(dem)
     first_cell = first(R)
@@ -530,7 +527,7 @@ function height_above_nearest_drainage(
     cellsize = cellsize(dem),
     threshold = 100,
 )
-    R = _cells(dem)
+    R = eachcell(dem)
     L = similar(dem, Int64)
     L .= LinearIndices(dem)
     first_cell = first(R)
@@ -587,7 +584,7 @@ function height_above_nearest_drainage(
     dem,
     stream_mask::AbstractArray{Bool},
 )
-    R = _cells(dem)
+    R = eachcell(dem)
     L = similar(dem, Int64)
     L .= LinearIndices(dem)
     first_cell = first(R)
@@ -747,7 +744,7 @@ function depression_volume(
 )
     depth = depression_depth(dem; filled)
     volume = 0.0
-    for cell in _cells(dem)
+    for cell in eachcell(dem)
         isfinite(depth[cell]) || continue
         volume += depth[cell] * cellarea(dem, cell; cellsize)
     end

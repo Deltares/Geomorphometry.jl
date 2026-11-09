@@ -479,6 +479,17 @@ end
         @test aspect(falling; method = MaximumDownwardGradient(), cellsize = (1.0, 1.0))[4, 4] ≈ 45
     end
 
+    @testset "generic methods iterate matrices by eachcell" begin
+        plane = [2.0 * i + 3.0 * j for i in 1:8, j in 1:8]
+        grid = Matrix{Union{Missing, Float64}}(plane)
+        @test Geomorphometry.eachcell(grid) == CartesianIndices(grid)
+        # The steepest neighbor drops 5 over a diagonal
+        @test slope(grid; cellsize = (1.0, 1.0))[4, 4] ≈ atand(5 / √2)
+        @test roughness(grid)[4, 4] ≈ roughness(plane)[4, 4]
+        @test topographic_position_index(grid)[4, 4] ≈ 0 atol = 1e-6
+        @test terrain_ruggedness_index(grid)[4, 4] ≈ terrain_ruggedness_index(plane)[4, 4]
+    end
+
     @testset "directional slope and laplacian" begin
         tilt = Float64[2.0 * i + 3.0 * j for i in 1:8, j in 1:8]
 

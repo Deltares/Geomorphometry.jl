@@ -116,7 +116,7 @@ function slope!(
     direction,
 )
     isnothing(direction) || throw(ArgumentError("Direction is not supported for MaximumDownwardGradient."))
-    cells = eachindex(dem)
+    cells = eachcell(dem)
     for cell in cells
         gradient = 0.0
         for neighbor in neighbors(dem, cell)
@@ -338,7 +338,7 @@ end
 
 function aspect!(::MaximumDownwardGradient, dst, dem, cellsize)
     fill!(dst, NaN)
-    for cell in _neighborhood_cells(dem)
+    for cell in eachcell(dem)
         slope = -Inf
         for neighbor in neighbors(dem, cell)
             difference = dem[neighbor] - dem[cell]
