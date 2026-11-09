@@ -32,17 +32,15 @@ function _cellsize(::Rasters.GI.AbstractProjectedTrait, dem::Raster)
 end
 function _cellsize(::Rasters.GI.AbstractGeographicTrait, dem::Raster)
     dim = Rasters.dims(dem, (Rasters.XDim, Rasters.YDim))
-    return (1,1)
-    # Rasters.isintervals(dim) || throw(
-        # ArgumentError("Cannot calculate cell size for a `Raster` with `Points` sampling."),
-    # )
+    Rasters.isintervals(dim) || throw(
+        ArgumentError("Cannot calculate cell size for a `Raster` with `Points` sampling."),
+    )
     centercoords = DimPoints(dem)[round.(Int, size(dem)[1:2] ./ 2)...]
     (step(dim[1]) * degwidth * cosd(centercoords[2]), step(dim[2]) * degwidth)
 end
 
 function _crstrait(dem::Raster)
     crs = Rasters.crs(dem)
-    isnothing(crs) && return Rasters.GI.GeographicTrait()
     acrs = ArchGDAL.importCRS(crs)
     Bool(ArchGDAL.GDAL.osrisgeographic(acrs.ptr)) && return Rasters.GI.GeographicTrait()
     Bool(ArchGDAL.GDAL.osrisprojected(acrs.ptr)) && return Rasters.GI.ProjectedTrait()

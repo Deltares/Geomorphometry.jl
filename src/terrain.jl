@@ -197,7 +197,7 @@ function slope!(
             return atand(hypot(gx, gy) * exaggeration)
         else
             return atand(
-                (-gx * sind(direction) + gy * cosd(direction)) *
+                (gx * sind(direction) + gy * cosd(direction)) *
                 exaggeration,
             )
         end
@@ -343,15 +343,16 @@ end
 
 function aspect!(::MaximumDownwardGradient, dst, dem, cellsize)
     fill!(dst, NaN)
-    cells = eachindex(dem)
-    for cell in cells
+    for cell in _neighborhood_cells(dem)
         slope = -Inf
         for neighbor in neighbors(dem, cell)
-            nslope = abs(dem[neighbor] - dem[cell]) /
-                     celldistance(dem, cell, neighbor; cellsize)
+            difference = dem[neighbor] - dem[cell]
+            nslope = abs(difference) / celldistance(dem, cell, neighbor; cellsize)
             if nslope > slope
                 slope = nslope
-                dst[cell] = cellbearing(dem, cell, neighbor; cellsize)
+                bearing = cellbearing(dem, cell, neighbor; cellsize)
+                # An uphill neighbor means the surface descends the opposite way.
+                dst[cell] = difference < 0 ? bearing : mod(bearing + 180, 360)
             end
         end
     end

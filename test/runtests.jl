@@ -106,6 +106,14 @@ end
         rdem = height_above_nearest_drainage(dem)
         @test all(iszero, rdem)
 
+        @testset "HAND with a stream mask" begin
+            peak_dem = zeros(Float32, 3, 3)
+            peak_dem[2, 2] = 10
+            hand = height_above_nearest_drainage(peak_dem, falses(3, 3))
+            @test hand[2, 2] == 10
+            @test count(iszero, hand) == 8
+        end
+
         @testset "HAND path clipping" begin
             path_dem = Float32[4, 6, 5, 7, 0]
             output = zeros(Float32, length(path_dem))
@@ -456,7 +464,17 @@ end
         # On a constant-gradient plane ZevenbergenThorne and Horn agree
         @test aspect(tilt; method = ZevenbergenThorne())[4, 4] ≈
               aspect(tilt; method = Horn())[4, 4] ≈ aspect(tilt; method = SymmetricGradient())[4, 4]
-              
+
+    end
+
+    @testset "aspect MaximumDownwardGradient on generic grids" begin
+        # A non-Real element type dispatches to the generic neighbor-based method.
+        # The steepest neighbors are on the diagonal; aspect is the downslope one.
+        plane = [2.0 * i + 3.0 * j for i in 1:8, j in 1:8]
+        rising = Matrix{Union{Missing, Float64}}(plane)
+        falling = Matrix{Union{Missing, Float64}}(-plane)
+        @test aspect(rising; method = MaximumDownwardGradient(), cellsize = (1.0, 1.0))[4, 4] ≈ 225
+        @test aspect(falling; method = MaximumDownwardGradient(), cellsize = (1.0, 1.0))[4, 4] ≈ 45
     end
 
     @testset "directional slope and laplacian" begin
@@ -468,6 +486,12 @@ end
         @test isfinite(
             slope(tilt; method = ZevenbergenThorne(), direction = 45.0)[4, 4],
         )
+
+        # On a plane all gradient estimators agree on the directional slope
+        for direction in (0.0, 45.0, 90.0, 180.0, 270.0)
+            @test slope(tilt; method = SymmetricGradient(), direction)[4, 4] ≈
+                  slope(tilt; method = Horn(), direction)[4, 4]
+        end
 
         # Maximum Downward Gradient does not support a direction
         @test_throws "Direction is not supported for MDG." slope(
@@ -628,5 +652,29 @@ end
             @test_throws ArgumentError geomorphon(dem; skip = -1)
             @test_throws ArgumentError geomorphon(dem; flatness = -1.0)
         end
+    end
+    @testset "Raster cellsize" begin
+        A = rand(4, 4)
+        degrees(start, sampling) = Sampled(
+            start:0.5:(start + 1.5);
+            sampling,
+            order = ForwardOrdered(),
+            span = Regular(0.5),
+        )
+        x = Rasters.X(degrees(4.0, Intervals(Start())))
+        y = Rasters.Y(degrees(52.0, Intervals(Start())))
+
+        # Geographic cells are converted from degrees to metres
+        δx, δy = Geomorphometry.cellsize(Raster(A, (x, y); crs = Rasters.EPSG(4326)))
+        @test δy ≈ 0.5 * 111_000
+        @test δx ≈ 0.5 * 111_000 * cosd(52.5)
+
+        points = (Rasters.X(degrees(4.0, Points())), Rasters.Y(degrees(52.0, Points())))
+        @test_throws ArgumentError Geomorphometry.cellsize(
+            Raster(A, points; crs = Rasters.EPSG(4326)),
+        )
+
+        # Without a CRS the cell size is unknown, so it must not be guessed
+        @test_throws Exception Geomorphometry.cellsize(Raster(A, (x, y)))
     end
 end

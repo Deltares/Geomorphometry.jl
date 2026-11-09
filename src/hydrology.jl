@@ -491,23 +491,13 @@ function _fd8weight(fd8, dem, cell, neighbor, cells, visited, cellsize)
 end
 
 """
-    topographic_wetness_index(dem::AbstractMatrix; method=DInf(), cellsize=cellsize(dem))
-    topographic_wetness_index(dem; method=D8(), cellsize=cellsize(dem))
+    topographic_wetness_index(dem; method=DInf(), cellsize=cellsize(dem))
 
 Computes the Topographic Wetness Index (TWI) of a digital elevation model (DEM) `dem` with an optional `method` for flow direction and a `cellsize`.
 """
 function topographic_wetness_index(
-    dem::AbstractMatrix;
-    method = DInf(),
-    cellsize = cellsize(dem),
-)
-    s = slope(dem; cellsize)
-    acc, _ = flowaccumulation(dem; method, cellsize)
-    return @. log(acc / tand(s))
-end
-function topographic_wetness_index(
     dem;
-    method = D8(),
+    method = DInf(),
     cellsize = cellsize(dem),
 )
     s = slope(dem; cellsize)
@@ -517,17 +507,11 @@ end
 @deprecate TWI topographic_wetness_index
 
 """
-    stream_power_index(dem::AbstractMatrix; method=DInf(), cellsize=cellsize(dem))
-    stream_power_index(dem; method=D8(), cellsize=cellsize(dem))
+    stream_power_index(dem; method=DInf(), cellsize=cellsize(dem))
 
 Computes the Stream Power Index (SPI) of a digital elevation model (DEM) `dem` with an optional `method` for flow direction and a `cellsize`.
 """
-function stream_power_index(dem::AbstractMatrix; method = DInf(), cellsize = cellsize(dem))
-    s = slope(dem; cellsize)
-    acc, _ = flowaccumulation(dem; method, cellsize)
-    return @. log(acc * tand(s))
-end
-function stream_power_index(dem; method = D8(), cellsize = cellsize(dem))
+function stream_power_index(dem; method = DInf(), cellsize = cellsize(dem))
     s = slope(dem; cellsize)
     acc, _ = flowaccumulation(dem; method, cellsize)
     return @. log(acc * tand(s))
@@ -535,14 +519,14 @@ end
 @deprecate SPI stream_power_index
 
 """
-    height_above_nearest_drainage(dem::AbstractMatrix; method=DInf(), cellsize=cellsize(dem), threshold=100)
+    height_above_nearest_drainage(dem; method=DInf(), cellsize=cellsize(dem), threshold=100)
 
-Compute Height Above Nearest Drainage (HAND, [nobreHeightNearestDrainage2011](@cite)) of a digital elevation model (DEM) `dem` 
+Compute Height Above Nearest Drainage (HAND, [nobreHeightNearestDrainage2011](@cite)) of a digital elevation model (DEM) `dem`
 with an optional `method` for flow direction, a `cellsize`, and a flow accumulation `threshold` for stream definition.
 """
 function height_above_nearest_drainage(
     dem;
-    method = D8(),
+    method = DInf(),
     cellsize = cellsize(dem),
     threshold = 100,
 )
@@ -594,9 +578,9 @@ function height_above_nearest_drainage(
 end
 
 """
-    height_above_nearest_drainage(dem::AbstractMatrix, stream_mask::AbstractMatrix{Bool})
+    height_above_nearest_drainage(dem, stream_mask::AbstractArray{Bool})
 
-Computes the Height Above Nearest Drainage (HAND, [nobreHeightNearestDrainage2011](@cite)) of a digital elevation model (DEM) `dem` 
+Computes the Height Above Nearest Drainage (HAND, [nobreHeightNearestDrainage2011](@cite)) of a digital elevation model (DEM) `dem`
 given a stream definition as a boolean `stream_mask`.
 """
 function height_above_nearest_drainage(
@@ -604,9 +588,11 @@ function height_above_nearest_drainage(
     stream_mask::AbstractArray{Bool},
 )
     R = _cells(dem)
-    L = LinearIndices(dem)
+    L = similar(dem, Int64)
+    L .= LinearIndices(dem)
     first_cell = first(R)
-    dir = fill(first_cell - first_cell, size(dem))
+    dir = _alloc_offsets(dem, typeof(first_cell - first_cell))
+    fill!(dir, first_cell - first_cell)
     closed = fill!(similar(dem, Bool), false)
     order = ones(Int64, length(closed) - sum(closed))
 
@@ -769,8 +755,7 @@ function depression_volume(
 end
 
 """
-    drainage_potential(dem::AbstractMatrix; method=DInf(), cellsize=cellsize(dem))
-    drainage_potential(dem; method=D8(), cellsize=cellsize(dem))
+    drainage_potential(dem; method=DInf(), cellsize=cellsize(dem))
 
 Computes a drainage potential index indicating how well each cell drains.
 
@@ -783,12 +768,7 @@ will shed cold air downslope rather than pooling it.
 Based on the relationship between slope and flow accumulation:
 `drainage = sin(slope) / log(1 + accumulation)`
 """
-function drainage_potential(dem::AbstractMatrix; method = DInf(), cellsize = cellsize(dem))
-    s = slope(dem; cellsize)
-    acc, _ = flowaccumulation(dem; method, cellsize)
-    return @. sind(s) / log1p(acc)
-end
-function drainage_potential(dem; method = D8(), cellsize = cellsize(dem))
+function drainage_potential(dem; method = DInf(), cellsize = cellsize(dem))
     s = slope(dem; cellsize)
     acc, _ = flowaccumulation(dem; method, cellsize)
     return @. sind(s) / log1p(acc)
