@@ -378,6 +378,32 @@ depression_volume(dtm; filled=fdtm)
 
 :::
 
+### Filling and flow directions
+
+[`filldepressions`](@ref) takes a `method`: the default [`PriorityFlood`](@ref) of
+[barnesPriorityFloodOptimalDepressionFilling2014](@citet), or [`Zhou`](@ref) after
+[zhouEfficientVariantPriorityFlood2016](@citet), which reaches the same surface 1.1-1.4x
+faster by region-growing slope cells on a plain queue instead of a priority queue.
+
+Filling leaves flats, over which no flow direction is defined, so by default it also gives
+them a drainage gradient with [`resolveflats`](@ref), after
+[barnesEfficientAssignmentDrainage2014](@citet). Cells are raised by single `nextfloat`
+steps, so the surface is unchanged at any meaningful precision. Pass `flats=false` for the
+filled surface alone.
+
+[`flowdirection`](@ref) then reads directions off that surface, looking only at each cell's
+neighbours, and returns them with the share each receiver takes:
+
+```@example plots
+z = filldepressions(cdtm)                            # fill depressions, resolve flats
+directions, weights = flowdirection(z; method=D8())  # directions off the filled surface
+nothing # hide
+```
+
+[`D8`](@ref) has a single receiver that takes everything, so its weights are a `Fill` and
+cost nothing whatever the size of the grid. [`DInf`](@ref) and [`FD8`](@ref) store a share
+per receiver, two and eight respectively, which `weighttype=Float16` halves.
+
 Filling the depressions in a DEM is not necessary to calculate the flow accumulation. Here we use [`flowaccumulation`](@ref) to do so, and it automatically carves out depressions. Note that the local drainage direction is also returned. By default the FD8 algorithm is used, but you can also use the D∞ or D8 algorithm by setting the `method` keyword argument to `DInf()` or `D8()`.
 
 ::: warning

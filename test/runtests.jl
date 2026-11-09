@@ -37,6 +37,7 @@ end
     end
     # Must run after ExplicitImports
     include("horizon.jl")
+    include("hydrology.jl")
     @testset "pmf" begin
         # Write your own tests here.
         A = rand(25, 25)
@@ -308,8 +309,11 @@ end
             @test maximum(acc) <= length(conservation_dem)
         end
 
+        # Filling levels the bowl; the default also gives the resulting flat a gradient
+        # of one float step per cell, so the surface is level only to within that.
         fdem = filldepressions(dem)
-        @test all(==(10), fdem)
+        @test all(≈(10), fdem)
+        @test all(==(10), filldepressions(dem; flats = false))
 
         @testset "depression_depth" begin
             bd = depression_depth(dem)

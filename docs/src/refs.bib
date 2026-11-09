@@ -17,7 +17,6 @@
   keywords      = {Computer Science - Data Structures and Algorithms}
 }
 
-
 @inproceedings{bartelsDTMGenerationLIDAR2006,
   title      = {{{DTM Generation}} from {{LIDAR Data}} Using {{Skewness Balancing}}},
   booktitle  = {18th {{International Conference}} on {{Pattern Recognition}} ({{ICPR}}'06)},
@@ -33,7 +32,6 @@
   annotation = {27 citations (Crossref) [2022-01-19]\\
                 ZSCC: 0000080}
 }
-
 
 @article{bartelsThresholdfreeObjectGround2010,
   title    = {Threshold-Free Object and Ground Point Separation in {{LIDAR}} Data},
@@ -53,7 +51,6 @@
   keywords = {_tablet,DSM,DTM,GIS,LIDAR,Remote sensing,Skewness Balancing}
 }
 
-
 @book{burroughPrinciplesGeographicalInformation2015,
   title       = {Principles of {{Geographical Information Systems}}},
   author      = {Burrough, P. A. and McDonnell, Rachael A. and Lloyd, Christopher D.},
@@ -65,7 +62,6 @@
   langid      = {english},
   keywords    = {Business & Economics / Economic History,Science / Earth Sciences / Geography,Technology & Engineering / Cartography,Technology & Engineering / Remote Sensing & Geographic Information Systems,Technology & Engineering / Surveying,Travel / General}
 }
-
 
 @article{cavalliEffectivenessAirborneLidar2008,
   title    = {The Effectiveness of Airborne {{LiDAR}} Data in the Recognition of Channel-Bed Morphology},
@@ -106,7 +102,6 @@
   year      = {1989}
 }
 
-
 @article{hornHillShadingReflectance1981,
   title    = {Hill Shading and the Reflectance Map},
   author   = {Horn, B.K.P.},
@@ -122,7 +117,6 @@
   abstract = {Shaded overlays for maps give the user an immediate appreciation for the surface topography since they appeal to an important visual depth cue. A brief review of the history of manual methods is followed by a discussion of a number of methods that have been proposed for the automatic generation of shaded overlays. These techniques are compared using the reflectance map as a common representation for the dependence of tone or gray level on the orientation of surface elements.},
   keywords = {Automation,Graphics,History,Photography,Production,Reflectivity,Shadow mapping,Streaming media,Surface topography,Surface treatment}
 }
-
 
 @article{ilichMultiscaleDTMOpensourcePackage2023,
   title      = {{{MultiscaleDTM}}: {{An}} Open-Source {{R}} Package for Multiscale Geomorphometric Analysis},
@@ -473,5 +467,33 @@
   abstract = {Advancing research. Creating connections.},
   langid   = {english},
   keywords = {characteristics,Courant-Friedrichs-Lewy (CFL) condition,Eikonal equation,Gauss-Seidel iteration,Godunov scheme,upwind difference}
+}
+
+@article{barnesEfficientAssignmentDrainage2014,
+  title    = {An Efficient Assignment of Drainage Direction over Flat Surfaces in Raster Digital Elevation Models},
+  author   = {Barnes, Richard and Lehman, Clarence and Mulla, David},
+  year     = {2014},
+  month    = jan,
+  journal  = {Computers \& Geosciences},
+  volume   = {62},
+  pages    = {128--135},
+  issn     = {00983004},
+  doi      = {10.1016/j.cageo.2013.01.009},
+  abstract = {Depression-filling leaves flat regions with no local relief, over which drainage directions are undefined. This paper presents an algorithm which assigns drainage directions over flats by combining a gradient away from higher terrain with a gradient towards lower terrain, computed with two breadth-first traversals. The result is a realistic, convergent drainage pattern in O(n) time.},
+  keywords = {flats,flow direction,hydrology}
+}
+
+@article{zhouEfficientVariantPriorityFlood2016,
+  title    = {An Efficient Variant of the {{Priority-Flood}} Algorithm for Filling Depressions in Raster Digital Elevation Models},
+  author   = {Zhou, Guiyun and Sun, Zhongxuan and Fu, Suhua},
+  year     = {2016},
+  month    = may,
+  journal  = {Computers \& Geosciences},
+  volume   = {90},
+  pages    = {87--96},
+  issn     = {00983004},
+  doi      = {10.1016/j.cageo.2016.02.021},
+  abstract = {A variant of Priority-Flood that keeps the majority of cells out of the priority queue. Slope cells are processed by region growing on two plain queues, and only potential spill cells, where terrain turns back downhill, are pushed onto the priority queue. This reduces the complexity to O(m log m) with m much smaller than the number of cells, and runs 44.6\% faster than Barnes et al. (2014) in testing.},
+  keywords = {depression filling,hydrology,priority flood}
 }
 
