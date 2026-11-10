@@ -193,26 +193,14 @@ _dinf_aspect(aspects, dem, cell, cellsize) = aspects[cell]
 _dinf_aspect(::Nothing, dem, cell, cellsize) = _localaspect(dem, cell, cellsize)
 
 function _localaspect(dem, cell, cellsize)
-    xx = xy = yy = xz = yz = 0.0
-    center = dem[cell]
-    for neighbor in neighbors(dem, cell)
-        distance = celldistance(dem, cell, neighbor; cellsize)
-        iszero(distance) && continue
-        bearing = _cellbearing(dem, cell, neighbor, cellsize)
-        east = distance * sind(bearing)
-        north = distance * cosd(bearing)
-        elevation = dem[neighbor] - center
-        xx += east^2
-        xy += east * north
-        yy += north^2
-        xz += east * elevation
-        yz += north * elevation
-    end
-
-    determinant = xx * yy - xy^2
-    iszero(determinant) && return NaN
-    east_gradient = (xz * yy - yz * xy) / determinant
-    north_gradient = (yz * xx - xz * xy) / determinant
+    east_gradient, north_gradient = _symmetric_gradient(
+        SymmetricGradient(),
+        dem,
+        cell,
+        dem[cell],
+        _neighborvalues(dem, cell),
+        cellsize,
+    )
     iszero(east_gradient) && iszero(north_gradient) && return NaN
     return mod(atand(-east_gradient, -north_gradient), 360)
 end

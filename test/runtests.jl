@@ -506,6 +506,17 @@ end
                   slope(tilt; method = Horn(), direction)[4, 4]
         end
 
+        # SymmetricGradient fits the plane exactly for rectangular cells and for the
+        # clipped neighborhoods at the edges
+        for cellsize in ((2.0, 1.0), (30.0, -20.0))
+            expected = atand(hypot(2 / cellsize[1], 3 / cellsize[2]))
+            @test all(≈(expected), slope(tilt; method = SymmetricGradient(), cellsize))
+            @test aspect(tilt; method = SymmetricGradient(), cellsize)[4, 4] ≈
+                  aspect(tilt; method = Horn(), cellsize)[4, 4]
+            @test slope(tilt; method = SymmetricGradient(), cellsize, direction = 90.0)[4, 4] ≈
+                  slope(tilt; method = Horn(), cellsize, direction = 90.0)[4, 4]
+        end
+
         # Maximum Downward Gradient does not support a direction
         @test_throws "Direction is not supported for MaximumDownwardGradient." slope(
             tilt;

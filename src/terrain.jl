@@ -7,7 +7,7 @@ const nbkernel = LocalFilters.Kernel{Int8,2}(reshape(1:9, 3, 3))
 
 abstract type DerivativeMethod end
 
-"""Symmetric finite difference estimator using the distance and bearing of all neighboring cells."""
+"""Least-squares plane fit through all neighboring cells, using their distance and bearing. On a full regular neighborhood this is a symmetric finite difference."""
 struct SymmetricGradient <: DerivativeMethod end
 
 """Second order finite difference estimator using all 4 neighbors by [Zevenbergen and Thorne, (1987)](@cite zevenbergen1987quantitative)."""
@@ -225,6 +225,9 @@ function slope!(
     return localfilter!(dst, dem, nbkernel, initial, mdg, store!)
 end
 
+# Least-squares fit of a plane through the neighbors, which holds for rectangular cells and
+# for neighborhoods clipped at the edges. Returns NaN gradients when the neighbors do not
+# span both directions.
 function _symmetric_gradient(
     ::SymmetricGradient,
     dem,
@@ -233,23 +236,21 @@ function _symmetric_gradient(
     neighbor_values,
     cellsize,
 )
-    gx = zero(float(z0))
-    gy = zero(float(z0))
-    r2 = zero(float(z0))
-
+    xx = xy = yy = xz = yz = 0.0
     for (neighbor, z) in zip(neighbors(dem, cell), neighbor_values)
         d = celldistance(dem, cell, neighbor; cellsize)
-        θ = cellbearing(dem, cell, neighbor; cellsize)
-        east, north = sincosd(θ)
+        east, north = d .* sincosd(cellbearing(dem, cell, neighbor; cellsize))
         dz = z - z0
-
-        gx += d * east * dz
-        gy += d * north * dz
-        r2 += d^2
+        xx += east^2
+        xy += east * north
+        yy += north^2
+        xz += east * dz
+        yz += north * dz
     end
 
-    scale = 2 / r2
-    return gx * scale, gy * scale
+    determinant = xx * yy - xy^2
+    iszero(determinant) && return NaN, NaN
+    return (xz * yy - yz * xy) / determinant, (yz * xx - xz * xy) / determinant
 end
 
 """
