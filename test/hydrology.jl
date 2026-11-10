@@ -368,3 +368,50 @@ end
     _, uphill = flowaccumulation(copy(posinf); method = D8(), cellsize = unitcell)
     @test CartesianIndex(uphill[2, 2]) != CartesianIndex(-1, 0)
 end
+
+@testset "accumulation follows the facet, not the carved D8 direction" begin
+    @testset "a facet that misses the carved direction still routes" begin
+        # The window from "the steepest facet need not touch the steepest edge", with a
+        # rim to drain to. The carve takes W, the steepest single edge; the steepest facet
+        # is E/NE. Both of those receivers are earlier in the pop order than the centre,
+        # so both are legal and the facet decides.
+        dem = fill(0.5, 5, 5)
+        dem[1, :] .= -10
+        dem[5, :] .= -10
+        dem[:, 1] .= -10
+        dem[:, 5] .= -10
+        dem[3, 3] = 0.0
+        dem[4, 3] = -1.0      # E,  steepest facet with NE
+        dem[4, 4] = -1.4      # NE
+        dem[2, 3] = -1.05     # W,  steepest single edge, so the carved direction
+        acc, = flowaccumulation(copy(dem); method = DInf(), cellsize = unitcell)
+        @test acc[4, 3] ≈ 1.5155 atol = 1e-4
+        @test acc[4, 4] ≈ 1.4845 atol = 1e-4
+        @test acc[2, 3] ≈ 1.0                    # nothing went to the carved direction
+    end
+
+    @testset "a spill cell whose facet looks back into its depression" begin
+        # Inside a depression the facet points at the floor, which the flood popped after
+        # the spill cell, so neither receiver can take the flow. The carved escape route
+        # is the only edge guaranteed earlier in the pop order, and taking it is what
+        # keeps the single pass sound rather than throwing.
+        dem = rough_dem(120, 120)
+        acc, = flowaccumulation(copy(dem); method = DInf(), cellsize = unitcell)
+        @test all(isfinite, acc)
+        @test minimum(acc) >= 1
+        @test maximum(acc) <= length(dem)
+    end
+
+    @testset "the carve wins where a facet cannot reach nodata" begin
+        # No facet can name a -Inf cell, since the vertices must be finite, but the carve
+        # can: a coastal cell drains straight to sea rather than along the shore.
+        dem = fill(1.0, 4, 4)
+        dem[:, 1] .= -Inf
+        dem[2, 2] = 0.5
+        acc, dirs = flowaccumulation(copy(dem); method = DInf(), cellsize = unitcell)
+        @test all(isfinite, acc)
+        @test !Geomorphometry.ispit(dirs[2, 2])
+        # Straight west into the sea, not north or south along the shore.
+        @test CartesianIndex(dirs[2, 2]) == CartesianIndex(0, -1)
+    end
+end

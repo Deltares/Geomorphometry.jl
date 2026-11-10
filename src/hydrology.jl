@@ -582,16 +582,29 @@ function _accumulate!(::DInf, acc, order, dir, R, dem, cellsize)
         end
         acell, bcell, aa, bb = flowneighbors
         a, b = acell - cell, bcell - cell
+        carved = cell + dir[i]
 
-        # Depression
-        if (a != dir[i] && b != dir[i])
-            acc[cell + dir[i]] += acc[i]
+        # A facet can never reach nodata, since `_dinfreceivers` needs finite vertices,
+        # but the carve can: -Inf is the lowest thing there is. Where the carve found it,
+        # it wins outright, which is what keeps a river mouth at the coast.
+        if isinf(dem[carved]) && signbit(dem[carved])
+            acc[carved] += acc[i]
             output[i] = _directioncode(dem, dir[i], cellsize)
             visited[i] = true
             continue
         end
 
-        # Do not route flow back into cells that have already drained
+        # Both receivers have drained already, so both sit later in the pop order than
+        # this cell and neither can take its flow. That is a spill cell whose facet looks
+        # back into the depression it drains; the carve knows the way out.
+        if visited[acell] && visited[bcell]
+            acc[carved] += acc[i]
+            output[i] = _directioncode(dem, dir[i], cellsize)
+            visited[i] = true
+            continue
+        end
+
+        # Exactly one has drained: the other takes everything.
         if visited[acell]
             aa = 0
             bb = 1
@@ -611,9 +624,6 @@ function _accumulate!(::DInf, acc, order, dir, R, dem, cellsize)
             dirs |= _directioncode(dem, b, cellsize)
         end
         output[i] = dirs
-        if visited[acell] && visited[bcell]
-            error()
-        end
         visited[i] = true
     end
     return output
