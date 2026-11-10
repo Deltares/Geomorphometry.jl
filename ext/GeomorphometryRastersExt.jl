@@ -41,10 +41,15 @@ end
 
 function _crstrait(dem::Raster)
     crs = Rasters.crs(dem)
+    # Without a CRS the coordinates are used as is, as GDAL does
+    isnothing(crs) && return Rasters.GI.ProjectedTrait()
     acrs = ArchGDAL.importCRS(crs)
     Bool(ArchGDAL.GDAL.osrisgeographic(acrs.ptr)) && return Rasters.GI.GeographicTrait()
     Bool(ArchGDAL.GDAL.osrisprojected(acrs.ptr)) && return Rasters.GI.ProjectedTrait()
     return Rasters.GI.UnknownTrait()
 end
+
+Geomorphometry.outlets(r::Raster) = Geomorphometry.outlets(parent(r))
+Geomorphometry.neighbors(r::Raster, cell::CartesianIndex{2}) = Geomorphometry.neighbors(parent(r), cell)
 
 end # module

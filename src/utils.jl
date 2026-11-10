@@ -197,10 +197,11 @@ end
     o
 end
 
-# Allocate an output array of element type `T` for `dem`. The default uses `similar`, so
+# Allocate an array of element type `T` shaped like `dem`. The default uses `similar`, so
 # that plain matrices and GPU arrays propagate their storage type. Extensions override it
-# for wrapper types that carry a missing value which cannot be converted to `T`, such as
-# the categorical `Landform`.
+# for wrapper types that cannot hold `T` as is: a missing value that cannot be converted
+# to the categorical `Landform`, or an element type restricted to numbers that excludes
+# the offset between two cells.
 _alloc(dem, T) = similar(dem, T)
 
 """

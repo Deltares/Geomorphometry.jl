@@ -3,6 +3,19 @@ using Test
 using Aqua
 using ExplicitImports
 
+function Geomorphometry.decompose(
+    ::Type{Int},
+    direction::FlowDirection{D8D},
+    center,
+)
+    map(decompose(direction)) do branch
+        Int(branch) == 0 && return 0
+        Int(branch) == 1 && return 1
+        Int(branch) == 16 && return -1
+        error("Unsupported test direction")
+    end
+end
+
 @testset "Geomorphometry" begin
     @testset "Aqua" begin
         Aqua.test_all(Geomorphometry)
@@ -11,13 +24,15 @@ using ExplicitImports
         # `LocalFilters.Kernel` is a deliberate dependency on non-public API:
         # it carries the per-neighbour coefficients (1..9) that the terrain
         # update functions switch on, which no public LocalFilters neighbourhood
-        # exposes. The public-ness checks use `Base.ispublic` only on Julia
-        # 1.11+, so gate them by version to avoid false positives on 1.10.
+        # exposes. `Base.@deprecate_binding` is the standard way to deprecate a
+        # name, but it is not public either. The public-ness checks use
+        # `Base.ispublic` only on Julia 1.11+, so gate them by version to avoid
+        # false positives on 1.10.
         test_explicit_imports(
             Geomorphometry;
             all_explicit_imports_are_public = VERSION >= v"1.11",
             all_qualified_accesses_are_public = VERSION >= v"1.11" ?
-                                                (; ignore = (:Kernel,)) : false,
+                                                (; ignore = (:Kernel, Symbol("@deprecate_binding"))) : false,
         )
     end
     # Must run after ExplicitImports
@@ -73,9 +88,10 @@ using ExplicitImports
         roughness(A)
         slope(A; method = Horn())
         slope(A; cellsize = (5, 5), method = ZevenbergenThorne())
-        slope(A; cellsize = (10, 10), method = MDG())
+        slope(A; cellsize = (10, 10), method = MaximumDownwardGradient())
+        slope(A; cellsize = (10, 10), method = SymmetricGradient())
         aspect(A)
-        aspect(A; method = MDG())
+        aspect(A; method = MaximumDownwardGradient())
         laplacian(A; gis = true)
         hillshade(A)
     end
@@ -90,9 +106,186 @@ using ExplicitImports
         ]
 
         rdem = height_above_nearest_drainage(dem)
-        @test rdem[1, 1] == 0  # all descending
-        @test rdem[4, 4] == 3  # highest ascending point
-        @test maximum(rdem) == 3
+        @test all(iszero, rdem)
+
+        @testset "HAND with a stream mask" begin
+            peak_dem = zeros(Float32, 3, 3)
+            peak_dem[2, 2] = 10
+            hand = height_above_nearest_drainage(peak_dem, falses(3, 3))
+            @test hand[2, 2] == 10
+            @test count(iszero, hand) == 8
+        end
+
+        @testset "HAND keeps the DEM precision" begin
+            high_dem = fill(1.0e6, 3, 3)
+            high_dem[2, 2] += 0.01
+            hand = height_above_nearest_drainage(high_dem; method = D8())
+            @test hand[2, 2] ≈ 0.01 atol = 1.0e-8
+        end
+
+        @testset "HAND path clipping" begin
+            path_dem = Float32[4, 6, 5, 7, 0]
+            output = zeros(Float32, length(path_dem))
+            directions = [1, 1, 1, 1, 0]
+            stream_mask = falses(length(path_dem))
+            stream_mask[end] = true
+            Geomorphometry._hand!(
+                output,
+                reverse(eachindex(path_dem)),
+                directions,
+                eachindex(path_dem),
+                path_dem,
+                stream_mask,
+            )
+            @test output == path_dem
+
+            below_stream_dem = Float32[-2, 1, 0]
+            fill!(output, 0)
+            resize!(output, length(below_stream_dem))
+            directions = [1, 1, 0]
+            stream_mask = Bool[false, false, true]
+            Geomorphometry._hand!(
+                output,
+                reverse(eachindex(below_stream_dem)),
+                directions,
+                eachindex(below_stream_dem),
+                below_stream_dem,
+                stream_mask,
+            )
+            @test output == Float32[0, 1, 0]
+        end
+
+        @testset "HAND flow directions" begin
+            branch_dem = zeros(Float32, 3, 3)
+            branch_dem[2, 2] = 10
+            branch_dem[3, 2] = 6
+            branch_dem[2, 3] = 8
+            streams = falses(3, 3)
+            streams[3, 2] = true
+            streams[2, 3] = true
+            order = [filter(!=(5), collect(eachindex(branch_dem))); 5]
+            cells = CartesianIndices(branch_dem)
+            output = similar(branch_dem)
+
+            d8 = fill(FlowDirection{LDD, UInt8}(5), size(branch_dem))
+            d8[2, 2] = FlowDirection{LDD, UInt8}(6)
+            Geomorphometry._hand!(
+                output,
+                order,
+                d8,
+                cells,
+                branch_dem,
+                streams,
+                (1, 1),
+            )
+            @test output[2, 2] == 4
+
+            dinf = fill(FlowDirection{D8D, UInt8}(0), size(branch_dem))
+            dinf[2, 2] = FlowDirection{D8D, UInt8}(1 | 64)
+            Geomorphometry._hand!(
+                output,
+                order,
+                dinf,
+                cells,
+                branch_dem,
+                streams,
+                (1, 1),
+            )
+            @test output[2, 2] == 2
+
+            north_down = fill(FlowDirection{D8D, UInt8}(0), size(branch_dem))
+            north_down[2, 2] = FlowDirection{D8D, UInt8}(64)
+            north_stream = falses(3, 3)
+            north_stream[2, 1] = true
+            branch_dem[2, 1] = 7
+            Geomorphometry._hand!(
+                output,
+                order,
+                north_down,
+                cells,
+                branch_dem,
+                north_stream,
+                (1, -1),
+            )
+            @test output[2, 2] == 3
+        end
+
+        @testset "HAND stream burning and depression filling" begin
+            depression_dem = reshape(Float32[0, 7, 5, 6, 4], 5, 1)
+            cells = CartesianIndices(depression_dem)
+            order = collect(eachindex(depression_dem))
+            directions =
+                fill(FlowDirection{D8D, UInt8}(16), size(depression_dem))
+            directions[1] = FlowDirection{D8D, UInt8}(0)
+            priority_directions =
+                fill(CartesianIndex(-1, 0), size(depression_dem))
+            priority_directions[1] = CartesianIndex(0, 0)
+
+            streams = falses(size(depression_dem))
+            streams[end] = true
+            Geomorphometry._burn_streams!(
+                streams,
+                order,
+                priority_directions,
+                cells,
+            )
+            @test all(streams)
+
+            filled = similar(depression_dem)
+            Geomorphometry._fill_flow_depressions!(
+                filled,
+                order,
+                directions,
+                cells,
+                depression_dem,
+                (1, 1),
+            )
+            @test vec(filled) == Float32[0, 7, 7, 7, 7]
+
+            streams .= false
+            streams[1] = true
+            output = similar(depression_dem)
+            Geomorphometry._hand!(
+                output,
+                order,
+                directions,
+                cells,
+                filled,
+                streams,
+                (1, 1),
+            )
+            @test vec(output) == Float32[0, 7, 7, 7, 7]
+
+            generic_dem = Float32[4, 6, 5, 7, 0]
+            generic_cells = eachindex(generic_dem)
+            generic_order = reverse(eachindex(generic_dem))
+            generic_directions =
+                fill(FlowDirection{D8D, UInt8}(1), length(generic_dem))
+            generic_directions[end] = FlowDirection{D8D, UInt8}(0)
+            generic_priority = ones(Int, length(generic_dem))
+            generic_priority[end] = 0
+
+            generic_streams = falses(length(generic_dem))
+            generic_streams[1] = true
+            Geomorphometry._burn_streams!(
+                generic_streams,
+                generic_order,
+                generic_priority,
+                generic_cells,
+            )
+            @test all(generic_streams)
+
+            generic_filled = similar(generic_dem)
+            Geomorphometry._fill_flow_depressions!(
+                generic_filled,
+                generic_order,
+                generic_directions,
+                generic_cells,
+                generic_dem,
+                nothing,
+            )
+            @test generic_filled == Float32[7, 7, 7, 7, 0]
+        end
 
         acc, dir = flowaccumulation(dem; method = D8())
         @test maximum(acc) == 10
@@ -106,6 +299,14 @@ using ExplicitImports
         @test maximum(acc) == 10
         @test acc[2, 2] == 9
         @test acc[5, 5] == 1
+
+        @testset "FD8 conserves flow" begin
+            conservation_dem =
+                Float32[mod(i + j + 6i * j, 101) for i in 1:8, j in 1:8]
+            acc, _ =
+                flowaccumulation(conservation_dem; method = FD8(), cellsize = (1, 1))
+            @test maximum(acc) <= length(conservation_dem)
+        end
 
         fdem = filldepressions(dem)
         @test all(==(10), fdem)
@@ -176,10 +377,22 @@ using ExplicitImports
         @testset "CartesianIndex round-trip" begin
             # For each LDD direction, converting to CI and back should be identity
             for code in UInt8(1):UInt8(9)
-                ci = CartesianIndex(FlowDirection{LDD}(code))
+                ci = only(decompose(
+                    CartesianIndex{2},
+                    FlowDirection{LDD}(code),
+                ))
                 code2 = FlowDirection{LDD}(ci).value
                 @test code == code2
             end
+            @test collect(decompose(
+                CartesianIndex{2},
+                FlowDirection{D8D}(1 | 64),
+            )) == [CartesianIndex(1, 0), CartesianIndex(0, 1)]
+            @test collect(decompose(
+                CartesianIndex{2},
+                FlowDirection{D8D}(1 | 64),
+                CartesianIndex(2, 2),
+            )) == [CartesianIndex(1, 0), CartesianIndex(0, 1)]
         end
 
         @testset "D8 tilted plane" begin
@@ -259,7 +472,29 @@ using ExplicitImports
         @test all(0 .<= a[2:7, 2:7] .< 360)
         # On a constant-gradient plane ZevenbergenThorne and Horn agree
         @test aspect(tilt; method = ZevenbergenThorne())[4, 4] ≈
-              aspect(tilt; method = Horn())[4, 4]
+              aspect(tilt; method = Horn())[4, 4] ≈ aspect(tilt; method = SymmetricGradient())[4, 4]
+
+    end
+
+    @testset "aspect MaximumDownwardGradient on generic grids" begin
+        # A non-Real element type dispatches to the generic neighbor-based method.
+        # The steepest neighbors are on the diagonal; aspect is the downslope one.
+        plane = [2.0 * i + 3.0 * j for i in 1:8, j in 1:8]
+        rising = Matrix{Union{Missing, Float64}}(plane)
+        falling = Matrix{Union{Missing, Float64}}(-plane)
+        @test aspect(rising; method = MaximumDownwardGradient(), cellsize = (1.0, 1.0))[4, 4] ≈ 225
+        @test aspect(falling; method = MaximumDownwardGradient(), cellsize = (1.0, 1.0))[4, 4] ≈ 45
+    end
+
+    @testset "generic methods iterate matrices by eachcell" begin
+        plane = [2.0 * i + 3.0 * j for i in 1:8, j in 1:8]
+        grid = Matrix{Union{Missing, Float64}}(plane)
+        @test Geomorphometry.eachcell(grid) == CartesianIndices(grid)
+        # The steepest neighbor drops 5 over a diagonal
+        @test slope(grid; cellsize = (1.0, 1.0))[4, 4] ≈ atand(5 / √2)
+        @test roughness(grid)[4, 4] ≈ roughness(plane)[4, 4]
+        @test topographic_position_index(grid)[4, 4] ≈ 0 atol = 1e-6
+        @test terrain_ruggedness_index(grid)[4, 4] ≈ terrain_ruggedness_index(plane)[4, 4]
     end
 
     @testset "directional slope and laplacian" begin
@@ -272,10 +507,27 @@ using ExplicitImports
             slope(tilt; method = ZevenbergenThorne(), direction = 45.0)[4, 4],
         )
 
+        # On a plane all gradient estimators agree on the directional slope
+        for direction in (0.0, 45.0, 90.0, 180.0, 270.0)
+            @test slope(tilt; method = SymmetricGradient(), direction)[4, 4] ≈
+                  slope(tilt; method = Horn(), direction)[4, 4]
+        end
+
+        # SymmetricGradient fits the plane exactly for rectangular cells and for the
+        # clipped neighborhoods at the edges
+        for cellsize in ((2.0, 1.0), (30.0, -20.0))
+            expected = atand(hypot(2 / cellsize[1], 3 / cellsize[2]))
+            @test all(≈(expected), slope(tilt; method = SymmetricGradient(), cellsize))
+            @test aspect(tilt; method = SymmetricGradient(), cellsize)[4, 4] ≈
+                  aspect(tilt; method = Horn(), cellsize)[4, 4]
+            @test slope(tilt; method = SymmetricGradient(), cellsize, direction = 90.0)[4, 4] ≈
+                  slope(tilt; method = Horn(), cellsize, direction = 90.0)[4, 4]
+        end
+
         # Maximum Downward Gradient does not support a direction
-        @test_throws "Direction is not supported for MDG." slope(
+        @test_throws "Direction is not supported for MaximumDownwardGradient." slope(
             tilt;
-            method = MDG(),
+            method = MaximumDownwardGradient(),
             direction = 10.0,
         )
 
@@ -328,6 +580,13 @@ using ExplicitImports
         @test size(mh) == size(tilt)
         @test eltype(mh) == Union{Missing, UInt8}
         @test all(0 .<= skipmissing(mh) .<= 255)
+
+        # Like the matrix methods, generic shading marks NaN elevations as missing
+        grid = Matrix{Union{Missing, Float64}}(tilt)
+        grid[4, 4] = NaN
+        @test ismissing(hillshade(grid)[4, 4])
+        @test ismissing(multihillshade(grid)[4, 4])
+        @test !ismissing(hillshade(grid)[1, 1])
     end
 
     @testset "skewness_balancing non-finite" begin
@@ -431,5 +690,31 @@ using ExplicitImports
             @test_throws ArgumentError geomorphon(dem; skip = -1)
             @test_throws ArgumentError geomorphon(dem; flatness = -1.0)
         end
+    end
+    @testset "Raster cellsize" begin
+        A = rand(4, 4)
+        degrees(start, sampling) = Sampled(
+            start:0.5:(start + 1.5);
+            sampling,
+            order = ForwardOrdered(),
+            span = Regular(0.5),
+        )
+        x = Rasters.X(degrees(4.0, Intervals(Start())))
+        y = Rasters.Y(degrees(52.0, Intervals(Start())))
+
+        # Geographic cells are converted from degrees to metres
+        δx, δy = Geomorphometry.cellsize(Raster(A, (x, y); crs = Rasters.EPSG(4326)))
+        @test δy ≈ 0.5 * 111_000
+        @test δx ≈ 0.5 * 111_000 * cosd(52.5)
+
+        points = (Rasters.X(degrees(4.0, Points())), Rasters.Y(degrees(52.0, Points())))
+        @test_throws ArgumentError Geomorphometry.cellsize(
+            Raster(A, points; crs = Rasters.EPSG(4326)),
+        )
+
+        # Without a CRS the coordinates are assumed projected and used as is
+        nocrs = Raster(A, (x, y))
+        @test Geomorphometry.cellsize(nocrs) == (0.5, 0.5)
+        @test first(flowaccumulation(nocrs)) isa Raster
     end
 end
