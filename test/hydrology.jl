@@ -199,3 +199,172 @@ end
         @test weights[centre, slot] ≈ acc[centre + offset] - 1 rtol = 1e-5
     end
 end
+
+@testset "carved directions are steepest descent" begin
+    @testset "on a drained surface the carve matches the stencil" begin
+        # The flood pops in elevation order, so every strictly lower neighbour of a cell
+        # is already popped when that cell is. Choosing the steepest of those is D8, so
+        # on a surface that drains the two routes agree away from the rim, where they
+        # differ by convention rather than by rule.
+        z = filldepressions(rough_dem(80, 80))
+        _, carved = flowaccumulation(copy(z); method = D8(), cellsize = unitcell)
+        stencil = directionsof(z; method = D8())
+        @test all(carved[I] == stencil[I] for I in CartesianIndices((2:79, 2:79)))
+    end
+
+    @testset "prefers the steeper orthogonal over the lower diagonal" begin
+        # NE is lower, E is steeper; the flood reaches (3,2) from NE either way.
+        dem = Float32[
+            20 20 20 20 20
+            20 20 20 20 20
+            20 10 9.0 20 20
+            20 8.8 20 20 20
+            20 20 20 20 20
+        ]
+        z = filldepressions(dem)
+        _, carved = flowaccumulation(copy(z); method = D8(), cellsize = unitcell)
+        @test carved[3, 2] == directionsof(z; method = D8())[3, 2]
+    end
+end
+
+@testset "DInf facets" begin
+    @testset "the steepest facet need not touch the steepest edge" begin
+        # A facet's slope is that of the plane through its three cells, which can exceed
+        # both of its own edges. So searching only the facets beside the steepest single
+        # neighbour is not Tarboton's method, and here it would pick the wrong quadrant.
+        dem = zeros(Float64, 3, 3)
+        centre = CartesianIndex(2, 2)
+        dem[CartesianIndex(3, 2)] = -1.0      # E,  edge slope 1.0
+        dem[CartesianIndex(3, 3)] = -1.4      # NE, edge slope 0.990
+        dem[CartesianIndex(1, 2)] = -1.05     # W,  edge slope 1.05, the steepest edge
+        near, far, _, _ = Geomorphometry._dinfreceivers(dem, centre, nothing, unitcell)
+        @test Set((near - centre, far - centre)) ==
+              Set((CartesianIndex(1, 0), CartesianIndex(1, 1)))
+    end
+
+    @testset "flow is split between two neighbours sharing a corner" begin
+        dem = rough_dem(40, 40)
+        for cell in CartesianIndices(dem)
+            receivers = Geomorphometry._dinfreceivers(dem, cell, nothing, unitcell)
+            isnothing(receivers) && continue
+            near, far, afraction, bfraction = receivers
+            @test afraction >= 0 && bfraction >= 0 && afraction + bfraction ≈ 1
+            @test maximum(abs, Tuple(far - near)) == 1      # adjacent to each other
+            @test maximum(abs, Tuple(near - cell)) == 1     # and both to the cell
+        end
+    end
+
+    @testset "a planar slope sends all flow one way" begin
+        dem = Float64[10.0 - i for i in 1:5, j in 1:5]
+        near, _, afraction, bfraction =
+            Geomorphometry._dinfreceivers(dem, CartesianIndex(3, 3), nothing, unitcell)
+        @test near - CartesianIndex(3, 3) == CartesianIndex(1, 0)
+        @test afraction ≈ 1 && bfraction ≈ 0
+    end
+end
+
+@testset "DInf falls back to bracketing an aspect off a raster" begin
+    # Rasters take the facet route above. Grids with no facet geometry derive an aspect
+    # per cell and split between the two neighbours bracketing it, which is the only
+    # path a DGGS uses, so it is exercised directly here.
+    using Geomorphometry: _localaspect, _flowneighbors
+
+    @testset "a plane sends everything one way" begin
+        # Drops along dim1, which is east, so the aspect is due east and the two
+        # bracketing neighbours collapse onto one.
+        plane = Float64[10.0 - i for i in 1:5, j in 1:5]
+        cell = CartesianIndex(3, 3)
+        aspect = _localaspect(plane, cell, unitcell)
+        @test aspect ≈ 90
+        near, far, afraction, bfraction = _flowneighbors(plane, cell, aspect, unitcell)
+        @test near == far == cell + CartesianIndex(1, 0)
+        @test afraction ≈ 1 && bfraction ≈ 0
+    end
+
+    @testset "an aspect between two bearings is split between them" begin
+        tilt = Float64[10.0 - 2i - j for i in 1:5, j in 1:5]
+        cell = CartesianIndex(3, 3)
+        aspect = _localaspect(tilt, cell, unitcell)
+        near, far, afraction, bfraction = _flowneighbors(tilt, cell, aspect, unitcell)
+        @test 45 < aspect < 90                      # between NE and E
+        @test Set((near - cell, far - cell)) ==
+              Set((CartesianIndex(1, 1), CartesianIndex(1, 0)))
+        @test afraction + bfraction ≈ 1
+        @test afraction > 0 && bfraction > 0
+    end
+
+    @testset "a flat has no aspect, so the cell has no receivers" begin
+        # NaN here is what `_dinfreceivers` guards: bracketing it would pick the cell
+        # itself as both of its receivers.
+        @test isnan(_localaspect(fill(5.0, 5, 5), CartesianIndex(3, 3), unitcell))
+    end
+end
+
+@testset "FD8 contour lengths" begin
+    # A peak whose eight neighbours all lie one below it, so every way down is equally
+    # steep and only the cell geometry decides the split: slope carries the distance
+    # travelled, the contour length the width crossed.
+    peak = fill(0.0f0, 5, 5)
+    peak[2:4, 2:4] .= 9
+    peak[3, 3] = 10
+
+    function peakshares(cellsize)
+        acc, = flowaccumulation(peak; method = FD8(), cellsize)
+        area = abs(cellsize[1] * cellsize[2])
+        share(I) = (acc[I] - area) / area
+        (
+            row = share(CartesianIndex(2, 3)) + share(CartesianIndex(4, 3)),
+            col = share(CartesianIndex(3, 2)) + share(CartesianIndex(3, 4)),
+            diagonal = sum(share(I) for I in CartesianIndex.(((2, 2), (2, 4), (4, 2), (4, 4)))),
+        )
+    end
+
+    @testset "square cells reproduce Quinn's L1 = 0.5, L2 = 0.354" begin
+        s = peakshares(unitcell)
+        @test s.row + s.col + s.diagonal ≈ 1
+        @test s.row ≈ s.col
+        # Each cardinal outweighs each diagonal by 2^p before normalising.
+        @test s.row / 2 ≈ (s.diagonal / 4) * 2^FD8().p rtol = 1e-5
+    end
+
+    @testset "a long thin cell sends more water out of its long side" begin
+        # Three times as tall as wide: a step along the columns is the short one and
+        # leaves through the tall face, so it dominates twice over. Invisible on squares.
+        tall, wide = peakshares((3.0, 1.0)), peakshares((1.0, 3.0))
+        @test tall.col > tall.row
+        @test tall.col ≈ wide.row && tall.row ≈ wide.col   # mirror images
+    end
+
+    @testset "the split depends on the cell's shape, not its size" begin
+        # Slope loses exactly what the contour length gains, so scaling changes nothing.
+        @test all(isapprox.(values(peakshares((30.0, 10.0))), values(peakshares((3.0, 1.0))), rtol = 1e-5))
+    end
+end
+
+@testset "height_above_nearest_drainage over a given stream mask" begin
+    z = filldepressions(rough_dem(30, 30))
+    mask = falses(30, 30)
+    mask[1, 1] = true
+    hand = height_above_nearest_drainage(z, mask)
+    @test size(hand) == size(z)
+    @test all(h -> !isfinite(h) || h >= 0, hand)
+    @test hand[1, 1] == 0
+end
+
+@testset "the carve drains into -Inf" begin
+    # The manual sets sea to -Inf before filling, so -Inf has to be a usable receiver: it
+    # is lower than anything. NaN and +Inf are not, and must not be routed into.
+    dem = fill(0.0, 3, 3)
+    dem[1, :] .= -Inf
+    dem[3, :] .= -Inf
+    dem[:, 1] .= -Inf
+    dem[:, 3] .= -Inf
+    dem[2, 2] = 5.0
+    _, carved = flowaccumulation(copy(dem); method = D8(), cellsize = unitcell)
+    @test !Geomorphometry.ispit(carved[2, 2])
+
+    posinf = copy(dem)
+    posinf[1, 2] = Inf
+    _, uphill = flowaccumulation(copy(posinf); method = D8(), cellsize = unitcell)
+    @test CartesianIndex(uphill[2, 2]) != CartesianIndex(-1, 0)
+end
