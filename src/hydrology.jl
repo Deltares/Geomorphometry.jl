@@ -253,7 +253,7 @@ function flowaccumulation!(
     L = similar(dem, Int64)
     L .= LinearIndices(dem)
     first_cell = first(R)
-    dir = _alloc_offsets(dem, typeof(first_cell - first_cell))
+    dir = _alloc(dem, typeof(first_cell - first_cell))
     fill!(dir, first_cell - first_cell)
     order = ones(Int64, length(closed) - sum(closed))
 
@@ -531,7 +531,7 @@ function height_above_nearest_drainage(
     L = similar(dem, Int64)
     L .= LinearIndices(dem)
     first_cell = first(R)
-    dir = _alloc_offsets(dem, typeof(first_cell - first_cell))
+    dir = _alloc(dem, typeof(first_cell - first_cell))
     fill!(dir, first_cell - first_cell)
     closed = similar(dem, Bool)
     closed .= false
@@ -588,7 +588,7 @@ function height_above_nearest_drainage(
     L = similar(dem, Int64)
     L .= LinearIndices(dem)
     first_cell = first(R)
-    dir = _alloc_offsets(dem, typeof(first_cell - first_cell))
+    dir = _alloc(dem, typeof(first_cell - first_cell))
     fill!(dir, first_cell - first_cell)
     closed = fill!(similar(dem, Bool), false)
     order = ones(Int64, length(closed) - sum(closed))

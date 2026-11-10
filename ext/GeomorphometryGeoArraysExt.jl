@@ -12,7 +12,7 @@ function Geomorphometry._alloc_directions(dem::GeoArray, T, ndirs)
 end
 
 # A GeoArray only holds numbers, so cell offsets go into a plain array of the same shape.
-Geomorphometry._alloc_offsets(dem::GeoArray, T) = similar(parent(dem), T)
+Geomorphometry._alloc(dem::GeoArray, T::Type{<:CartesianIndex}) = similar(parent(dem), T)
 
 function Geomorphometry.cellsize(dem::GeoArray)
     T = GeoArrays.GI.crstrait(dem)
