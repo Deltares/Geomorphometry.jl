@@ -110,21 +110,27 @@ function filldepressions!(
     return dem
 end
 
-function _filldepressions!(::PriorityFlood, dem, queued)
+function _filldepressions!(::PriorityFlood, dem, queued, labels = nothing, cellsize = nothing)
     R = eachcell(dem)
     first_cell = first(R)
     open = PriorityQueue{typeof(first_cell), eltype(dem)}()
     pit = DataStructures.Queue{typeof(first_cell)}()
 
+    counter = zero(Int32)
+    drained = _drainedmask(labels, dem)
     @inbounds for cell in outlets(dem)
         enqueue!(open, cell, dem[cell])
         queued[cell] = true  # queued
+        _seedlabel!(labels, cell)
     end
     @inbounds while !isempty(open) || !isempty(pit)
         cell = !isempty(pit) ? DataStructures.dequeue!(pit) : dequeue!(open)
+        counter = _labelcell!(labels, drained, dem, cell, cellsize, counter)
+        _markdrained!(drained, cell)
         for ncell in neighbors(dem, cell)
             queued[ncell] && continue
             queued[ncell] = true
+            _inheritlabel!(labels, ncell, cell)
             if dem[ncell] <= dem[cell]
                 dem[ncell] = dem[cell]
                 DataStructures.enqueue!(pit, ncell)
@@ -136,10 +142,75 @@ function _filldepressions!(::PriorityFlood, dem, queued)
     return dem
 end
 
+# Watershed labelling rides along with either flood. A cell keeps the label of whichever
+# cell reached it, and only the seeds on the rim of the DEM start a new one, so every cell
+# draining to the same point on that rim ends up with the same label. Following
+# [Barnes et al. (2014)](@cite barnesPriorityFloodOptimalDepressionFilling2014), which does
+# this on the plain-queue flood; it rests on the order cells are reached in, not on which
+# queue reached them, so it carries over to the [`Zhou`](@ref) flood unchanged.
+# `labels` carries both the watershed numbers, which run from one and are open ended, and
+# these two states, so they are reserved values in the same array rather than an enum.
+const UNREACHED = Int32(0)
+const RIMSEED = Int32(-1)     # reached from the rim, awaiting a number of its own
+
+@inline _seedlabel!(::Nothing, cell) = nothing
+@inline _seedlabel!(labels, cell) = labels[cell] = RIMSEED
+
+"""
+Settle a cell's label as it is popped.
+
+A seed on the rim starts a watershed of its own, since flow reaching the rim leaves the
+grid. Every other cell takes the label of the steepest neighbour already popped, which is
+the cell it drains to: the flood pops in elevation order, so those neighbours are exactly
+the ones below it. Taking the label at discovery instead would take it from whichever
+neighbour arrived first, the lowest rather than the steepest, which need not be the cell
+the water actually goes to.
+"""
+@inline _labelcell!(::Nothing, drained, dem, cell, cellsize, counter) = counter
+@inline function _labelcell!(labels, drained, dem, cell, cellsize, counter)
+    if labels[cell] == RIMSEED
+        isfinite(dem[cell]) || return counter
+        counter += one(counter)
+        labels[cell] = counter
+        return counter
+    end
+
+    steepest = typemin(float(eltype(dem)))
+    target = cell
+    z = dem[cell]
+    @inbounds for ncell in neighbors(dem, cell)
+        drained[ncell] || continue
+        nz = dem[ncell]
+        isfinite(nz) || continue
+        distance = celldistance(dem, cell, ncell; cellsize)
+        iszero(distance) && continue
+        gradient = (z - nz) / distance
+        if gradient > steepest
+            steepest = gradient
+            target = ncell
+        end
+    end
+    # With nothing popped beside it, a cell keeps what it inherited on discovery.
+    target == cell || (labels[cell] = labels[target])
+    return counter
+end
+
+@inline _inheritlabel!(::Nothing, ncell, cell) = nothing
+@inline _inheritlabel!(labels, ncell, cell) = labels[ncell] = labels[cell]
+
+# Only the labelling pass needs to know which cells have been popped.
+_drainedmask(::Nothing, dem) = nothing
+_drainedmask(labels, dem) = fill!(similar(dem, Bool), false)
+
+@inline _markdrained!(::Nothing, cell) = nothing
+@inline _markdrained!(drained, cell) = drained[cell] = true
+
+
 # Zhou et al. (2016). Three queues: `open` holds only potential spill cells, while `trace`
-# and `depression` region-grow slope and depression cells on plain queues. A cell reached
-# by walking uphill from a processed cell drains back the way it came, so its elevation
-# does not depend on visit order and it never needs the priority queue.
+# region-grows slope cells and `depression` region-grows depression cells, both on plain
+# queues. A cell reached by walking uphill from an already processed cell drains back the
+# way it came, so its final elevation does not depend on the order it is visited in and it
+# never needs to enter the priority queue.
 function _filldepressions!(::Zhou, dem, processed)
     first_cell = first(eachcell(dem))
     Cell = typeof(first_cell)
@@ -241,50 +312,135 @@ index `dem` with the result directly, some under `@inbounds`.
 neighbors(dem, cell::CartesianIndex{2}) =
     Iterators.filter(in(CartesianIndices(dem)), cell + nb for nb in nbs)
 
-function watersheds(dem, queued = fill!(similar(dem, Bool), false))
-    first_cell = first(eachcell(dem))
-    open = PriorityQueue{typeof(first_cell), eltype(dem)}()
-    pit = DataStructures.Queue{typeof(first_cell)}()
-    labels = fill!(similar(dem, Int), 0)
-    label = 1
-    pits = fill!(similar(dem, Bool), false)
+function watersheds(
+    dem,
+    directions::AbstractArray{<:FlowDirection},
+    weights = Fill(one(Float32), size(dem)..., 1);
+    cellsize = cellsize(dem),
+)
+    R = eachcell(dem)
+    labels = fill!(similar(dem, Int32), 0)
+    ready = _dependencyorder(dem, directions, weights, cellsize)
 
-    @inbounds for cell in outlets(dem)
-        enqueue!(open, cell, dem[cell])
-        queued[cell] = true  # queued
-    end
-    @inbounds while !isempty(open) || !isempty(pit)
-        cell = !isempty(pit) ? DataStructures.dequeue!(pit) : dequeue!(open)
-        if queued[cell] &&
-           !ismissing(dem[cell]) &&
-           isfinite(dem[cell]) &&
-           iszero(labels[cell])
-            labels[cell] = label
-            label += 1
-        end
-        for ncell in neighbors(dem, cell)
-            queued[ncell] && continue
-            queued[ncell] = true
-            if dem[ncell] <= dem[cell]
-                pits[ncell] = true
-                labels[ncell] = label
-                label += 1
-                dem[ncell] = dem[cell]
-                DataStructures.enqueue!(pit, ncell)
-            else
-                if !ismissing(dem[ncell]) && isfinite(dem[ncell])
-                    if pits[cell]
-                        labels[ncell] = label
-                        label += 1
-                    else
-                        labels[ncell] = labels[cell]
-                    end
-                end
-                enqueue!(open, ncell, dem[ncell])
-            end
+    # Receivers come after their contributors in dependency order, so walking it backwards
+    # reaches every cell once its own receiver is already labelled.
+    nlabels = zero(Int32)
+    @inbounds for index in lastindex(ready):-1:firstindex(ready)
+        cell = ready[index]
+        isfinite(dem[cell]) || continue
+        target = _mainreceiver(directions, weights, cell, cellsize, R)
+        if isnothing(target)
+            nlabels += one(nlabels)
+            labels[cell] = nlabels
+        else
+            labels[cell] = labels[target]
         end
     end
-    return dem, labels
+    return labels
+end
+
+"""
+    watersheds(dem; cellsize=cellsize(dem))
+    watersheds(dem, directions[, weights]; cellsize=cellsize(dem))
+
+Label the watersheds of `dem`: the sets of cells draining to the same outlet, numbered from
+one. An outlet sends its flow nowhere — a pit, or off the grid — and each starts a
+watershed; every other cell joins the watershed of the cell it drains to. `dem` is not
+modified.
+
+Given only `dem`, the labelling rides along with a flood inwards from the rim, as
+[`filldepressions`](@ref) does, which is Algorithm 5 of
+[Barnes et al. (2014)](@cite barnesPriorityFloodOptimalDepressionFilling2014). The flood
+routes through depressions on its way in, so `dem` need not drain: a depression with no
+outlet joins the watershed that fills it rather than becoming one of its own. Nodata is
+labelled too, and those labels mean nothing.
+
+Given `directions`, the labels follow that field instead, and so answer for whatever flow
+metric produced it. A cell that sends flow several ways joins the receiver taking the
+largest share of the `weights`, since watersheds partition the grid. Here `dem` must
+already drain, or every depression becomes a watershed of its own, and cells left in a
+cycle of receivers are labelled zero.
+
+The flood is always [`PriorityFlood`](@ref), unlike [`filldepressions`](@ref), which offers
+a choice. Taking cells in elevation order is what makes the labelling meaningful: a cell is
+reached by its lowest neighbour and takes that label. [`Zhou`](@ref) gives that ordering up
+to go faster, and a cell would then take its label from whichever neighbour the region
+growing arrived from, draining to it or not.
+
+```julia
+labels = watersheds(dem)                              # flooding, works on a raw DEM
+
+z = filldepressions(dem)                              # or follow a direction field
+directions, weights = flowdirection(z; method = D8())
+labels = watersheds(z, directions, weights)
+```
+"""
+function watersheds(dem; cellsize = cellsize(dem))
+    labels = fill!(similar(dem, Int32), UNREACHED)
+    _filldepressions!(
+        PriorityFlood(), copy(dem), fill!(similar(dem, Bool), false), labels, cellsize
+    )
+    return labels
+end
+
+"""
+The one receiver a cell gives most of its flow to, or `nothing` where it has none or its
+flow leaves the grid. Watersheds partition the grid, so a divergent cell has to pick one.
+"""
+function _mainreceiver(directions, weights, cell, cellsize, R)
+    direction = directions[cell]
+    count = ndirections(direction)
+    count == 0 && return nothing
+    RelativeIndex = typeof(first(R) - first(R))
+    best = zero(Float32)
+    target = nothing
+    slot = 0
+    @inbounds for relative in _relativeindices(RelativeIndex, direction, cell, cellsize)
+        iszero(relative) && continue
+        slot += 1
+        share = _share(weights, cell, slot, count)
+        share > best || continue
+        best = share
+        candidate = cell + relative
+        target = candidate in R ? candidate : nothing
+    end
+    return target
+end
+
+"""
+Cells in the order flow reaches them, every cell before the receiver it is labelled from,
+by counting in-degrees and releasing cells as their contributors are taken.
+
+Only each cell's main receiver is followed, which is the one the labelling uses. The full
+receiver graph would do for a single-receiver method, but a divergent cell can send a
+sliver of flow back into a cell it drains from, and that back edge is a cycle no label can
+cross even where the chosen paths are perfectly acyclic. Cells in a cycle of main receivers
+are left out, and so left unlabelled.
+"""
+function _dependencyorder(dem, directions, weights, cellsize)
+    R = eachcell(dem)
+    Cell = typeof(first(R))
+    contributors = fill!(similar(dem, UInt8), 0)
+    @inbounds for cell in R
+        target = _mainreceiver(directions, weights, cell, cellsize, R)
+        isnothing(target) || (contributors[target] += one(UInt8))
+    end
+
+    ready = Cell[]
+    sizehint!(ready, length(dem))
+    @inbounds for cell in R
+        iszero(contributors[cell]) && push!(ready, cell)
+    end
+    head = 1
+    @inbounds while head <= length(ready)
+        cell = ready[head]
+        head += 1
+        target = _mainreceiver(directions, weights, cell, cellsize, R)
+        isnothing(target) && continue
+        contributors[target] -= one(UInt8)
+        iszero(contributors[target]) && push!(ready, target)
+    end
+    return ready
 end
 
 """

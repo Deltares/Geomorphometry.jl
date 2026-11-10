@@ -538,6 +538,36 @@ heatmap(hand; colormap=:turbo)
 :::
 
 
+### Watersheds
+
+[`watersheds`](@ref) labels the sets of cells draining to the same outlet. Given a
+direction field it labels over that, so it answers for whatever flow metric produced it,
+and needs a DEM that already drains. Given only a DEM it floods inwards from the rim
+instead, so a depression with no outlet joins the basin that fills it rather than becoming
+one of its own, and a raw DEM works as it stands.
+
+A cell that sends flow several ways joins the one taking the largest share, since
+watersheds partition the grid, so the labelling depends on the flow metric even though the
+outlets do not.
+
+:::tabs
+
+== Flooded, raw DEM
+```@example plots
+heatmap(Float32.(watersheds(dtm)); colormap=:glasbey_bw_minc_20_n256)
+```
+== D8, filled
+```@example plots
+heatmap(Float32.(watersheds(z, directions, weights)); colormap=:glasbey_bw_minc_20_n256)
+```
+== FD8, filled
+```@example plots
+fd8directions, fd8weights = flowdirection(z; method=FD8())
+heatmap(Float32.(watersheds(z, fd8directions, fd8weights)); colormap=:glasbey_bw_minc_20_n256)
+```
+
+:::
+
 ## Terrain filters
 While filters seem unrelated to the previously discussed methods, these are used to filter (rasterized) pointclouds i.e. surface models (DSM) to arrive at a terrain model (DTM). We provide [`progressive_morphological_filter`](@ref), [`simple_morphological_filter`](@ref), and [`skewness_balancing`](@ref) filters. Here we use the `progressive_morphological_filter` filter to remove elevations that do not pass the slope filter (normally vegetation and buildings).
 

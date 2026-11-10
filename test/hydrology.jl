@@ -470,3 +470,84 @@ end
         @test CartesianIndex(dirs[2, 2]) == CartesianIndex(0, -1)
     end
 end
+
+@testset "watersheds" begin
+    @testset "one basin when everything drains to one point" begin
+        # A cone draining to its single lowest cell on the rim.
+        dem = Float32[hypot(i - 1, j - 1) for i in 1:9, j in 1:9]
+        for method in (D8(), DInf(), FD8())
+            dirs, weights = flowdirection(dem; method, cellsize = unitcell)
+            @test length(unique(watersheds(dem, dirs, weights; cellsize = unitcell))) == 1
+        end
+    end
+
+    @testset "a label is exactly the set of cells sharing an outlet" begin
+        z = filldepressions(rough_dem(40, 40))
+        dirs, weights = flowdirection(z; method = D8(), cellsize = unitcell)
+        labels = watersheds(z, dirs, weights; cellsize = unitcell)
+        @test all(>(0), labels)
+        # Every cell carries the label of the cell it drains to.
+        for cell in CartesianIndices(z)
+            offsets = Geomorphometry.decompose(CartesianIndex{2}, dirs[cell])
+            for o in offsets
+                iszero(o) && continue
+                target = cell + Geomorphometry._orient(o, unitcell)
+                target in CartesianIndices(z) || continue
+                @test labels[target] == labels[cell]
+            end
+        end
+    end
+
+    @testset "a divergent cell joins the basin taking most of its flow" begin
+        z = filldepressions(rough_dem(30, 30))
+        dirs, weights = flowdirection(z; method = FD8(), cellsize = unitcell)
+        labels = watersheds(z, dirs, weights; cellsize = unitcell)
+        for cell in CartesianIndices(z)
+            main = Geomorphometry._mainreceiver(
+                dirs, weights, cell, unitcell, CartesianIndices(z)
+            )
+            isnothing(main) && continue
+            @test labels[main] == labels[cell]
+        end
+    end
+
+    @testset "flooding labels an unfilled DEM, following directions does not" begin
+        # A hollow with no outlet. Flooding routes through it, so it joins the basin that
+        # fills it; the directions stop dead inside it, making it a basin of its own.
+        dem = rough_dem(40, 40)
+        flooded = watersheds(dem)
+        dirs, weights = flowdirection(dem; method = D8(), cellsize = unitcell)
+        followed = watersheds(dem, dirs, weights; cellsize = unitcell)
+        @test all(>(0), flooded)
+        @test length(unique(flooded)) < length(unique(followed))
+    end
+
+    @testset "it does not touch the elevation model" begin
+        dem = rough_dem(20, 20)
+        before = copy(dem)
+        watersheds(dem)
+        @test dem == before
+    end
+end
+
+@testset "a minority branch cannot suppress the labels" begin
+    # A -> B, with B sending 10% back to A and 90% on to the pit C. The chosen paths
+    # A -> B -> C are acyclic, but the 10% back edge is a cycle in the full receiver
+    # graph, which once left every cell unlabelled.
+    dem = zeros(Float32, 1, 3)
+    east = Geomorphometry._directioncode(dem, CartesianIndex(0, 1), unitcell)
+    west = Geomorphometry._directioncode(dem, CartesianIndex(0, -1), unitcell)
+
+    directions = fill(FlowDirection{Geomorphometry.D8D}(zero(UInt8)), 1, 3)
+    weights = zeros(Float32, 1, 3, 8)
+    directions[1, 1] = FlowDirection{Geomorphometry.D8D}(east)
+    weights[1, 1, 1] = 1
+    directions[1, 2] = FlowDirection{Geomorphometry.D8D}(west | east)
+    for (slot, bit) in enumerate(sort([west, east]))
+        weights[1, 2, slot] = bit == west ? 0.1 : 0.9
+    end
+
+    labels = watersheds(dem, directions, weights; cellsize = unitcell)
+    @test all(>(0), labels)
+    @test length(unique(labels)) == 1          # all three drain to the same pit
+end

@@ -63,7 +63,7 @@ export slope,
     aspect, laplacian, plan_curvature, profile_curvature, tangential_curvature
 export skewness_balancing
 export PriorityFlood, Zhou
-export resolveflats, resolveflats!, flowdirection
+export resolveflats, resolveflats!, flowdirection, watersheds
 export filldepressions,
     flowaccumulation,
     topographic_wetness_index,
