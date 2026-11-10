@@ -116,6 +116,13 @@ end
             @test count(iszero, hand) == 8
         end
 
+        @testset "HAND keeps the DEM precision" begin
+            high_dem = fill(1.0e6, 3, 3)
+            high_dem[2, 2] += 0.01
+            hand = height_above_nearest_drainage(high_dem; method = D8())
+            @test hand[2, 2] ≈ 0.01 atol = 1.0e-8
+        end
+
         @testset "HAND path clipping" begin
             path_dem = Float32[4, 6, 5, 7, 0]
             output = zeros(Float32, length(path_dem))

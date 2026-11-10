@@ -547,8 +547,10 @@ function height_above_nearest_drainage(
     flowdirs = _accumulate!(method, acc, order, dir, R, dem, cellsize)
     stream_mask = acc .>= threshold
     _burn_streams!(stream_mask, order, dir, R)
-    _fill_flow_depressions!(acc, order, flowdirs, R, dem, cellsize)
-    _hand!(output, order, flowdirs, R, acc, stream_mask, cellsize)
+    # At least the precision of the DEM, and floating point to hold NaN
+    filled = similar(dem, promote_type(Float32, eltype(dem)))
+    _fill_flow_depressions!(filled, order, flowdirs, R, dem, cellsize)
+    _hand!(output, order, flowdirs, R, filled, stream_mask, cellsize)
     return output
 end
 
