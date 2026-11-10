@@ -86,7 +86,7 @@ function watersheds(dem, queued = fill!(similar(dem, Bool), false))
     first_cell = first(eachcell(dem))
     open = PriorityQueue{typeof(first_cell), eltype(dem)}()
     pit = DataStructures.Queue{typeof(first_cell)}()
-    labels = zeros(Int, size(dem))
+    labels = fill!(similar(dem, Int), 0)
     label = 1
     pits = fill!(similar(dem, Bool), false)
 
