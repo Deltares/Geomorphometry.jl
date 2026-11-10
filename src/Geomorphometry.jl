@@ -40,6 +40,8 @@ include("spread.jl")
 include("skew.jl")
 include("flowdir.jl")
 include("hydrology.jl")
+include("flats.jl")
+include("direction.jl")
 include("horizon.jl")
 include("geomorphon.jl")
 
@@ -60,6 +62,8 @@ export roughness,
 export slope,
     aspect, laplacian, plan_curvature, profile_curvature, tangential_curvature
 export skewness_balancing
+export PriorityFlood, Zhou
+export resolveflats, resolveflats!, flowdirection
 export filldepressions,
     flowaccumulation,
     topographic_wetness_index,

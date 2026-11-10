@@ -47,6 +47,7 @@ LocalFilters = "1.2"
 OffsetArrays = "1.10"
 PaddedViews = "0.5"
 QuickHeaps = "0.2"
+Random = "1"
 Rasters = "0.13, 0.14, 0.15"
 StaticArrays = "1"
 Statistics = "1"
@@ -61,8 +62,9 @@ ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
 Eikonal = "a6aab1ba-8f88-4217-b671-4d0788596809"
 ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"
 GeoArrays = "2fb1d81b-e6a0-5fc5-82e6-8e06903437ab"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Rasters = "a3a2b9e3-a471-40c9-b274-f788e487c689"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "GeoArrays", "Rasters", "ArchGDAL", "Eikonal", "Aqua", "ExplicitImports"]
+test = ["Test", "Random", "GeoArrays", "Rasters", "ArchGDAL", "Eikonal", "Aqua", "ExplicitImports"]
