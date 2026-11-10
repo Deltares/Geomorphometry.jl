@@ -509,12 +509,15 @@ function flowaccumulation!(
 )
     R = eachcell(dem)
     Cell = typeof(first(R))
+    # The offset between two cells, whatever the grid calls it: a `CartesianIndex` on a
+    # raster, a relative cell on a DGGS. `_relativeindices` decodes a direction into these.
+    RelativeIndex = typeof(first(R) - first(R))
     contributors = fill!(similar(dem, UInt8), 0)
 
     @inbounds for cell in R
-        for offset in decompose(CartesianIndex{2}, directions[cell], cell)
-            iszero(offset) && continue
-            target = cell + _orient(offset, cellsize)
+        for relative in _relativeindices(RelativeIndex, directions[cell], cell, cellsize)
+            iszero(relative) && continue
+            target = cell + relative
             target in R && (contributors[target] += one(UInt8))
         end
     end
@@ -533,11 +536,10 @@ function flowaccumulation!(
         count = ndirections(direction)
         count == 0 && continue
         slot = 0
-        for bit in decompose(direction)
-            offset = CartesianIndex(bit)
-            iszero(offset) && continue
+        for relative in _relativeindices(RelativeIndex, direction, cell, cellsize)
+            iszero(relative) && continue
             slot += 1
-            target = cell + _orient(offset, cellsize)
+            target = cell + relative
             target in R || continue
             acc[target] += acc[cell] * _share(weights, cell, slot, count)
             contributors[target] -= one(UInt8)

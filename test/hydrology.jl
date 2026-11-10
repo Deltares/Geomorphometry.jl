@@ -367,6 +367,7 @@ end
     posinf[1, 2] = Inf
     _, uphill = flowaccumulation(copy(posinf); method = D8(), cellsize = unitcell)
     @test CartesianIndex(uphill[2, 2]) != CartesianIndex(-1, 0)
+end
 
 @testset "flowaccumulation over a given direction field" begin
     @testset "every cell counts once" begin
