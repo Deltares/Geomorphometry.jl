@@ -378,6 +378,26 @@ depression_volume(dtm; filled=fdtm)
 
 :::
 
+### Lowest neighbour is not steepest descent
+
+[`flowaccumulation`](@ref) carves: one Priority-Flood pass gives each cell a direction as
+it goes, routing flow through depressions without changing any elevation, after
+[barnesPriorityFloodOptimalDepressionFilling2014](@citet) and the least-cost search of
+[wangEfficientMethodIdentifying2006](@citet) and [metzEfficientExtractionDrainage2011](@citet).
+
+!!! info "Why the direction is chosen when a cell is popped"
+    A flood reaches a cell from whichever neighbour pops first, and it pops in elevation
+    order, so the rule it implies is *lowest neighbour*. [`D8`](@ref) is *steepest
+    descent*. On a square grid these differ, because a diagonal is `√2` away: it must drop
+    41.4% further to win on gradient, but wins on elevation as soon as it drops further at
+    all. With a centre at 10.0 and unit cells, an eastern neighbour at 9.0 has gradient
+    1.000 while a north-eastern one at 8.8 has only 0.849 — lower, but shallower.
+
+    So a cell settles its direction when it is *popped*, from the neighbours already
+    popped, which are exactly the ones below it. On a drained surface the carved and
+    derived directions then agree for 99.97% of interior cells of this tile; what remains
+    is cells beside nodata, or with nowhere downhill to go.
+
 ### Filling and flow directions
 
 [`filldepressions`](@ref) takes a `method`: the default [`PriorityFlood`](@ref) of

@@ -22,6 +22,12 @@ Improved Priority-Flood, Algorithm 2 of
 flooded inwards from the outlets through a priority queue, and cells found below the
 current flood level are filled through a plain queue. Runs in `O(m log m)` time, where
 `m` is the number of cells that reach the priority queue.
+
+The flood itself is that of [Wang and Liu (2006)](@cite wangEfficientMethodIdentifying2006),
+who derived it as a least-cost search whose cost is a cell's *spill elevation*, the lowest
+level it must be raised to for water to reach an outlet. The plain queue is what Barnes et
+al. add, keeping cells below the flood level out of the priority queue, for run times 16%
+shorter.
 """
 struct PriorityFlood <: DepressionFillingMethod end
 
@@ -313,13 +319,77 @@ function _directioncode(dem, direction, cellsize)
     UInt8(Int(FlowDirection{D8D}(direction)))
 end
 
+# The eight triangular facets of [Tarboton (1997)](@cite tarbotonNewMethodDetermination1997),
+# each pairing an orthogonal neighbour with one of the two diagonals beside it.
+const _facets = (
+    (CartesianIndex(1, 0), CartesianIndex(1, 1)),
+    (CartesianIndex(0, 1), CartesianIndex(1, 1)),
+    (CartesianIndex(0, 1), CartesianIndex(-1, 1)),
+    (CartesianIndex(-1, 0), CartesianIndex(-1, 1)),
+    (CartesianIndex(-1, 0), CartesianIndex(-1, -1)),
+    (CartesianIndex(0, -1), CartesianIndex(-1, -1)),
+    (CartesianIndex(0, -1), CartesianIndex(1, -1)),
+    (CartesianIndex(1, 0), CartesianIndex(1, -1)),
+)
+
 """
     _dinfreceivers(dem, cell, state, cellsize)
 
-The two neighbours [`DInf`](@ref) splits `cell`'s flow between and the fraction each takes,
-or `nothing` when it has nowhere to send it. Shared by [`flowaccumulation`](@ref) and
-[`flowdirection`](@ref) so the two cannot drift apart.
+The two neighbours [`DInf`](@ref) splits `cell`'s flow between, and their fractions, or
+`nothing` when it has nowhere to send it.
+
+On a raster this is the facet method of
+[Tarboton (1997)](@cite tarbotonNewMethodDetermination1997): the steepest of the eight
+triangular facets around the cell fixes a flow angle, which is shared between the two
+neighbours bounding that facet. Other grids have no facet geometry, so they fall back to
+bracketing the local aspect.
 """
+function _dinfreceivers(dem::AbstractMatrix, cell, state, cellsize)
+    R = CartesianIndices(dem)
+    center = dem[cell]
+    isfinite(center) || return nothing
+
+    steepest = 0.0
+    near = far = cell
+    slope1 = slope2 = length1 = length2 = 0.0
+    onedge = 0        # -1 towards the orthogonal neighbour, +1 towards the diagonal
+
+    @inbounds for (offset1, offset2) in _facets
+        first_cell, second_cell = cell + offset1, cell + offset2
+        (first_cell in R && second_cell in R) || continue
+        z1, z2 = dem[first_cell], dem[second_cell]
+        (isfinite(z1) && isfinite(z2)) || continue
+        d1 = celldistance(dem, cell, first_cell; cellsize)
+        d2 = celldistance(dem, first_cell, second_cell; cellsize)
+        (d1 > 0 && d2 > 0) || continue
+
+        s1 = (center - z1) / d1
+        s2 = (z1 - z2) / d2
+        # Where the steepest direction of the facet falls outside it, the maximum sits on
+        # one of its edges. Both tests are comparisons: no trigonometry is needed to find
+        # out which case holds, only to share the flow once the winner is known.
+        if s2 <= 0
+            slope, side = s1, -1
+        elseif s2 * d1 >= s1 * d2
+            slope, side = (center - z2) / hypot(d1, d2), 1
+        else
+            slope, side = hypot(s1, s2), 0
+        end
+
+        if slope > steepest
+            steepest = slope
+            near, far = first_cell, second_cell
+            slope1, slope2, length1, length2 = s1, s2, d1, d2
+            onedge = side
+        end
+    end
+
+    steepest > 0 || return nothing
+    fraction = onedge < 0 ? 0.0 :
+        onedge > 0 ? 1.0 : atan(slope2, slope1) / atan(length2, length1)
+    return near, far, 1 - fraction, fraction
+end
+
 function _dinfreceivers(dem, cell, state, cellsize)
     aspect = _dinf_aspect(state, dem, cell, cellsize)
     # Undefined over a flat or beside nodata, and bracketing a NaN would pick the cell
@@ -354,10 +424,8 @@ function _flowneighbors(dem, cell, aspect, cellsize)
     return lower_cell, upper_cell, upper_gap / gap, lower_gap / gap
 end
 
-# The signs matter: `_cellbearing` keeps them, so dropping them here would leave the
-# aspect and the receiver bearings in different frames and pick the wrong neighbour.
-_dinf_aspects(dem::AbstractMatrix, cellsize) =
-    aspect(dem; method = Horn(), cellsize)
+# Rasters take the facet route, which needs no precomputation; other grids derive an aspect
+# per cell. Either way there is nothing to prepare for the whole grid.
 _dinf_aspects(dem, cellsize) = nothing
 _dinf_aspect(aspects, dem, cell, cellsize) = aspects[cell]
 _dinf_aspect(::Nothing, dem, cell, cellsize) = _localaspect(dem, cell, cellsize)
@@ -394,13 +462,23 @@ function flowaccumulation(
     flowaccumulation!(dem, acc, copy(closed); method, cellsize)
 end
 
-function flowaccumulation!(
-    dem,
-    acc::AbstractArray{<:Real},
-    closed = fill!(similar(dem, Bool), false);
-    method = DInf(),
-    cellsize = cellsize(dem),
-)
+"""
+    _carve(dem, closed, cellsize)
+
+Flood `dem` inwards from its outlets and return the order cells were reached in, together
+with the direction each one drains to. `dem` is not modified: flow is routed through
+depressions rather than over them.
+
+Algorithm 4 of
+[Barnes et al. (2014)](@cite barnesPriorityFloodOptimalDepressionFilling2014), after the
+least-cost path search of [Metz et al. (2011)](@cite metzEfficientExtractionDrainage2011).
+A cell settles its direction when it is popped, taking the steepest of the neighbours
+already popped: the flood goes in elevation order, so those are exactly the ones below it.
+
+Cells already marked in `closed` are left out of the order, and `closed` is written to as
+the flood proceeds.
+"""
+function _carve(dem, closed, cellsize)
     R = eachcell(dem)
     L = similar(dem, Int64)
     L .= LinearIndices(dem)
@@ -410,26 +488,60 @@ function flowaccumulation!(
     order = ones(Int64, length(closed) - sum(closed))
 
     open = PriorityQueue{typeof(first_cell), eltype(dem)}()
+    drained = fill!(similar(dem, Bool), false)  # popped, and so downstream of what follows
+    rim = fill!(similar(dem, Bool), false)      # flow leaves the grid here, not a cell
 
     @inbounds for cell in outlets(dem)
         enqueue!(open, cell, dem[cell])
         closed[cell] = true
+        rim[cell] = true
     end
     i = 1
     @inbounds while !isempty(open)
         cell = dequeue!(open)
         order[i] = L[cell]
         i += 1
+        drained[cell] = true
+
+        z = dem[cell]
+        # Nothing seen yet, so the first neighbour already popped wins outright and a
+        # level one stands until something lower turns up, which is how a cell on flat
+        # ground still drains.
+        steepest = typemin(float(eltype(dem)))
         for ncell in neighbors(dem, cell)
-            # skip visited cells
-            closed[ncell] && continue
-
-            closed[ncell] = true
-            dir[ncell] = cell - ncell
-
-            enqueue!(open, ncell, dem[ncell])
+            if drained[ncell]
+                # Already popped, so it is downstream: a candidate receiver for this cell.
+                rim[cell] && continue
+                nz = dem[ncell]
+                # A -Inf neighbour is the lowest thing there is and a legitimate receiver,
+                # which the manual relies on to drain into sea. NaN and +Inf are not.
+                isnan(nz) && continue
+                (isinf(nz) && !signbit(nz)) && continue
+                distance = celldistance(dem, cell, ncell; cellsize)
+                iszero(distance) && continue
+                gradient = (z - nz) / distance
+                if gradient > steepest
+                    steepest = gradient
+                    dir[cell] = ncell - cell
+                end
+            elseif !closed[ncell]
+                closed[ncell] = true
+                enqueue!(open, ncell, dem[ncell])
+            end
         end
     end
+    return order, dir
+end
+
+function flowaccumulation!(
+    dem,
+    acc::AbstractArray{<:Real},
+    closed = fill!(similar(dem, Bool), false);
+    method = DInf(),
+    cellsize = cellsize(dem),
+)
+    R = eachcell(dem)
+    order, dir = _carve(dem, closed, cellsize)
 
     dirs = _accumulate!(method, acc, order, dir, R, dem, cellsize)
     return acc, dirs
@@ -460,6 +572,7 @@ function _accumulate!(::DInf, acc, order, dir, R, dem, cellsize)
     for i in reverse(order)
         iszero(dir[i]) && continue
         cell = R[i]
+
         flowneighbors = _dinfreceivers(dem, cell, aspects, cellsize)
         if isnothing(flowneighbors)
             acc[cell + dir[i]] += acc[i]
@@ -469,16 +582,29 @@ function _accumulate!(::DInf, acc, order, dir, R, dem, cellsize)
         end
         acell, bcell, aa, bb = flowneighbors
         a, b = acell - cell, bcell - cell
+        carved = cell + dir[i]
 
-        # Depression
-        if (a != dir[i] && b != dir[i])
-            acc[cell + dir[i]] += acc[i]
+        # A facet can never reach nodata, since `_dinfreceivers` needs finite vertices,
+        # but the carve can: -Inf is the lowest thing there is. Where the carve found it,
+        # it wins outright, which is what keeps a river mouth at the coast.
+        if isinf(dem[carved]) && signbit(dem[carved])
+            acc[carved] += acc[i]
             output[i] = _directioncode(dem, dir[i], cellsize)
             visited[i] = true
             continue
         end
 
-        # Do not route flow back into cells that have already drained
+        # Both receivers have drained already, so both sit later in the pop order than
+        # this cell and neither can take its flow. That is a spill cell whose facet looks
+        # back into the depression it drains; the carve knows the way out.
+        if visited[acell] && visited[bcell]
+            acc[carved] += acc[i]
+            output[i] = _directioncode(dem, dir[i], cellsize)
+            visited[i] = true
+            continue
+        end
+
+        # Exactly one has drained: the other takes everything.
         if visited[acell]
             aa = 0
             bb = 1
@@ -498,14 +624,17 @@ function _accumulate!(::DInf, acc, order, dir, R, dem, cellsize)
             dirs |= _directioncode(dem, b, cellsize)
         end
         output[i] = dirs
-        if visited[acell] && visited[bcell]
-            error()
-        end
         visited[i] = true
     end
     return output
 end
 
+"""
+Rasters keep the fixed distance and contour tables of
+[Quinn et al. (1991)](@cite quinnPredictionHillslopeFlow1991), which depend only on
+`cellsize`. Grids with no such fixed neighbourhood derive both per cell instead, in
+[`_fd8weights!`](@ref).
+"""
 function _accumulate!(fd8::FD8, acc, order, dir, R::CartesianIndices{2}, dem, cellsize)
     # Contour lengths come from `_rastercontour`, which `flowdirection` uses too.
     offsets = CartesianIndices((-1:1, -1:1))
@@ -634,7 +763,10 @@ their raster contour lengths from here so the two cannot disagree.
 function _rastercontour(offset, cellsize)
     δx, δy = abs.(cellsize)
     (!iszero(offset[1]) && !iszero(offset[2])) && return hypot(δx, δy) / 4
-    return iszero(offset[2]) ? δx : δy
+    # Half the face the step crosses, which is perpendicular to it: a step along axis 1
+    # travels δx but leaves through a face δy wide. `dists` beside the caller asks the
+    # other question, how far the step goes, and so pairs each axis with its own spacing.
+    return iszero(offset[2]) ? δy / 2 : δx / 2
 end
 
 function _fd8scratch(dem)
@@ -674,6 +806,28 @@ function _contourlengths!(scratch::FD8Scratch, dem, cell, cellsize)
         # A gap wider than a right angle means neighbours are missing, at the edge of the
         # DEM or beside nodata. Clamp it: the formula otherwise runs the contour out to
         # tand(90) = Inf, and an infinite weight takes the whole cell's flow.
+        #
+        # This models the boundary as a flat face perpendicular to the centre-to-centre
+        # line at half the distance, which is a Voronoi edge. So it is exact wherever
+        # the neighbourhood is a Voronoi one: d for the four faces of a 4-connected
+        # square, d/√3 for the six edges of a hexagon, every contour equal on a
+        # hexagonal DGGS.
+        #
+        # TODO The 8-connected Moore neighbourhood is the one case that is not a Voronoi
+        # neighbourhood — diagonal neighbours share only a corner, no edge — so there is
+        # no face here to measure and the formula returns a degenerate answer: equal
+        # gaps force L = d * tand(gap / 2), exactly proportional to d, and the 1/√2 a
+        # diagonal loses on slope it wins straight back on contour. Every direction then
+        # weighs 0.414Δz, ranking neighbours by drop rather than gradient, with `p`
+        # concentrating on the largest drop rather than the steepest slope.
+        #
+        # The missing term is the projection: flux through a boundary element is
+        # S * w * cos(angle between the flow and that element's normal), and summing raw
+        # arc length assumes the boundary faces the flow squarely. It does on a Voronoi
+        # edge, which is why this is exact there and why the term is invisible until a
+        # corner shows up. Projecting turns the diagonal's 0.586 into 0.414 and restores
+        # a √2 ratio; Quinn's raster table splits each face 50/25/25 instead and
+        # projects to 0.5 and 0.354, a ratio of 2. Hence the separate raster method.
         scratch.contours[index] =
             (isfinite(previous_gap) && isfinite(next_gap)) ?
             scratch.distances[index] / 2 *
@@ -782,42 +936,14 @@ function height_above_nearest_drainage(
     threshold = 100,
 )
     R = eachcell(dem)
-    L = similar(dem, Int64)
-    L .= LinearIndices(dem)
-    first_cell = first(R)
-    dir = _alloc(dem, typeof(first_cell - first_cell))
-    fill!(dir, first_cell - first_cell)
-    closed = similar(dem, Bool)
-    closed .= false
-    order = ones(Int64, length(closed) - sum(closed))
-
+    closed = fill!(similar(dem, Bool), false)
     output = zero(dem)
     acc = similar(dem, Float32)
     for cell in R
         acc[cell] = cellarea(dem, cell; cellsize)
     end
 
-    open = PriorityQueue{typeof(first_cell), eltype(dem)}()
-
-    @inbounds for cell in outlets(dem)
-        enqueue!(open, cell, dem[cell])
-        closed[cell] = true
-    end
-    i = 1
-    @inbounds while !isempty(open)
-        cell = dequeue!(open)
-        order[i] = L[cell]
-        i += 1
-        for ncell in neighbors(dem, cell)
-            # skip visited cells
-            closed[ncell] && continue
-
-            closed[ncell] = true
-            dir[ncell] = cell - ncell
-
-            enqueue!(open, ncell, dem[ncell])
-        end
-    end
+    order, dir = _carve(dem, closed, cellsize)
 
     flowdirs = _accumulate!(method, acc, order, dir, R, dem, cellsize)
     stream_mask = acc .>= threshold
@@ -837,40 +963,14 @@ given a stream definition as a boolean `stream_mask`.
 """
 function height_above_nearest_drainage(
     dem,
-    stream_mask::AbstractArray{Bool},
+    stream_mask::AbstractArray{Bool};
+    cellsize = cellsize(dem),
 )
     R = eachcell(dem)
-    L = similar(dem, Int64)
-    L .= LinearIndices(dem)
-    first_cell = first(R)
-    dir = _alloc(dem, typeof(first_cell - first_cell))
-    fill!(dir, first_cell - first_cell)
     closed = fill!(similar(dem, Bool), false)
-    order = ones(Int64, length(closed) - sum(closed))
-
     output = zero(dem)
 
-    open = PriorityQueue{typeof(first_cell), eltype(dem)}()
-
-    @inbounds for cell in outlets(dem)
-        enqueue!(open, cell, dem[cell])
-        closed[cell] = true
-    end
-    i = 1
-    @inbounds while !isempty(open)
-        cell = dequeue!(open)
-        order[i] = L[cell]
-        i += 1
-        for ncell in neighbors(dem, cell)
-            # skip visited cells
-            closed[ncell] && continue
-
-            closed[ncell] = true
-            dir[ncell] = cell - ncell
-
-            enqueue!(open, ncell, dem[ncell])
-        end
-    end
+    order, dir = _carve(dem, closed, cellsize)
 
     _hand!(output, order, dir, R, dem, stream_mask)
     return output
