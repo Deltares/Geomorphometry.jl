@@ -1,8 +1,8 @@
 # Single-receiver methods use the same LDD encoding as `flowaccumulation`; methods that can
 # send flow several ways need the bitwise D8D encoding.
-_convention(::D8) = LDD
-_convention(::DInf) = D8D
-_convention(::FD8) = D8D
+convention(::D8) = LDD
+convention(::DInf) = D8D
+convention(::FD8) = D8D
 
 # A method that can send flow several ways needs the share each receiver takes; a single
 # receiver takes everything, so there is nothing to carry.
@@ -20,7 +20,7 @@ Share of each cell's flow per receiver, one dimension larger than the DEM, the t
 axis in [`D8D`](@ref) bit order. A single-receiver method stores nothing: its weights are a
 [`Fill`](@extref FillArrays.Fill) and cost no memory.
 """
-function _weights(method::FlowDirectionMethod, dem, T)
+function allocweights(method::FlowDirectionMethod, dem, T)
     n = maxreceivers(method)
     # A single receiver takes everything, so there is nothing to store.
     hasweights(method) || return Fill(one(T), size(dem)..., n)
@@ -29,14 +29,18 @@ end
 
 
 """Record the share of a cell's `slot`-th receiver. Nothing to record without weights."""
-@inline _setshare!(::Fill, cell, slot, fraction) = fraction
-@inline _setshare!(weights::AbstractArray{T}, cell, slot, fraction) where {T} =
+@inline setshare!(::Fill, cell, slot, fraction) = fraction
+@inline setshare!(weights::AbstractArray{T}, cell, slot, fraction) where {T} =
     @inbounds weights[cell, slot] = T(fraction)
 
-# Per-method state cheaper to derive once for the whole DEM than per cell.
-_directionstate(::FlowDirectionMethod, dem, cellsize) = nothing
-_directionstate(::DInf, dem, cellsize) = _dinf_aspects(dem, cellsize)
-_directionstate(::FD8, dem, cellsize) = _fd8scratch(dem)
+"""
+Whatever a method wants to set up once for the whole DEM rather than per cell: a grid of
+aspects for [`DInf`](@ref) off a raster, and for [`FD8`](@ref) the scratch buffers it
+reuses from cell to cell. Methods that need neither get `nothing`.
+"""
+directionstate(::FlowDirectionMethod, dem, cellsize) = nothing
+directionstate(::DInf, dem, cellsize) = _dinf_aspects(dem, cellsize)
+directionstate(::FD8, dem, cellsize) = _fd8scratch(dem)
 
 """
     flowdirection(dem; method=D8(), cellsize=cellsize(dem), weighttype=Float32)
@@ -63,12 +67,12 @@ function flowdirection(
     cellsize = cellsize(dem),
     weighttype::Type{<:AbstractFloat} = Float32,
 )
-    C = _convention(method)
+    C = convention(method)
     directions = _directiongrid(dem, C)
-    weights = _weights(method, dem, weighttype)
-    state = _directionstate(method, dem, cellsize)
+    weights = allocweights(method, dem, weighttype)
+    state = directionstate(method, dem, cellsize)
     @inbounds for cell in eachcell(dem)
-        code = _flowdirection!(weights, method, state, dem, cell, cellsize)
+        code = celldirection!(weights, method, state, dem, cell, cellsize)
         directions[cell] = FlowDirection{C}(code)
     end
     return directions, weights
@@ -81,7 +85,7 @@ Offset towards `cell`'s steepest downslope neighbour, or zero when it has none: 
 [Jenson and Domingue (1988)](@cite jensonExtractingTopographicStructure1988), and the
 fallback wherever a method leaves a cell undecided.
 """
-function _steepestdescent(dem, cell, cellsize)
+function steepestdescent(dem, cell, cellsize)
     offset = cell - cell
     z = dem[cell]
     isfinite(z) || return offset
@@ -100,55 +104,51 @@ function _steepestdescent(dem, cell, cellsize)
     return offset
 end
 
-_steepestcode(dem, cell, cellsize) =
-    _directioncode(dem, _steepestdescent(dem, cell, cellsize), cellsize)
+steepestcode(dem, cell, cellsize) =
+    _directioncode(dem, steepestdescent(dem, cell, cellsize), cellsize)
 
-_flowdirection!(weights, ::D8, _, dem, cell, cellsize) =
-    _orient(_steepestdescent(dem, cell, cellsize), cellsize)
+celldirection!(weights, ::D8, _, dem, cell, cellsize) =
+    _orient(steepestdescent(dem, cell, cellsize), cellsize)
 
 # DInf: the two neighbours bounding the steepest facet, using the same `_dinfreceivers`
 # partition as `flowaccumulation`.
-function _flowdirection!(weights, ::DInf, state, dem, cell, cellsize)
+function celldirection!(weights, ::DInf, state, dem, cell, cellsize)
     z = dem[cell]
     isfinite(z) || return zero(UInt8)
 
-    flowneighbors = _dinfreceivers(dem, cell, state, cellsize)
-    isnothing(flowneighbors) && return _steepestshare!(weights, dem, cell, cellsize)
-    acell, bcell, afraction, bfraction = flowneighbors
+    receivers = _dinfreceivers(dem, cell, state, cellsize)
+    isnothing(receivers) && return steepestshare!(weights, dem, cell, cellsize)
+    acell, bcell, afraction, bfraction = receivers
 
-    # A receiver the partition names but that is not lower takes nothing, so the shares of
-    # those that remain are renormalised before being recorded.
-    takesa = afraction > 0 && isfinite(dem[acell]) && dem[acell] < z
-    takesb = bfraction > 0 && isfinite(dem[bcell]) && dem[bcell] < z
-    total = (takesa ? afraction : 0.0) + (takesb ? bfraction : 0.0)
-    # The partition can name terrain that is not lower, most often beside a flat. Fall back
-    # rather than leave a cell that can drain without a direction.
-    total > 0 || return _steepestshare!(weights, dem, cell, cellsize)
+    # The partition can name a cell that is not actually lower, most often beside a flat.
+    # Such a receiver takes nothing and the other is renormalised to the whole; if that
+    # leaves nobody, fall back rather than strand a cell that can drain.
+    lower(ncell) = isfinite(dem[ncell]) && dem[ncell] < z
+    a = (_directioncode(dem, acell - cell, cellsize), lower(acell) ? afraction : 0.0)
+    b = (_directioncode(dem, bcell - cell, cellsize), lower(bcell) ? bfraction : 0.0)
+    total = last(a) + last(b)
+    total > 0 || return steepestshare!(weights, dem, cell, cellsize)
 
-    abit = takesa ? _directioncode(dem, acell - cell, cellsize) : zero(UInt8)
-    bbit = takesb ? _directioncode(dem, bcell - cell, cellsize) : zero(UInt8)
-    # Shares are stored in the order the directions come back out, which is by bit
-    if iszero(bbit)
-        _setshare!(weights, cell, 1, afraction / total)
-    elseif iszero(abit)
-        _setshare!(weights, cell, 1, bfraction / total)
-    elseif abit < bbit
-        _setshare!(weights, cell, 1, afraction / total)
-        _setshare!(weights, cell, 2, bfraction / total)
-    else
-        _setshare!(weights, cell, 1, bfraction / total)
-        _setshare!(weights, cell, 2, afraction / total)
+    # Shares are read back in the order `decompose` hands the directions out, which is by
+    # bit, so emit the pair in that order.
+    code = zero(UInt8)
+    slot = 0
+    @inbounds for (bit, fraction) in (first(a) <= first(b) ? (a, b) : (b, a))
+        iszero(fraction) && continue
+        slot += 1
+        setshare!(weights, cell, slot, fraction / total)
+        code |= bit
     end
-    return abit | bbit
+    return code
 end
 
 # FD8: every downslope neighbour receives flow, weighted by slope and contour length, using
 # the same `_fd8weights!` as `flowaccumulation`.
-function _flowdirection!(weights, fd8::FD8, scratch, dem, cell, cellsize)
+function celldirection!(weights, fd8::FD8, scratch, dem, cell, cellsize)
     z = dem[cell]
     isfinite(z) || return zero(UInt8)
-    total = _fd8weights!(scratch, fd8, dem, cell, _Unvisited(), cellsize)
-    iszero(total) && return _steepestshare!(weights, dem, cell, cellsize)
+    total = _fd8weights!(scratch, fd8, dem, cell, Unvisited(), cellsize)
+    iszero(total) && return steepestshare!(weights, dem, cell, cellsize)
 
     # Gather the shares against their direction bits, then emit them in bit order, which is
     # the order the directions come back out in.
@@ -165,18 +165,18 @@ function _flowdirection!(weights, fd8::FD8, scratch, dem, cell, cellsize)
     @inbounds for bit in decompose(D8D, code)
         iszero(bit) && continue
         slot += 1
-        _setshare!(weights, cell, slot, scratch.bitweights[trailing_zeros(Int(bit)) + 1])
+        setshare!(weights, cell, slot, scratch.bitweights[trailing_zeros(Int(bit)) + 1])
     end
     return code
 end
 
 """The steepest descent fallback: one receiver, taking everything."""
-function _steepestshare!(weights, dem, cell, cellsize)
-    code = _steepestcode(dem, cell, cellsize)
-    iszero(code) || _setshare!(weights, cell, 1, one(Float32))
+function steepestshare!(weights, dem, cell, cellsize)
+    code = steepestcode(dem, cell, cellsize)
+    iszero(code) || setshare!(weights, cell, 1, one(Float32))
     return code
 end
 
 """A stencil has no traversal order, so nothing is excluded for being already visited."""
-struct _Unvisited end
-Base.getindex(::_Unvisited, _...) = false
+struct Unvisited end
+Base.getindex(::Unvisited, _...) = false

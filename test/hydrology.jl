@@ -149,3 +149,53 @@ end
     @test size(weights) == (8, 8, maxreceivers(FD8()))
     @test all(>=(0), weights)
 end
+
+@testset "filldepressions leaves alone what it should" begin
+    @testset "an integer DEM keeps its type and is not nudged" begin
+        # Resolving flats moves cells by single float steps, which an integer cannot
+        # represent, so it is off by default rather than throwing.
+        dem = fill(5, 5, 5)
+        @test filldepressions(dem) == dem
+        @test eltype(filldepressions(dem)) == Int
+    end
+
+    @testset "cells the caller excluded are untouched" begin
+        dem = fill(5.0, 5, 5)
+        @test filldepressions(dem, trues(5, 5)) == dem
+        # Excluding just the interior leaves those cells alone while the rim resolves.
+        mask = falses(5, 5)
+        mask[2:4, 2:4] .= true
+        z = filldepressions(dem, mask)
+        @test z[2:4, 2:4] == dem[2:4, 2:4]
+    end
+
+    @testset "a flat cannot be raised over terrain that was higher" begin
+        # One float step of relief: the centre is above its neighbours by the smallest
+        # amount representable, so raising the flat around it must not overtake it.
+        dem = fill(1.0, 5, 5)
+        dem[3, 3] = nextfloat(1.0)
+        z = filldepressions(dem)
+        centre = CartesianIndex(3, 3)
+        offsets = filter(!iszero, CartesianIndices((-1:1, -1:1)))
+        @test any(z[centre + o] < z[centre] for o in offsets)
+    end
+end
+
+@testset "FD8 weights agree between the stencil and accumulation" begin
+    # Both read their raster contour lengths from `_rastercontour`, so the share a cell
+    # gives each neighbour must not depend on which route derived it.
+    peak = Float64[1 1 1; 1 2 1; 1 1 1]
+    centre = CartesianIndex(2, 2)
+    method = FD8(; p = 1.0)
+
+    directions, weights = flowdirection(peak; method, cellsize = unitcell)
+    acc, = flowaccumulation(copy(peak); method, cellsize = unitcell)
+
+    offsets = Geomorphometry.decompose(CartesianIndex{2}, directions[centre])
+    for (slot, offset) in enumerate(offsets)
+        iszero(offset) && continue
+        # The centre starts with one cell of area, so a neighbour's accumulation above its
+        # own area is exactly the share the centre sent it.
+        @test weights[centre, slot] ≈ acc[centre + offset] - 1 rtol = 1e-5
+    end
+end

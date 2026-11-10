@@ -1,10 +1,11 @@
 """
-    resolveflats(dem)
-    resolveflats!(dem)
+    resolveflats(dem, excluded=nothing)
+    resolveflats!(dem, excluded=nothing)
 
 Give the flats of `dem` a drainage gradient, following
 [Barnes et al. (2014)](@cite barnesEfficientAssignmentDrainage2014), and return the
-elevation model. `resolveflats!` writes into `dem` instead of a copy.
+elevation model. `resolveflats!` writes into `dem` instead of a copy. Cells marked in
+`excluded` keep their elevation and take no part in a flat.
 
 A flat is a connected region of equal elevation, over which no flow direction is defined.
 The gradient is the superposition of one away from higher terrain, which gives convergent
@@ -13,12 +14,13 @@ twice the weight, so it settles cells where the two disagree without iterating.
 
 Cells are raised by whole `nextfloat` steps, so the surface is unchanged at any meaningful
 precision but every flat cell gains a strictly lower neighbour. A flat with no outlet is a
-depression, not a flat, and is left alone. [`filldepressions`](@ref) calls this by default.
+depression, not a flat, and is left alone. [`filldepressions`](@ref) calls this by default,
+which needs a floating point `dem`: integer elevations cannot express the gradient.
 """
-resolveflats(dem) = resolveflats!(copy(dem))
+resolveflats(dem, excluded = nothing) = resolveflats!(copy(dem), excluded)
 
-function resolveflats!(dem)
-    increments = _flatmask(dem)
+function resolveflats!(dem, excluded = nothing)
+    increments = flatmask(dem, excluded)
     @inbounds for cell in eachcell(dem)
         increment = increments[cell]
         iszero(increment) || (dem[cell] = nextfloat(dem[cell], increment))
@@ -26,11 +28,29 @@ function resolveflats!(dem)
     return dem
 end
 
+"""Was `cell` excluded by the caller? Nothing is excluded when there is no mask."""
+@inline isexcluded(::Nothing, cell) = false
+@inline isexcluded(excluded, cell) = @inbounds excluded[cell]
+
+"""
+The largest part of `increment` that keeps `z` strictly below `limit`. `nextfloat(z, n)` is
+a constant-time step over `n` representable values, so the usual case of ample headroom
+costs one comparison, and the search that follows is bounded by `increment` itself.
+"""
+function cappedincrement(z, limit, increment)
+    nextfloat(z, Int(increment)) < limit && return increment
+    steps = increment
+    while steps > zero(steps) && !(nextfloat(z, Int(steps)) < limit)
+        steps -= one(steps)
+    end
+    return steps
+end
+
 """
 Per-cell increment counts for [`resolveflats`](@ref): zero wherever a cell already drains,
 positive on cells that have no strictly lower neighbour and belong to a flat that drains.
 """
-function _flatmask(dem)
+function flatmask(dem, excluded = nothing)
     R = eachcell(dem)
     Cell = typeof(first(R))
 
@@ -50,7 +70,7 @@ function _flatmask(dem)
     # drain but touches higher terrain.
     @inbounds for cell in R
         z = dem[cell]
-        if !isfinite(z)
+        if !isfinite(z) || isexcluded(excluded, cell)
             drains[cell] = true
             continue
         end
@@ -110,7 +130,7 @@ function _flatmask(dem)
     # edges. `flatheights` is how far each flat reaches, which Step 3 needs to invert it.
     flatheights = zeros(Int32, nlabels)
     seen = fill!(similar(dem, Bool), false)
-    _seed!(seen, highedges)
+    markseen!(seen, highedges)
     increment = one(Int32)
     frontier = copy(highedges)
     next = Cell[]
@@ -119,7 +139,7 @@ function _flatmask(dem)
         for cell in frontier
             flatmask[cell] = increment
             flatheights[labels[cell]] = increment
-            _growflat!(next, seen, dem, labels, drains, cell)
+            growflat!(next, seen, dem, labels, drains, cell)
         end
         frontier, next = next, frontier
         increment += one(increment)
@@ -132,14 +152,14 @@ function _flatmask(dem)
         flatmask[cell] = -flatmask[cell]
     end
     fill!(seen, false)
-    _seed!(seen, lowedges)
+    markseen!(seen, lowedges)
     increment = one(Int32)
     frontier = copy(lowedges)
     empty!(next)
     @inbounds while !isempty(frontier)
         empty!(next)
         for cell in frontier
-            _growflat!(next, seen, dem, labels, drains, cell)
+            growflat!(next, seen, dem, labels, drains, cell)
             flatmask[cell] < 0 && (flatmask[cell] += flatheights[labels[cell]])
             flatmask[cell] += 2 * increment
         end
@@ -152,10 +172,26 @@ function _flatmask(dem)
     @inbounds for cell in R
         drains[cell] && (flatmask[cell] = 0)
     end
+
+    # The increments assume the surrounding relief dwarfs a few float steps. Where it does
+    # not, raising a cell could carry it over a neighbour that was strictly higher and take
+    # away that neighbour's drainage, so each one is capped below its lowest higher
+    # neighbour.
+    @inbounds for cell in R
+        iszero(flatmask[cell]) && continue
+        z = dem[cell]
+        limit = typemax(float(typeof(z)))
+        for ncell in neighbors(dem, cell)
+            nz = dem[ncell]
+            (isfinite(nz) && nz > z) && (limit = min(limit, nz))
+        end
+        isinf(limit) && continue
+        flatmask[cell] = cappedincrement(z, limit, flatmask[cell])
+    end
     return flatmask
 end
 
-function _seed!(seen, cells)
+function markseen!(seen, cells)
     for cell in cells
         seen[cell] = true
     end
@@ -163,7 +199,7 @@ function _seed!(seen, cells)
 end
 
 """Queue the not-yet-visited cells of `cell`'s own flat that still need a gradient."""
-@inline function _growflat!(next, seen, dem, labels, drains, cell)
+@inline function growflat!(next, seen, dem, labels, drains, cell)
     label = labels[cell]
     @inbounds for ncell in neighbors(dem, cell)
         if !seen[ncell] && labels[ncell] == label && !drains[ncell]

@@ -52,18 +52,24 @@ Fill the depressions of a digital elevation model, so that every cell drains to 
   algorithm defines an ordering for `NaN`, so which cells a flood reaches, and in what
   order, is left to the comparison rules rather than decided. Mask nodata out beforehand if
   the choice of method must not change the result.
-- `flats=true`: Also give the resulting flats a drainage gradient with
-  [`resolveflats`](@ref), so that every cell of the output has a strictly lower neighbour
-  and a defined flow direction. Pass `false` for the filled surface on its own.
+- `flats`: Also give the resulting flats a drainage gradient with [`resolveflats`](@ref),
+  so that every cell of the output has a strictly lower neighbour and a defined flow
+  direction. Pass `false` for the filled surface on its own. Defaults to `true` for a
+  floating point `dem` and `false` otherwise, as integer elevations cannot express a
+  gradient of single float steps. Cells excluded by `mask` keep their elevation.
 """
 function filldepressions(
     dem,
     mask = fill!(similar(dem, Bool), false);
     method::DepressionFillingMethod = PriorityFlood(),
-    flats::Bool = true,
+    flats::Bool = _canresolveflats(dem),
 )
     filldepressions!(copy(dem), mask; method, flats)
 end
+
+# Resolving flats nudges elevations by single float steps, which an integer DEM cannot
+# represent, so it is only on by default where it can work.
+_canresolveflats(dem) = eltype(dem) <: AbstractFloat
 
 abstract type FlowDirectionMethod end
 
@@ -88,10 +94,13 @@ function filldepressions!(
     dem,
     queued = fill!(similar(dem, Bool), false);
     method::DepressionFillingMethod = PriorityFlood(),
-    flats::Bool = true,
+    flats::Bool = _canresolveflats(dem),
 )
+    # The flood writes into `queued`, so the caller's exclusions are kept to hand back to
+    # `resolveflats!`, which must leave those cells alone too.
+    excluded = flats ? copy(queued) : nothing
     _filldepressions!(method, dem, queued)
-    flats && resolveflats!(dem)
+    flats && resolveflats!(dem, excluded)
     return dem
 end
 
@@ -345,8 +354,10 @@ function _flowneighbors(dem, cell, aspect, cellsize)
     return lower_cell, upper_cell, upper_gap / gap, lower_gap / gap
 end
 
+# The signs matter: `_cellbearing` keeps them, so dropping them here would leave the
+# aspect and the receiver bearings in different frames and pick the wrong neighbour.
 _dinf_aspects(dem::AbstractMatrix, cellsize) =
-    aspect(dem; method = Horn(), cellsize = abs.(cellsize))
+    aspect(dem; method = Horn(), cellsize)
 _dinf_aspects(dem, cellsize) = nothing
 _dinf_aspect(aspects, dem, cell, cellsize) = aspects[cell]
 _dinf_aspect(::Nothing, dem, cell, cellsize) = _localaspect(dem, cell, cellsize)
@@ -496,17 +507,11 @@ function _accumulate!(::DInf, acc, order, dir, R, dem, cellsize)
 end
 
 function _accumulate!(fd8::FD8, acc, order, dir, R::CartesianIndices{2}, dem, cellsize)
-    # Derive contour lengths, which is used to calculate the weights
-    # Uses the algorithm by Quinn et al. (1991), L1=0.5 L2=0.354 for δx=δy=1
-    # TODO Check whether just using the angles is enough.
-    δx, δy = abs.(cellsize)
-    δxy = sqrt((δx / 4)^2 + (δy / 4)^2)
-    contour_lengths = @SMatrix [
-        δxy δx δxy
-        δy 0 δy
-        δxy δx δxy
-    ]
+    # Contour lengths come from `_rastercontour`, which `flowdirection` uses too.
+    offsets = CartesianIndices((-1:1, -1:1))
+    contour_lengths = map(o -> iszero(o) ? 0.0 : _rastercontour(o, cellsize), offsets)
 
+    δx, δy = abs.(cellsize)
     δxy = sqrt(δx^2 + δy^2)
     dists = @SMatrix [
         δxy δx δxy
@@ -614,6 +619,24 @@ mutable struct FD8Scratch{C, O, T}
     bitweights::Vector{T}   # a cell's shares, gathered against their direction bit
 end
 
+"""
+    _rastercontour(offset, cellsize)
+
+Contour length a step of `offset` crosses on a square grid, after
+[Quinn et al. (1991)](@cite quinnPredictionHillslopeFlow1991).
+
+The eight Moore neighbours are not a Voronoi neighbourhood — a diagonal shares only a
+corner, so there is no face there to measure — and the angular construction in
+[`_contourlengths!`](@ref) degenerates on them, giving every direction the same weight. This
+is the fix-up for that, and both [`flowdirection`](@ref) and [`flowaccumulation`](@ref) take
+their raster contour lengths from here so the two cannot disagree.
+"""
+function _rastercontour(offset, cellsize)
+    δx, δy = abs.(cellsize)
+    (!iszero(offset[1]) && !iszero(offset[2])) && return hypot(δx, δy) / 4
+    return iszero(offset[2]) ? δx : δy
+end
+
 function _fd8scratch(dem)
     cell = first(eachcell(dem))
     C, O = typeof(cell), typeof(cell - cell)
@@ -622,7 +645,9 @@ end
 
 """
 Recompute the contour length and distance of each neighbour for the neighbourhood shape now
-in `scratch.offsets`, after [Quinn et al. (1991)](@cite quinnPredictionHillslopeFlow1991).
+in `scratch.offsets`. Each neighbour is given the Voronoi edge it would share with `cell`,
+derived from the angular gaps to its neighbours on either side, which is exact wherever the
+neighbourhood is a Voronoi one. Rasters are the exception and have their own method.
 """
 function _contourlengths!(scratch::FD8Scratch, dem, cell, cellsize)
     n = length(scratch.offsets)
@@ -655,6 +680,23 @@ function _contourlengths!(scratch::FD8Scratch, dem, cell, cellsize)
             (tand(min(previous_gap, 90) / 2) + tand(min(next_gap, 90) / 2)) : 0.0
     end
 
+    resize!(scratch.shape, n)
+    copyto!(scratch.shape, scratch.offsets)
+    return scratch
+end
+
+"""Rasters take their contour lengths from [`_rastercontour`](@ref)."""
+function _contourlengths!(
+    scratch::FD8Scratch{<:CartesianIndex{2}}, dem, cell, cellsize
+)
+    n = length(scratch.offsets)
+    resize!(scratch.contours, n)
+    resize!(scratch.distances, n)
+    @inbounds for (index, offset) in enumerate(scratch.offsets)
+        scratch.distances[index] =
+            celldistance(dem, cell, scratch.neighbors[index]; cellsize)
+        scratch.contours[index] = _rastercontour(offset, cellsize)
+    end
     resize!(scratch.shape, n)
     copyto!(scratch.shape, scratch.offsets)
     return scratch
