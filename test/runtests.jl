@@ -687,7 +687,9 @@ end
             Raster(A, points; crs = Rasters.EPSG(4326)),
         )
 
-        # Without a CRS the cell size is unknown, so it must not be guessed
-        @test_throws Exception Geomorphometry.cellsize(Raster(A, (x, y)))
+        # Without a CRS the coordinates are assumed projected and used as is
+        nocrs = Raster(A, (x, y))
+        @test Geomorphometry.cellsize(nocrs) == (0.5, 0.5)
+        @test first(flowaccumulation(nocrs)) isa Raster
     end
 end
