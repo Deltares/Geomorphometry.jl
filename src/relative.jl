@@ -11,11 +11,9 @@ function roughness(dem::AbstractMatrix{<:Real}, window::Stencil = Moore(1))
 end
 function roughness(dem)
     dst = similar(dem)
-    cells = eachcell(dem)
-    for cell in cells
+    for cell in eachcell(dem)
         value = zero(eltype(dem))
         for neighbor in neighbors(dem, cell)
-            neighbor in cells || continue
             value = max(value, abs(dem[neighbor] - dem[cell]))
         end
         dst[cell] = value
@@ -43,12 +41,10 @@ function topographic_position_index(dem::AbstractMatrix{<:Real}, window::Stencil
 end
 function topographic_position_index(dem)
     dst = similar(dem, Float32)
-    cells = eachcell(dem)
-    for cell in cells
+    for cell in eachcell(dem)
         total = 0.0
         count = 0
         for neighbor in neighbors(dem, cell)
-            neighbor in cells || continue
             total += dem[neighbor]
             count += 1
         end
@@ -130,12 +126,10 @@ function terrain_ruggedness_index(dem; normalize = false, squared = true)
     end
 
     dst = copy(dem)
-    cells = eachcell(dem)
-    for cell in cells
+    for cell in eachcell(dem)
         value = 0.0
         count = 0
         for neighbor in neighbors(dem, cell)
-            neighbor in cells || continue
             difference = abs(dem[neighbor] - dem[cell])
             value += squared ? difference^2 : difference
             count += 1
@@ -168,11 +162,9 @@ function prominence(dem::AbstractMatrix{<:Real})
 end
 function prominence(dem)
     dst = similar(dem, Int8)
-    cells = eachcell(dem)
-    for cell in cells
+    for cell in eachcell(dem)
         count = 0
         for neighbor in neighbors(dem, cell)
-            neighbor in cells || continue
             count += dem[neighbor] <= dem[cell]
         end
         dst[cell] = count

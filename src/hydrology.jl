@@ -45,8 +45,7 @@ Base.@kwdef struct FD8 <: FlowDirectionMethod
 end
 
 function filldepressions!(dem, queued = fill!(similar(dem, Bool), false))
-    R = eachcell(dem)
-    first_cell = first(R)
+    first_cell = first(eachcell(dem))
     open = PriorityQueue{typeof(first_cell), eltype(dem)}()
     pit = DataStructures.Queue{typeof(first_cell)}()
 
@@ -57,8 +56,7 @@ function filldepressions!(dem, queued = fill!(similar(dem, Bool), false))
     @inbounds while !isempty(open) || !isempty(pit)
         cell = !isempty(pit) ? DataStructures.dequeue!(pit) : dequeue!(open)
         for ncell in neighbors(dem, cell)
-            ncell in R || continue
-            (queued[ncell] || ncell == cell) && continue
+            queued[ncell] && continue
             queued[ncell] = true
             if dem[ncell] <= dem[cell]
                 dem[ncell] = dem[cell]
@@ -85,8 +83,7 @@ neighbors(dem, cell::CartesianIndex{2}) =
     Iterators.filter(in(CartesianIndices(dem)), cell + nb for nb in nbs)
 
 function watersheds(dem, queued = fill!(similar(dem, Bool), false))
-    R = eachcell(dem)
-    first_cell = first(R)
+    first_cell = first(eachcell(dem))
     open = PriorityQueue{typeof(first_cell), eltype(dem)}()
     pit = DataStructures.Queue{typeof(first_cell)}()
     labels = zeros(Int, size(dem))
@@ -107,8 +104,7 @@ function watersheds(dem, queued = fill!(similar(dem, Bool), false))
             label += 1
         end
         for ncell in neighbors(dem, cell)
-            ncell in R || continue
-            (queued[ncell] || ncell == cell) && continue
+            queued[ncell] && continue
             queued[ncell] = true
             if dem[ncell] <= dem[cell]
                 pits[ncell] = true
@@ -198,10 +194,8 @@ _dinf_aspect(::Nothing, dem, cell, cellsize) = _localaspect(dem, cell, cellsize)
 
 function _localaspect(dem, cell, cellsize)
     xx = xy = yy = xz = yz = 0.0
-    cells = eachcell(dem)
     center = dem[cell]
     for neighbor in neighbors(dem, cell)
-        neighbor in cells || continue
         distance = celldistance(dem, cell, neighbor; cellsize)
         iszero(distance) && continue
         bearing = _cellbearing(dem, cell, neighbor, cellsize)
@@ -269,9 +263,8 @@ function flowaccumulation!(
         order[i] = L[cell]
         i += 1
         for ncell in neighbors(dem, cell)
-            ncell in R || continue
-            # skip visited and center cells
-            (closed[ncell] || ncell == cell) && continue
+            # skip visited cells
+            closed[ncell] && continue
 
             closed[ncell] = true
             dir[ncell] = cell - ncell
@@ -329,27 +322,27 @@ function _accumulate!(::DInf, acc, order, dir, R, dem, cellsize)
             continue
         end
 
-        # Scale flows correctly at the edges
-        if !(acell in R) || visited[acell]
+        # Do not route flow back into cells that have already drained
+        if visited[acell]
             aa = 0
             bb = 1
         end
-        if !(bcell in R) || visited[bcell]
+        if visited[bcell]
             aa = 1
             bb = 0
         end
 
         dirs = zero(UInt8)
-        if acell in R && aa > 0
+        if aa > 0
             acc[acell] += acc[i] * aa
             dirs |= _directioncode(dem, a, cellsize)
         end
-        if bcell in R && bb > 0
+        if bb > 0
             acc[bcell] += acc[i] * bb
             dirs |= _directioncode(dem, b, cellsize)
         end
         output[i] = dirs
-        if acell in R && bcell in R && visited[acell] && visited[bcell]
+        if visited[acell] && visited[bcell]
             error()
         end
         visited[i] = true
@@ -357,7 +350,7 @@ function _accumulate!(::DInf, acc, order, dir, R, dem, cellsize)
     return output
 end
 
-function _accumulate!(fd8::FD8, acc, order, dir, R, dem::AbstractMatrix, cellsize)
+function _accumulate!(fd8::FD8, acc, order, dir, R::CartesianIndices{2}, dem, cellsize)
     # Derive contour lengths, which is used to calculate the weights
     # Uses the algorithm by Quinn et al. (1991), L1=0.5 L2=0.354 for δx=δy=1
     # TODO Check whether just using the angles is enough.
@@ -434,8 +427,7 @@ function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
         downstream = cell + dir[i]
         downstream_weight = 0.0
         for neighbor in neighbors(dem, cell)
-            neighbor in R || continue
-            weight = _fd8weight(fd8, dem, cell, neighbor, R, visited, cellsize)
+            weight = _fd8weight(fd8, dem, cell, neighbor, visited, cellsize)
             total_weight += weight
             neighbor == downstream && (downstream_weight = weight)
         end
@@ -449,8 +441,7 @@ function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
 
         directions = zero(UInt8)
         for neighbor in neighbors(dem, cell)
-            neighbor in R || continue
-            weight = _fd8weight(fd8, dem, cell, neighbor, R, visited, cellsize)
+            weight = _fd8weight(fd8, dem, cell, neighbor, visited, cellsize)
             iszero(weight) && continue
             acc[neighbor] += acc[i] * (weight / total_weight)
             directions |= _directioncode(dem, neighbor - cell, cellsize)
@@ -461,7 +452,7 @@ function _accumulate!(fd8::FD8, acc, order, dir, R, dem, cellsize)
     return output
 end
 
-function _fd8weight(fd8, dem, cell, neighbor, cells, visited, cellsize)
+function _fd8weight(fd8, dem, cell, neighbor, visited, cellsize)
     visited[neighbor] && return 0.0
     difference = dem[cell] - dem[neighbor]
     (difference < 0 || isnan(difference)) && return 0.0
@@ -471,7 +462,7 @@ function _fd8weight(fd8, dem, cell, neighbor, cells, visited, cellsize)
     bearing = _cellbearing(dem, cell, neighbor, cellsize)
     previous_gap = next_gap = Inf
     for other in neighbors(dem, cell)
-        (other == neighbor || !(other in cells)) && continue
+        other == neighbor && continue
         other_bearing = _cellbearing(dem, cell, other, cellsize)
         candidate_previous_gap = mod(bearing - other_bearing, 360)
         candidate_next_gap = mod(other_bearing - bearing, 360)
@@ -555,9 +546,8 @@ function height_above_nearest_drainage(
         order[i] = L[cell]
         i += 1
         for ncell in neighbors(dem, cell)
-            ncell in R || continue
-            # skip visited and center cells
-            (closed[ncell] || ncell == cell) && continue
+            # skip visited cells
+            closed[ncell] && continue
 
             closed[ncell] = true
             dir[ncell] = cell - ncell
@@ -607,9 +597,8 @@ function height_above_nearest_drainage(
         order[i] = L[cell]
         i += 1
         for ncell in neighbors(dem, cell)
-            ncell in R || continue
-            # skip visited and center cells
-            (closed[ncell] || ncell == cell) && continue
+            # skip visited cells
+            closed[ncell] && continue
 
             closed[ncell] = true
             dir[ncell] = cell - ncell
@@ -663,7 +652,6 @@ function _fill_flow_depressions!(filled, order, flowdirs, R, dem, cellsize)
         if !ispit(flowdirs[i])
             for relative in _relativeindices(RelativeIndex, flowdirs[i], cell, cellsize)
                 downstream = cell + relative
-                downstream in R || continue
                 isfinite(filled[downstream]) || continue
                 elevation = max(elevation, filled[downstream])
             end
@@ -686,7 +674,6 @@ function _hand!(output, order, flowdirs, R, filled, stream_mask, cellsize)
             best = zero(eltype(output))
             for relative in _relativeindices(RelativeIndex, flowdirs[i], cell, cellsize)
                 downstream = cell + relative
-                downstream in R || continue
                 if !isfinite(filled[downstream]) || !isfinite(output[downstream])
                     continue
                 end

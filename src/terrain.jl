@@ -116,11 +116,9 @@ function slope!(
     direction,
 )
     isnothing(direction) || throw(ArgumentError("Direction is not supported for MaximumDownwardGradient."))
-    cells = eachcell(dem)
-    for cell in cells
+    for cell in eachcell(dem)
         gradient = 0.0
         for neighbor in neighbors(dem, cell)
-            neighbor in cells || continue
             gradient = max(
                 gradient,
                 abs(dem[neighbor] - dem[cell]) /
