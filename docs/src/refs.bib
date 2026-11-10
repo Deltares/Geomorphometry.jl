@@ -528,3 +528,19 @@
   keywords   = {depression filling,hydrology,least-cost search,priority flood}
 }
 
+@article{barnesParallelNonDivergentFlow2017,
+  title    = {Parallel Non-Divergent Flow Accumulation for Trillion Cell Digital Elevation Models on Desktops or Clusters},
+  author   = {Barnes, Richard},
+  year     = {2017},
+  month    = jun,
+  journal  = {Environmental Modelling \& Software},
+  volume   = {92},
+  pages    = {202--212},
+  issn     = {13648152},
+  doi      = {10.1016/j.envsoft.2017.02.022},
+  eprint   = {1608.04431},
+  archiveprefix = {arXiv},
+  abstract = {The companion to Barnes (2016) for flow accumulation. Each tile is solved with a dependency-count (in-degree) traversal, then each perimeter cell's flow path is followed to the cell where it leaves the tile, compressing the tile interior into a perimeter-to-perimeter link map. These are joined into a global perimeter flow graph, solved, and the resulting offsets broadcast back. Requires a non-divergent flow metric: one receiver per cell.},
+  keywords = {flow accumulation,hydrology,parallel computing,upslope area}
+}
+

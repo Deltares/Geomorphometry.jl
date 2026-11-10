@@ -419,6 +419,29 @@ parent(directions[400:800, 300:700])  # arrows, as the drainage direction below
 nothing at any grid size. [`DInf`](@ref) and [`FD8`](@ref) store a share per receiver, two
 and eight, which `weighttype=Float16` halves.
 
+[`flowaccumulation`](@ref) then accumulates over them, after
+[barnesParallelNonDivergentFlow2017](@citet): each cell is released to its receivers once
+all of its own contributors have been, so the grid is traversed in dependency order without
+sorting it. There is no `method` to pass, as the directions already settle it.
+
+```@example plots
+acc = flowaccumulation(z, directions, weights)
+nothing # hide
+```
+
+Filling and then deriving is the faster of the two routes on this tile, by 20 to 40%, and
+the fill is most of it — deriving directions and accumulating over them are cheap by
+comparison, so the choice between carving and filling is a hydrological one rather than a
+performance one.
+
+| | D8 | D∞ | FD8 |
+| --- | --- | --- | --- |
+| **carve**, one Priority-Flood | 2.4 s | 3.4 s | 3.0 s |
+| **fill**, three passes | 2.0 s | 2.4 s | 2.5 s |
+| — `filldepressions` (fill + flats) | 1.6 s | 1.6 s | 1.6 s |
+| — `flowdirection` | 0.15 s | 0.37 s | 0.38 s |
+| — `flowaccumulation` over those directions | 0.06 s | 0.11 s | 0.20 s |
+
 Filling the depressions in a DEM is not necessary to calculate the flow accumulation. Here we use [`flowaccumulation`](@ref) to do so, and it automatically carves out depressions. Note that the local drainage direction is also returned. By default the FD8 algorithm is used, but you can also use the D∞ or D8 algorithm by setting the `method` keyword argument to `DInf()` or `D8()`.
 
 ::: warning
