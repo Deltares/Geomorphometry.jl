@@ -22,8 +22,8 @@ function pssm(
     slope(dem; cellsize, method, exaggeration)
 end
 
-function _shading_result(illumination)::UInt8
-    isfinite(illumination) || return zero(UInt8)
+function _shading_result(illumination)
+    isfinite(illumination) || return missing
     round(UInt8, max(zero(illumination), 255 * illumination))
 end
 

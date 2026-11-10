@@ -580,6 +580,13 @@ end
         @test size(mh) == size(tilt)
         @test eltype(mh) == Union{Missing, UInt8}
         @test all(0 .<= skipmissing(mh) .<= 255)
+
+        # Like the matrix methods, generic shading marks NaN elevations as missing
+        grid = Matrix{Union{Missing, Float64}}(tilt)
+        grid[4, 4] = NaN
+        @test ismissing(hillshade(grid)[4, 4])
+        @test ismissing(multihillshade(grid)[4, 4])
+        @test !ismissing(hillshade(grid)[1, 1])
     end
 
     @testset "skewness_balancing non-finite" begin
