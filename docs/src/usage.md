@@ -540,24 +540,15 @@ heatmap(hand; colormap=:turbo)
 
 ### Watersheds
 
-[`watersheds`](@ref) labels the sets of cells draining to the same outlet, and there are
-two ways to it, matching the two ways of making a DEM drain.
-
-Given a direction field it labels over that, so it answers for whatever flow metric
-produced it. It can only send a cell where the directions point, so it needs a DEM that
-already drains. Given only a DEM it floods inwards from the rim instead, exactly as
-[`filldepressions`](@ref) does, so a hollow with no outlet joins the basin that fills it
-rather than becoming one of its own. Nothing needs preparing and the DEM is not modified.
-
-The difference shows on a raw DEM: flooding finds 5400 watersheds on this tile, one per
-cell on the rim where water leaves, while following directions on the same raw DEM finds
-300822, because every depression is somewhere flow arrives and stops.
+[`watersheds`](@ref) labels the sets of cells draining to the same outlet. Given a
+direction field it labels over that, so it answers for whatever flow metric produced it,
+and needs a DEM that already drains. Given only a DEM it floods inwards from the rim
+instead, so a depression with no outlet joins the basin that fills it rather than becoming
+one of its own, and a raw DEM works as it stands.
 
 A cell that sends flow several ways joins the one taking the largest share, since
-watersheds partition the grid. So the labelling depends on the flow metric even though the
-outlets do not: on the filled surface all three methods find the same 2135 watersheds, but
-[`DInf`](@ref) puts 95.5% of cells in the same one as [`D8`](@ref), and [`FD8`](@ref) only
-72.1%.
+watersheds partition the grid, so the labelling depends on the flow metric even though the
+outlets do not.
 
 :::tabs
 
@@ -576,12 +567,6 @@ heatmap(Float32.(watersheds(z, fd8directions, fd8weights)); colormap=:glasbey_bw
 ```
 
 :::
-
-The flood is always [`PriorityFlood`](@ref), unlike [`filldepressions`](@ref). Taking cells
-in elevation order is what makes the labelling meaningful: a cell is reached by its lowest
-neighbour and takes that label. [`Zhou`](@ref) gives up that ordering to go faster, and a
-cell then takes its label from whichever neighbour the region growing arrived from,
-draining to it or not, so it is not offered here.
 
 ## Terrain filters
 While filters seem unrelated to the previously discussed methods, these are used to filter (rasterized) pointclouds i.e. surface models (DSM) to arrive at a terrain model (DTM). We provide [`progressive_morphological_filter`](@ref), [`simple_morphological_filter`](@ref), and [`skewness_balancing`](@ref) filters. Here we use the `progressive_morphological_filter` filter to remove elevations that do not pass the slope filter (normally vegetation and buildings).

@@ -529,3 +529,25 @@ end
         @test dem == before
     end
 end
+
+@testset "a minority branch cannot suppress the labels" begin
+    # A -> B, with B sending 10% back to A and 90% on to the pit C. The chosen paths
+    # A -> B -> C are acyclic, but the 10% back edge is a cycle in the full receiver
+    # graph, which once left every cell unlabelled.
+    dem = zeros(Float32, 1, 3)
+    east = Geomorphometry._directioncode(dem, CartesianIndex(0, 1), unitcell)
+    west = Geomorphometry._directioncode(dem, CartesianIndex(0, -1), unitcell)
+
+    directions = fill(FlowDirection{Geomorphometry.D8D}(zero(UInt8)), 1, 3)
+    weights = zeros(Float32, 1, 3, 8)
+    directions[1, 1] = FlowDirection{Geomorphometry.D8D}(east)
+    weights[1, 1, 1] = 1
+    directions[1, 2] = FlowDirection{Geomorphometry.D8D}(west | east)
+    for (slot, bit) in enumerate(sort([west, east]))
+        weights[1, 2, slot] = bit == west ? 0.1 : 0.9
+    end
+
+    labels = watersheds(dem, directions, weights; cellsize = unitcell)
+    @test all(>(0), labels)
+    @test length(unique(labels)) == 1          # all three drain to the same pit
+end

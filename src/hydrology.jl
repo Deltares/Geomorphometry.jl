@@ -148,11 +148,13 @@ end
 # [Barnes et al. (2014)](@cite barnesPriorityFloodOptimalDepressionFilling2014), which does
 # this on the plain-queue flood; it rests on the order cells are reached in, not on which
 # queue reached them, so it carries over to the [`Zhou`](@ref) flood unchanged.
-const _CANDIDATE = Int32(0)   # not yet reached
-const _QUEUED = Int32(-1)     # seeded from the rim, awaiting a label of its own
+# `labels` carries both the watershed numbers, which run from one and are open ended, and
+# these two states, so they are reserved values in the same array rather than an enum.
+const UNREACHED = Int32(0)
+const RIMSEED = Int32(-1)     # reached from the rim, awaiting a number of its own
 
 @inline _seedlabel!(::Nothing, cell) = nothing
-@inline _seedlabel!(labels, cell) = labels[cell] = _QUEUED
+@inline _seedlabel!(labels, cell) = labels[cell] = RIMSEED
 
 """
 Settle a cell's label as it is popped.
@@ -166,7 +168,7 @@ the water actually goes to.
 """
 @inline _labelcell!(::Nothing, drained, dem, cell, cellsize, counter) = counter
 @inline function _labelcell!(labels, drained, dem, cell, cellsize, counter)
-    if labels[cell] == _QUEUED
+    if labels[cell] == RIMSEED
         isfinite(dem[cell]) || return counter
         counter += one(counter)
         labels[cell] = counter
@@ -310,29 +312,6 @@ index `dem` with the result directly, some under `@inbounds`.
 neighbors(dem, cell::CartesianIndex{2}) =
     Iterators.filter(in(CartesianIndices(dem)), cell + nb for nb in nbs)
 
-"""
-    watersheds(dem, directions[, weights]; cellsize=cellsize(dem))
-    watersheds(dem; cellsize=cellsize(dem))
-
-Label the watersheds of `dem`: the sets of cells draining to the same outlet, numbered
-from one. An outlet sends its flow nowhere — a pit, or off the grid — and each starts a
-watershed; every other cell joins the watershed of the cell it drains to.
-
-Given `directions`, a cell that sends flow several ways joins the one taking the largest
-share of the `weights`, since watersheds partition the grid. That makes the result a
-function of the flow metric. `dem` must already drain, or every depression becomes a
-watershed of its own — see [`filldepressions`](@ref); cells left in a cycle are zero.
-
-Given only `dem`, it floods inwards from the rim instead, exactly as
-[`filldepressions`](@ref) does, and so works on a DEM that does not drain: a hollow joins
-the watershed that fills it rather than becoming one of its own. The DEM is not modified.
-
-```julia
-z = filldepressions(dem)
-directions, weights = flowdirection(z; method = D8())
-labels = watersheds(z, directions, weights)
-```
-"""
 function watersheds(
     dem,
     directions::AbstractArray{<:FlowDirection},
@@ -341,7 +320,7 @@ function watersheds(
 )
     R = eachcell(dem)
     labels = fill!(similar(dem, Int32), 0)
-    ready = _dependencyorder(dem, directions, cellsize)
+    ready = _dependencyorder(dem, directions, weights, cellsize)
 
     # Receivers come after their contributors in dependency order, so walking it backwards
     # reaches every cell once its own receiver is already labelled.
@@ -361,32 +340,43 @@ function watersheds(
 end
 
 """
-    watersheds(dem)
+    watersheds(dem; cellsize=cellsize(dem))
+    watersheds(dem, directions[, weights]; cellsize=cellsize(dem))
 
-Label watersheds by flooding `dem` inwards from its rim, rather than by following a
-direction field.
-
-`dem` need not drain: the flood routes through depressions on its way in, so a hollow with
-no outlet joins the watershed that fills it rather than becoming one of its own. That is
-the difference from the direction-field method above, which can only send a cell where the
-directions point, and it makes this the one to reach for on a raw DEM. `dem` is not
+Label the watersheds of `dem`: the sets of cells draining to the same outlet, numbered from
+one. An outlet sends its flow nowhere — a pit, or off the grid — and each starts a
+watershed; every other cell joins the watershed of the cell it drains to. `dem` is not
 modified.
 
-Every cell on the rim is an outlet and starts a watershed, so cells sharing a label are
-those draining to the same point on the rim. This is Algorithm 5 of
-[Barnes et al. (2014)](@cite barnesPriorityFloodOptimalDepressionFilling2014).
+Given only `dem`, the labelling rides along with a flood inwards from the rim, as
+[`filldepressions`](@ref) does, which is Algorithm 5 of
+[Barnes et al. (2014)](@cite barnesPriorityFloodOptimalDepressionFilling2014). The flood
+routes through depressions on its way in, so `dem` need not drain: a depression with no
+outlet joins the watershed that fills it rather than becoming one of its own. Nodata is
+labelled too, and those labels mean nothing.
+
+Given `directions`, the labels follow that field instead, and so answer for whatever flow
+metric produced it. A cell that sends flow several ways joins the receiver taking the
+largest share of the `weights`, since watersheds partition the grid. Here `dem` must
+already drain, or every depression becomes a watershed of its own, and cells left in a
+cycle of receivers are labelled zero.
 
 The flood is always [`PriorityFlood`](@ref), unlike [`filldepressions`](@ref), which offers
 a choice. Taking cells in elevation order is what makes the labelling meaningful: a cell is
-reached by its lowest neighbour and takes that label, so the labels follow the way water
-runs. [`Zhou`](@ref) reaches the same filled surface faster by region-growing slope cells
-on a plain queue, giving up that ordering, and a cell then takes its label from whichever
-neighbour the region growing arrived from, draining to it or not.
+reached by its lowest neighbour and takes that label. [`Zhou`](@ref) gives that ordering up
+to go faster, and a cell would then take its label from whichever neighbour the region
+growing arrived from, draining to it or not.
 
-Nodata is labelled too, since the flood passes through it, and those labels mean nothing.
+```julia
+labels = watersheds(dem)                              # flooding, works on a raw DEM
+
+z = filldepressions(dem)                              # or follow a direction field
+directions, weights = flowdirection(z; method = D8())
+labels = watersheds(z, directions, weights)
+```
 """
 function watersheds(dem; cellsize = cellsize(dem))
-    labels = fill!(similar(dem, Int32), _CANDIDATE)
+    labels = fill!(similar(dem, Int32), UNREACHED)
     _filldepressions!(
         PriorityFlood(), copy(dem), fill!(similar(dem, Bool), false), labels, cellsize
     )
@@ -394,42 +384,46 @@ function watersheds(dem; cellsize = cellsize(dem))
 end
 
 """
-The receiver taking the largest share of a cell's flow, or `nothing` when that receiver
-lies outside the grid and the cell is therefore an outlet.
+The one receiver a cell gives most of its flow to, or `nothing` where it has none or its
+flow leaves the grid. Watersheds partition the grid, so a divergent cell has to pick one.
 """
 function _mainreceiver(directions, weights, cell, cellsize, R)
     direction = directions[cell]
-    ndirections(direction) == 0 && return nothing
+    count = ndirections(direction)
+    count == 0 && return nothing
+    RelativeIndex = typeof(first(R) - first(R))
     best = zero(Float32)
     target = nothing
     slot = 0
-    @inbounds for bit in decompose(direction)
-        offset = CartesianIndex(bit)
-        iszero(offset) && continue
+    @inbounds for relative in _relativeindices(RelativeIndex, direction, cell, cellsize)
+        iszero(relative) && continue
         slot += 1
-        share = _share(weights, cell, slot, ndirections(direction))
+        share = _share(weights, cell, slot, count)
         share > best || continue
         best = share
-        candidate = cell + _orient(offset, cellsize)
+        candidate = cell + relative
         target = candidate in R ? candidate : nothing
     end
     return target
 end
 
 """
-Cells in the order flow reaches them, every cell after all of those draining into it. Cells
-that `directions` leaves in a cycle are left out, since flow never finishes reaching them.
+Cells in the order flow reaches them, every cell before the receiver it is labelled from,
+by counting in-degrees and releasing cells as their contributors are taken.
+
+Only each cell's main receiver is followed, which is the one the labelling uses. The full
+receiver graph would do for a single-receiver method, but a divergent cell can send a
+sliver of flow back into a cell it drains from, and that back edge is a cycle no label can
+cross even where the chosen paths are perfectly acyclic. Cells in a cycle of main receivers
+are left out, and so left unlabelled.
 """
-function _dependencyorder(dem, directions, cellsize)
+function _dependencyorder(dem, directions, weights, cellsize)
     R = eachcell(dem)
     Cell = typeof(first(R))
     contributors = fill!(similar(dem, UInt8), 0)
     @inbounds for cell in R
-        for offset in decompose(CartesianIndex{2}, directions[cell], cell)
-            iszero(offset) && continue
-            target = cell + _orient(offset, cellsize)
-            target in R && (contributors[target] += one(UInt8))
-        end
+        target = _mainreceiver(directions, weights, cell, cellsize, R)
+        isnothing(target) || (contributors[target] += one(UInt8))
     end
 
     ready = Cell[]
@@ -441,13 +435,10 @@ function _dependencyorder(dem, directions, cellsize)
     @inbounds while head <= length(ready)
         cell = ready[head]
         head += 1
-        for offset in decompose(CartesianIndex{2}, directions[cell], cell)
-            iszero(offset) && continue
-            target = cell + _orient(offset, cellsize)
-            target in R || continue
-            contributors[target] -= one(UInt8)
-            iszero(contributors[target]) && push!(ready, target)
-        end
+        target = _mainreceiver(directions, weights, cell, cellsize, R)
+        isnothing(target) && continue
+        contributors[target] -= one(UInt8)
+        iszero(contributors[target]) && push!(ready, target)
     end
     return ready
 end
